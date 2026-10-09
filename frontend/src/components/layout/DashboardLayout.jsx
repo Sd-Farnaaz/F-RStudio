@@ -1,66 +1,119 @@
-import { Link, useLocation } from 'react-router-dom';
-import { Calendar, Users, Home, Settings, LogOut, Bell, Search, Menu } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Calendar, Users, Home, Settings, LogOut, Bell, Search, Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
-  const navigation = [
-    { name: 'Today', href: '/app/today', icon: Home },
-    { name: 'Calendar', href: '#', icon: Calendar },
-    { name: 'Clients', href: '#', icon: Users },
-    { name: 'Settings', href: '#', icon: Settings },
-  ];
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    const role = user?.role;
+    await logout();
+    setIsLoggingOut(false);
+    
+    if (role === 'SuperAdmin') navigate('/superadmin/login', { replace: true });
+    else if (role === 'Admin') navigate('/admin/login', { replace: true });
+    else navigate('/login', { replace: true });
+  };
+
+  const role = user?.role || 'User';
+
+  let navigation = [];
+  if (role === 'SuperAdmin') {
+    navigation = [
+      { name: 'Overview', href: '/superadmin/dashboard', icon: Home },
+    ];
+  } else if (role === 'Admin') {
+    navigation = [
+      { name: 'Dashboard', href: '/admin/dashboard', icon: Home },
+      { name: 'Services', href: '/admin/services', icon: Calendar },
+      { name: 'Staff', href: '/admin/staff', icon: Users },
+      { name: 'Customers', href: '#', icon: Users },
+      { name: 'Salon Profile', href: '/admin/settings/salon', icon: Settings },
+    ];
+  } else {
+    navigation = [
+      { name: 'My Bookings', href: '/my-bookings', icon: Calendar },
+      { name: 'Account Settings', href: '#', icon: Settings },
+    ];
+  }
 
   return (
-    <div className="min-h-screen bg-ivory flex">
+    <div className="h-[100dvh] overflow-hidden bg-ivory flex">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-deep-plum/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-deep-plum/40 backdrop-blur-sm z-40 lg:hidden transition-opacity"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 w-64 bg-white border-r border-border-color transform transition-transform duration-200 ease-in-out z-50 lg:translate-x-0 lg:static ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="h-16 flex items-center px-6 border-b border-border-color">
+      <div className={`fixed inset-y-0 left-0 w-72 bg-white border-r border-border-color flex flex-col transform transition-transform duration-300 ease-in-out z-50 lg:translate-x-0 lg:static shadow-xl lg:shadow-none ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-border-color">
           <Link to="/" className="text-2xl font-serif font-semibold text-primary-rose">SalonBook</Link>
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-muted hover:text-deep-plum">
+            <X className="w-6 h-6" />
+          </button>
         </div>
-        <div className="p-4 flex flex-col h-[calc(100vh-4rem)] justify-between">
-          <nav className="space-y-1">
+        
+        <div className="flex-1 overflow-y-auto p-4">
+          <nav className="space-y-1.5">
+            <div className="px-3 py-2 mb-2 text-xs font-semibold text-muted uppercase tracking-wider">
+              {role === 'Admin' ? 'Salon Management' : role === 'SuperAdmin' ? 'Platform' : 'My Account'}
+            </div>
             {navigation.map((item) => {
               const active = location.pathname === item.href;
               return (
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors ${active ? 'bg-rose-tint text-primary-rose' : 'text-muted hover:bg-soft-blush hover:text-deep-plum'}`}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${active ? 'bg-rose-tint text-primary-rose shadow-sm' : 'text-muted hover:bg-soft-blush hover:text-deep-plum'}`}
                 >
-                  <item.icon className={`mr-3 h-5 w-5 ${active ? 'text-primary-rose' : 'text-muted'}`} />
+                  <item.icon className={`mr-3 h-5 w-5 ${active ? 'text-primary-rose' : 'text-muted group-hover:text-deep-plum'}`} />
                   {item.name}
                 </Link>
               );
             })}
           </nav>
-          <div className="border-t border-border-color pt-4">
-            <Link to="/login" className="flex items-center px-3 py-2.5 text-sm font-medium text-muted hover:bg-soft-blush hover:text-deep-plum rounded-md transition-colors">
-              <LogOut className="mr-3 h-5 w-5 text-muted" />
-              Log out
-            </Link>
+        </div>
+
+        <div className="shrink-0 p-4 border-t border-border-color bg-white">
+          <div className="px-3 py-3 mb-4 rounded-lg bg-ivory border border-border-color flex items-center">
+            <div className="w-10 h-10 rounded-full bg-primary-rose text-white flex items-center justify-center font-medium shadow-sm">
+              {user?.fullName?.charAt(0) || 'U'}
+            </div>
+            <div className="ml-3 overflow-hidden">
+              <p className="text-sm font-medium text-deep-plum truncate">{user?.fullName || 'User'}</p>
+              <p className="text-xs text-muted truncate">{user?.email}</p>
+            </div>
           </div>
+          <button 
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="flex w-full items-center px-3 py-2.5 text-sm font-medium text-danger hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+          >
+            <LogOut className="mr-3 h-5 w-5" />
+            {isLoggingOut ? 'Signing out...' : 'Sign Out'}
+          </button>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Topbar */}
-        <header className="h-16 bg-white border-b border-border-color flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0">
+        <header className="h-16 bg-white border-b border-border-color flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0 shadow-sm z-30 relative">
           <div className="flex items-center lg:hidden">
             <button 
               onClick={() => setSidebarOpen(true)}
-              className="text-muted hover:text-deep-plum focus:outline-none p-1 rounded-md"
+              className="text-muted hover:text-deep-plum focus:outline-none p-1.5 rounded-md hover:bg-soft-blush transition-colors"
             >
               <Menu className="h-6 w-6" />
             </button>
@@ -71,22 +124,19 @@ export default function DashboardLayout({ children }) {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
               <input 
                 type="text" 
-                placeholder="Search clients..." 
-                className="pl-9 pr-4 py-1.5 text-sm border border-border-color rounded-md focus:outline-none focus:ring-2 focus:ring-primary-rose/50 w-64 bg-ivory"
+                placeholder="Search..." 
+                className="pl-9 pr-4 py-2 text-sm border border-border-color rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-rose/50 w-64 bg-ivory transition-shadow"
               />
             </div>
-            <button className="text-muted hover:text-primary-rose transition-colors relative p-1 rounded-full hover:bg-soft-blush">
+            <button className="text-muted hover:text-primary-rose transition-colors relative p-2 rounded-full hover:bg-soft-blush">
               <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 h-2 w-2 bg-primary-rose rounded-full"></span>
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary-rose rounded-full border border-white"></span>
             </button>
-            <div className="h-8 w-8 rounded-full bg-rose-tint border border-primary-rose/20 flex items-center justify-center text-primary-rose font-medium text-sm">
-              JS
-            </div>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-ivory">
           {children}
         </main>
       </div>

@@ -9,6 +9,10 @@
   --color-rose-tint: #F5E5E5;
   --color-soft-blush: #FBEFEB;
   --color-border-color: #E9DEDA;
+  --color-success: #39765B;
+  --color-warning: #A86F2C;
+  --color-danger: #B54747;
+  --color-info: #456C9A;
   --font-serif: "Playfair Display", serif;
   --font-sans: "Inter", sans-serif;
 }
