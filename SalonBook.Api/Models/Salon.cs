@@ -59,4 +59,6 @@ public class Salon
     public ICollection<VendorPayout> Payouts { get; set; } = new List<VendorPayout>();
 
     public ICollection<VendorComplianceLog> ComplianceLogs { get; set; } = new List<VendorComplianceLog>();
+
+    public ICollection<Staff> StaffMembers { get; set; } = new List<Staff>();
 }

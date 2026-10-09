@@ -316,6 +316,119 @@ namespace SalonBook.Api.Data.Migrations
                     b.ToTable("Services", (string)null);
                 });
 
+            modelBuilder.Entity("SalonBook.Api.Models.Staff", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("SalonId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalonId")
+                        .HasDatabaseName("IX_Staff_SalonId");
+
+                    b.HasIndex("SalonId", "IsActive")
+                        .HasDatabaseName("IX_Staff_SalonId_IsActive");
+
+                    b.ToTable("Staff", (string)null);
+                });
+
+            modelBuilder.Entity("SalonBook.Api.Models.StaffBreak", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<TimeSpan>("EndTime")
+                        .HasColumnType("time");
+
+                    b.Property<int>("StaffScheduleId")
+                        .HasColumnType("int");
+
+                    b.Property<TimeSpan>("StartTime")
+                        .HasColumnType("time");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StaffScheduleId")
+                        .HasDatabaseName("IX_StaffBreaks_StaffScheduleId");
+
+                    b.ToTable("StaffBreaks", (string)null);
+                });
+
+            modelBuilder.Entity("SalonBook.Api.Models.StaffSchedule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("DayOfWeek")
+                        .HasColumnType("int");
+
+                    b.Property<TimeSpan>("EndTime")
+                        .HasColumnType("time");
+
+                    b.Property<bool>("IsWorkingDay")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("StaffId")
+                        .HasColumnType("int");
+
+                    b.Property<TimeSpan>("StartTime")
+                        .HasColumnType("time");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StaffId", "DayOfWeek")
+                        .IsUnique()
+                        .HasDatabaseName("IX_StaffSchedules_StaffId_DayOfWeek");
+
+                    b.ToTable("StaffSchedules", (string)null);
+                });
+
             modelBuilder.Entity("SalonBook.Api.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -555,6 +668,42 @@ namespace SalonBook.Api.Data.Migrations
                     b.Navigation("Salon");
                 });
 
+            modelBuilder.Entity("SalonBook.Api.Models.Staff", b =>
+                {
+                    b.HasOne("SalonBook.Api.Models.Salon", "Salon")
+                        .WithMany("StaffMembers")
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Staff_Salons_SalonId");
+
+                    b.Navigation("Salon");
+                });
+
+            modelBuilder.Entity("SalonBook.Api.Models.StaffBreak", b =>
+                {
+                    b.HasOne("SalonBook.Api.Models.StaffSchedule", "StaffSchedule")
+                        .WithMany("Breaks")
+                        .HasForeignKey("StaffScheduleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_StaffBreaks_StaffSchedules_StaffScheduleId");
+
+                    b.Navigation("StaffSchedule");
+                });
+
+            modelBuilder.Entity("SalonBook.Api.Models.StaffSchedule", b =>
+                {
+                    b.HasOne("SalonBook.Api.Models.Staff", "Staff")
+                        .WithMany("Schedules")
+                        .HasForeignKey("StaffId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_StaffSchedules_Staff_StaffId");
+
+                    b.Navigation("Staff");
+                });
+
             modelBuilder.Entity("SalonBook.Api.Models.User", b =>
                 {
                     b.HasOne("SalonBook.Api.Models.Salon", "Salon")
@@ -598,7 +747,19 @@ namespace SalonBook.Api.Data.Migrations
 
                     b.Navigation("Services");
 
+                    b.Navigation("StaffMembers");
+
                     b.Navigation("Users");
+                });
+
+            modelBuilder.Entity("SalonBook.Api.Models.Staff", b =>
+                {
+                    b.Navigation("Schedules");
+                });
+
+            modelBuilder.Entity("SalonBook.Api.Models.StaffSchedule", b =>
+                {
+                    b.Navigation("Breaks");
                 });
 
             modelBuilder.Entity("SalonBook.Api.Models.User", b =>

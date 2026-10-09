@@ -1,0 +1,198 @@
+using Microsoft.EntityFrameworkCore;
+using SalonBook.Api.Data;
+using SalonBook.Api.DTOs;
+using SalonBook.Api.Models;
+
+namespace SalonBook.Api.Services;
+
+public interface IAvailabilityService
+{
+    Task<SalonAvailabilityResponse> GetAvailabilityAsync(
+        string salonSlug,
+        int serviceId,
+        string dateString,
+        int? staffId = null,
+        CancellationToken cancellationToken = default);
+}
+
+public class AvailabilityService : IAvailabilityService
+{
+    private readonly ApplicationDbContext _dbContext;
+    private readonly ILogger<AvailabilityService> _logger;
+
+    public AvailabilityService(
+        ApplicationDbContext dbContext,
+        ILogger<AvailabilityService> logger)
+    {
+        _dbContext = dbContext;
+        _logger = logger;
+    }
+
+    public async Task<SalonAvailabilityResponse> GetAvailabilityAsync(
+        string salonSlug,
+        int serviceId,
+        string dateString,
+        int? staffId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(salonSlug))
+        {
+            throw new ArgumentException("Salon slug is required.");
+        }
+
+        if (!DateOnly.TryParseExact(dateString, "yyyy-MM-dd", out var targetDate))
+        {
+            throw new ArgumentException("Invalid date format. Expected 'yyyy-MM-dd'.");
+        }
+
+        var normalizedSlug = salonSlug.Trim().ToLowerInvariant();
+
+        var salon = await _dbContext.Salons
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Slug == normalizedSlug && s.IsActive, cancellationToken);
+
+        if (salon == null)
+        {
+            throw new KeyNotFoundException($"Salon '{salonSlug}' was not found or is inactive.");
+        }
+
+        var service = await _dbContext.Services
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == serviceId && s.SalonId == salon.Id && s.IsActive, cancellationToken);
+
+        if (service == null)
+        {
+            throw new KeyNotFoundException($"Active service with ID {serviceId} was not found for salon '{salonSlug}'.");
+        }
+
+        var salonTz = GetTimeZoneInfo(salon.TimeZone);
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, salonTz);
+        var localToday = DateOnly.FromDateTime(localNow);
+
+        if (targetDate < localToday)
+        {
+            throw new ArgumentException("Cannot check availability for past dates.");
+        }
+
+        var targetDayOfWeek = targetDate.DayOfWeek;
+        var duration = TimeSpan.FromMinutes(service.DurationMinutes);
+
+        // Fetch staff and their schedules for that day
+        var staffQuery = _dbContext.Staff
+            .AsNoTracking()
+            .Where(s => s.SalonId == salon.Id && s.IsActive);
+
+        if (staffId.HasValue)
+        {
+            staffQuery = staffQuery.Where(s => s.Id == staffId.Value);
+        }
+
+        var staffList = await staffQuery
+            .Include(s => s.Schedules.Where(sch => sch.DayOfWeek == targetDayOfWeek && sch.IsWorkingDay))
+                .ThenInclude(sch => sch.Breaks)
+            .ToListAsync(cancellationToken);
+
+        var slotStaffMap = new SortedDictionary<TimeSpan, (TimeSpan EndTime, List<PublicStaffResponse> Staff)>();
+
+        const int slotStepMinutes = 15; // 15-minute slot alignment
+
+        foreach (var staff in staffList)
+        {
+            var schedule = staff.Schedules.FirstOrDefault();
+            if (schedule == null || !schedule.IsWorkingDay)
+            {
+                continue;
+            }
+
+            var current = schedule.StartTime;
+            while (current + duration <= schedule.EndTime)
+            {
+                var slotStart = current;
+                var slotEnd = current + duration;
+
+                // Check break overlaps
+                var overlapsBreak = schedule.Breaks.Any(b => slotStart < b.EndTime && b.StartTime < slotEnd);
+
+                // Check today past time
+                var isPastToday = targetDate == localToday && slotStart <= localNow.TimeOfDay;
+
+                if (!overlapsBreak && !isPastToday)
+                {
+                    if (!slotStaffMap.TryGetValue(slotStart, out var entry))
+                    {
+                        entry = (slotEnd, new List<PublicStaffResponse>());
+                        slotStaffMap[slotStart] = entry;
+                    }
+
+                    entry.Staff.Add(new PublicStaffResponse
+                    {
+                        Id = staff.Id,
+                        FullName = staff.FullName,
+                        Title = staff.Title,
+                        IsActive = staff.IsActive
+                    });
+                }
+
+                current = current.Add(TimeSpan.FromMinutes(slotStepMinutes));
+            }
+        }
+
+        var availableSlots = slotStaffMap.Select(kvp => new AvailabilitySlotResponse
+        {
+            StartTime = FormatTimeSpan(kvp.Key),
+            EndTime = FormatTimeSpan(kvp.Value.EndTime),
+            AvailableStaff = kvp.Value.Staff
+        }).ToList();
+
+        return new SalonAvailabilityResponse
+        {
+            Date = targetDate.ToString("yyyy-MM-dd"),
+            DayOfWeek = targetDayOfWeek.ToString(),
+            TimeZone = salon.TimeZone,
+            ServiceId = service.Id,
+            ServiceName = service.Name,
+            DurationMinutes = service.DurationMinutes,
+            Slots = availableSlots
+        };
+    }
+
+    private static string FormatTimeSpan(TimeSpan ts)
+    {
+        return $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}";
+    }
+
+    private static TimeZoneInfo GetTimeZoneInfo(string? timeZoneId)
+    {
+        if (string.IsNullOrWhiteSpace(timeZoneId))
+        {
+            return TryGetFallbackTimeZone("Asia/Kolkata");
+        }
+
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+        }
+        catch
+        {
+            return TryGetFallbackTimeZone(timeZoneId);
+        }
+    }
+
+    private static TimeZoneInfo TryGetFallbackTimeZone(string timeZoneId)
+    {
+        // Handle common cross-platform mappings
+        if (timeZoneId.Equals("Asia/Kolkata", StringComparison.OrdinalIgnoreCase) ||
+            timeZoneId.Equals("India Standard Time", StringComparison.OrdinalIgnoreCase))
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById("India Standard Time"); } catch { }
+            try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata"); } catch { }
+        }
+        else if (timeZoneId.Equals("UTC", StringComparison.OrdinalIgnoreCase))
+        {
+            return TimeZoneInfo.Utc;
+        }
+
+        return TimeZoneInfo.Utc;
+    }
+}
+

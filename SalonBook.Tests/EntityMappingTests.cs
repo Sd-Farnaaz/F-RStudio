@@ -145,6 +145,61 @@ public class EntityMappingTests
     }
 
     [Fact]
+    public void StaffEntity_HasConfiguredPropertiesAndRelationships()
+    {
+        using var context = CreateContext();
+        var entityType = context.Model.FindEntityType(typeof(Staff));
+
+        Assert.NotNull(entityType);
+        Assert.Equal("Staff", entityType.GetTableName());
+
+        var nameProp = entityType.FindProperty(nameof(Staff.FullName));
+        Assert.NotNull(nameProp);
+        Assert.False(nameProp.IsNullable);
+        Assert.Equal(150, nameProp.GetMaxLength());
+
+        var activeProp = entityType.FindProperty(nameof(Staff.IsActive));
+        Assert.NotNull(activeProp);
+        Assert.Equal(true, activeProp.GetDefaultValue());
+
+        var salonFk = entityType.GetForeignKeys().FirstOrDefault(fk => fk.PrincipalEntityType.ClrType == typeof(Salon));
+        Assert.NotNull(salonFk);
+        Assert.Equal(DeleteBehavior.Restrict, salonFk.DeleteBehavior);
+    }
+
+    [Fact]
+    public void StaffScheduleEntity_HasUniqueIndexAndCascade()
+    {
+        using var context = CreateContext();
+        var entityType = context.Model.FindEntityType(typeof(StaffSchedule));
+
+        Assert.NotNull(entityType);
+        Assert.Equal("StaffSchedules", entityType.GetTableName());
+
+        var dayIndex = entityType.GetIndexes().FirstOrDefault(i => i.Properties.Any(p => p.Name == nameof(StaffSchedule.DayOfWeek)));
+        Assert.NotNull(dayIndex);
+        Assert.True(dayIndex.IsUnique);
+
+        var staffFk = entityType.GetForeignKeys().FirstOrDefault(fk => fk.PrincipalEntityType.ClrType == typeof(Staff));
+        Assert.NotNull(staffFk);
+        Assert.Equal(DeleteBehavior.Cascade, staffFk.DeleteBehavior);
+    }
+
+    [Fact]
+    public void StaffBreakEntity_HasConfiguredProperties()
+    {
+        using var context = CreateContext();
+        var entityType = context.Model.FindEntityType(typeof(StaffBreak));
+
+        Assert.NotNull(entityType);
+        Assert.Equal("StaffBreaks", entityType.GetTableName());
+
+        var schedFk = entityType.GetForeignKeys().FirstOrDefault(fk => fk.PrincipalEntityType.ClrType == typeof(StaffSchedule));
+        Assert.NotNull(schedFk);
+        Assert.Equal(DeleteBehavior.Cascade, schedFk.DeleteBehavior);
+    }
+
+    [Fact]
     public void UserEntity_HasConfiguredPropertiesAndUniqueEmailIndex()
     {
         using var context = CreateContext();

@@ -120,5 +120,11 @@ public class SalonConfiguration : IEntityTypeConfiguration<Salon>
             .HasForeignKey(c => c.SalonId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_VendorComplianceLogs_Salons_SalonId");
+
+        builder.HasMany(s => s.StaffMembers)
+            .WithOne(st => st.Salon)
+            .HasForeignKey(st => st.SalonId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Staff_Salons_SalonId");
     }
 }

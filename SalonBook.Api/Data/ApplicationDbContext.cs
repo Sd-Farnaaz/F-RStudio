@@ -17,6 +17,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<Service> Services => Set<Service>();
     public DbSet<VendorPayout> VendorPayouts => Set<VendorPayout>();
     public DbSet<VendorComplianceLog> VendorComplianceLogs => Set<VendorComplianceLog>();
+    public DbSet<Staff> Staff => Set<Staff>();
+    public DbSet<StaffSchedule> StaffSchedules => Set<StaffSchedule>();
+    public DbSet<StaffBreak> StaffBreaks => Set<StaffBreak>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
