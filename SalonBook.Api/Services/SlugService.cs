@@ -49,3 +49,4 @@ public class SlugService : ISlugService
         return result;
     }
 }
+

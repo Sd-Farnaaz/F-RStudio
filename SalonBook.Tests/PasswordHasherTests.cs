@@ -44,3 +44,4 @@ public class PasswordHasherTests
         Assert.Equal(PasswordVerificationResult.Failed, result);
     }
 }
+

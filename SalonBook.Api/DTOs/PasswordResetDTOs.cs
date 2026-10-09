@@ -33,3 +33,4 @@ public class ResetPasswordRequest
     [StringLength(100, MinimumLength = 8, ErrorMessage = "New password must be at least 8 characters long.")]
     public string NewPassword { get; set; } = string.Empty;
 }
+

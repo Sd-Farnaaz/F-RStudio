@@ -42,3 +42,4 @@ public class RefreshToken
     // Navigation property
     public User User { get; set; } = null!;
 }
+

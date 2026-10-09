@@ -56,3 +56,4 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
             .HasDatabaseName("IX_RefreshTokens_UserId");
     }
 }
+

@@ -11,3 +11,4 @@ public static class Roles
     public static bool IsValid(string? role) =>
         role is not null && All.Contains(role);
 }
+

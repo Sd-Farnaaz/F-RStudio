@@ -17,3 +17,4 @@ public class SlugServiceTests
         Assert.Equal(expected, result);
     }
 }
+

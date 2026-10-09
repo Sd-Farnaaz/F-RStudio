@@ -16,3 +16,4 @@ public class JwtOptions
 
     public int PasswordResetTokenExpirationMinutes { get; set; } = 30;
 }
+

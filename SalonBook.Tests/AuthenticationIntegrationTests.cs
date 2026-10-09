@@ -315,3 +315,4 @@ public class AuthenticationIntegrationTests : IClassFixture<CustomWebApplication
         Assert.Equal(HttpStatusCode.OK, newLogin.StatusCode);
     }
 }
+

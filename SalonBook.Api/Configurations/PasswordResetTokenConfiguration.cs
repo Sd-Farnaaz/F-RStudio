@@ -40,3 +40,4 @@ public class PasswordResetTokenConfiguration : IEntityTypeConfiguration<Password
             .HasDatabaseName("IX_PasswordResetTokens_UserId");
     }
 }
+

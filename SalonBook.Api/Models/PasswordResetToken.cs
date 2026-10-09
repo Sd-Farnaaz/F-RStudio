@@ -30,3 +30,4 @@ public class PasswordResetToken
     // Navigation property
     public User User { get; set; } = null!;
 }
+
