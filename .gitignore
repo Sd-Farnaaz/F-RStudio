@@ -1,0 +1,39 @@
+## .NET Core / Visual Studio
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+.vs/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.userprefs
+*.dbmdl
+*.jfm
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+
+# User secrets / credentials / local overrides
+appsettings.secrets.json
+*.local.json
+
+# Rider / JetBrains
+.idea/
+*.DotSettings.user
+
+# Node / Frontend
+node_modules/
+dist/
+.vite/

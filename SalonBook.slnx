@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SalonBook.Api/SalonBook.Api.csproj" />
+  <Project Path="SalonBook.Tests/SalonBook.Tests.csproj" />
+</Solution>
