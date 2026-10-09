@@ -39,6 +39,14 @@ public class Salon
 
     public bool IsActive { get; set; } = true;
 
+    public bool IsVerified { get; set; } = false;
+
+    public string KycStatus { get; set; } = "NotSubmitted"; // "NotSubmitted", "Pending", "Verified", "Rejected"
+
+    public string? GstNumber { get; set; }
+
+    public decimal AnnualRevenueTarget { get; set; } = 1200000.00m;
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedAtUtc { get; set; }
@@ -47,4 +55,8 @@ public class Salon
     public ICollection<User> Users { get; set; } = new List<User>();
 
     public ICollection<Service> Services { get; set; } = new List<Service>();
+
+    public ICollection<VendorPayout> Payouts { get; set; } = new List<VendorPayout>();
+
+    public ICollection<VendorComplianceLog> ComplianceLogs { get; set; } = new List<VendorComplianceLog>();
 }

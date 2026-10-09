@@ -144,6 +144,12 @@ namespace SalonBook.Api.Data.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
 
+                    b.Property<decimal>("AnnualRevenueTarget")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(1200000.00m);
+
                     b.Property<string>("BusinessType")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -177,10 +183,26 @@ namespace SalonBook.Api.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<string>("GstNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
+
+                    b.Property<bool>("IsVerified")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("KycStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("NotSubmitted");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -356,6 +378,149 @@ namespace SalonBook.Api.Data.Migrations
                     b.ToTable("Users", (string)null);
                 });
 
+            modelBuilder.Entity("SalonBook.Api.Models.VendorComplianceLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CustomerIdentifier")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("DisputeDetails")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<decimal?>("DisputedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("DocumentType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("DocumentUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("ReviewedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReviewedBy")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("SalonId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalonId")
+                        .HasDatabaseName("IX_VendorComplianceLogs_SalonId");
+
+                    b.HasIndex("SalonId", "EventType")
+                        .HasDatabaseName("IX_VendorComplianceLogs_SalonId_EventType");
+
+                    b.ToTable("VendorComplianceLogs", (string)null);
+                });
+
+            modelBuilder.Entity("SalonBook.Api.Models.VendorPayout", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("BankReleaseAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("CommissionAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)")
+                        .HasDefaultValue("INR");
+
+                    b.Property<DateTime?>("DisbursedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EscrowTransactionId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal>("NetAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("SalonId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("Pending");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UtrNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EscrowTransactionId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_VendorPayouts_EscrowTransactionId");
+
+                    b.HasIndex("SalonId")
+                        .HasDatabaseName("IX_VendorPayouts_SalonId");
+
+                    b.HasIndex("SalonId", "Status")
+                        .HasDatabaseName("IX_VendorPayouts_SalonId_Status");
+
+                    b.ToTable("VendorPayouts", (string)null);
+                });
+
             modelBuilder.Entity("SalonBook.Api.Models.PasswordResetToken", b =>
                 {
                     b.HasOne("SalonBook.Api.Models.User", "User")
@@ -401,8 +566,36 @@ namespace SalonBook.Api.Data.Migrations
                     b.Navigation("Salon");
                 });
 
+            modelBuilder.Entity("SalonBook.Api.Models.VendorComplianceLog", b =>
+                {
+                    b.HasOne("SalonBook.Api.Models.Salon", "Salon")
+                        .WithMany("ComplianceLogs")
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_VendorComplianceLogs_Salons_SalonId");
+
+                    b.Navigation("Salon");
+                });
+
+            modelBuilder.Entity("SalonBook.Api.Models.VendorPayout", b =>
+                {
+                    b.HasOne("SalonBook.Api.Models.Salon", "Salon")
+                        .WithMany("Payouts")
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_VendorPayouts_Salons_SalonId");
+
+                    b.Navigation("Salon");
+                });
+
             modelBuilder.Entity("SalonBook.Api.Models.Salon", b =>
                 {
+                    b.Navigation("ComplianceLogs");
+
+                    b.Navigation("Payouts");
+
                     b.Navigation("Services");
 
                     b.Navigation("Users");

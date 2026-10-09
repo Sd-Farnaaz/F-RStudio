@@ -94,6 +94,57 @@ public class EntityMappingTests
     }
 
     [Fact]
+    public void VendorPayoutEntity_HasConfiguredPropertiesAndPrecision()
+    {
+        using var context = CreateContext();
+        var entityType = context.Model.FindEntityType(typeof(VendorPayout));
+
+        Assert.NotNull(entityType);
+        Assert.Equal("VendorPayouts", entityType.GetTableName());
+
+        var amountProp = entityType.FindProperty(nameof(VendorPayout.Amount));
+        Assert.NotNull(amountProp);
+        Assert.Equal(18, amountProp.GetPrecision());
+        Assert.Equal(2, amountProp.GetScale());
+
+        var netAmountProp = entityType.FindProperty(nameof(VendorPayout.NetAmount));
+        Assert.NotNull(netAmountProp);
+        Assert.Equal(18, netAmountProp.GetPrecision());
+        Assert.Equal(2, netAmountProp.GetScale());
+
+        var statusProp = entityType.FindProperty(nameof(VendorPayout.Status));
+        Assert.NotNull(statusProp);
+        Assert.Equal("Pending", statusProp.GetDefaultValue());
+
+        var txnIndex = entityType.GetIndexes().FirstOrDefault(i => i.Properties.Any(p => p.Name == nameof(VendorPayout.EscrowTransactionId)));
+        Assert.NotNull(txnIndex);
+        Assert.True(txnIndex.IsUnique);
+
+        var salonFk = entityType.GetForeignKeys().FirstOrDefault(fk => fk.PrincipalEntityType.ClrType == typeof(Salon));
+        Assert.NotNull(salonFk);
+        Assert.Equal(DeleteBehavior.Restrict, salonFk.DeleteBehavior);
+    }
+
+    [Fact]
+    public void VendorComplianceLogEntity_HasConfiguredProperties()
+    {
+        using var context = CreateContext();
+        var entityType = context.Model.FindEntityType(typeof(VendorComplianceLog));
+
+        Assert.NotNull(entityType);
+        Assert.Equal("VendorComplianceLogs", entityType.GetTableName());
+
+        var eventTypeProp = entityType.FindProperty(nameof(VendorComplianceLog.EventType));
+        Assert.NotNull(eventTypeProp);
+        Assert.False(eventTypeProp.IsNullable);
+        Assert.Equal(50, eventTypeProp.GetMaxLength());
+
+        var salonFk = entityType.GetForeignKeys().FirstOrDefault(fk => fk.PrincipalEntityType.ClrType == typeof(Salon));
+        Assert.NotNull(salonFk);
+        Assert.Equal(DeleteBehavior.Restrict, salonFk.DeleteBehavior);
+    }
+
+    [Fact]
     public void UserEntity_HasConfiguredPropertiesAndUniqueEmailIndex()
     {
         using var context = CreateContext();

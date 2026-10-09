@@ -15,6 +15,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<Service> Services => Set<Service>();
+    public DbSet<VendorPayout> VendorPayouts => Set<VendorPayout>();
+    public DbSet<VendorComplianceLog> VendorComplianceLogs => Set<VendorComplianceLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

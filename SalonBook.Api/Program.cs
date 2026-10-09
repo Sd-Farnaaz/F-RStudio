@@ -52,6 +52,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<ISlugService, SlugService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<ISuperAdminProvisioningService, SuperAdminProvisioningService>();
+builder.Services.AddScoped<IMediaStorageService, LocalMediaStorageService>();
 
 // 5. Authentication with JWT Bearer
 var signingKey = Encoding.UTF8.GetBytes(string.IsNullOrWhiteSpace(jwtOptions.SecretKey) ? "Development_Fallback_Key_32_Characters_Minimum!" : jwtOptions.SecretKey);
@@ -204,6 +205,7 @@ if (app.Environment.IsDevelopment())
 }
 
 // 14. Middleware Pipeline
+app.UseStaticFiles();
 app.UseCors(FrontendCorsPolicy);
 app.UseRateLimiter();
 

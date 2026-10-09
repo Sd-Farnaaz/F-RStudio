@@ -75,6 +75,23 @@ public class SalonConfiguration : IEntityTypeConfiguration<Salon>
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(s => s.IsVerified)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(s => s.KycStatus)
+            .IsRequired()
+            .HasMaxLength(30)
+            .HasDefaultValue("NotSubmitted");
+
+        builder.Property(s => s.GstNumber)
+            .HasMaxLength(30);
+
+        builder.Property(s => s.AnnualRevenueTarget)
+            .IsRequired()
+            .HasPrecision(18, 2)
+            .HasDefaultValue(1200000.00m);
+
         builder.Property(s => s.CreatedAtUtc)
             .IsRequired();
 
@@ -85,11 +102,23 @@ public class SalonConfiguration : IEntityTypeConfiguration<Salon>
         builder.HasIndex(s => new { s.City, s.IsActive })
             .HasDatabaseName("IX_Salons_City_IsActive");
 
-        // Cascade delete or restrict for Services
+        // Relationships
         builder.HasMany(s => s.Services)
             .WithOne(svc => svc.Salon)
             .HasForeignKey(svc => svc.SalonId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Services_Salons_SalonId");
+
+        builder.HasMany(s => s.Payouts)
+            .WithOne(p => p.Salon)
+            .HasForeignKey(p => p.SalonId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_VendorPayouts_Salons_SalonId");
+
+        builder.HasMany(s => s.ComplianceLogs)
+            .WithOne(c => c.Salon)
+            .HasForeignKey(c => c.SalonId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_VendorComplianceLogs_Salons_SalonId");
     }
 }
