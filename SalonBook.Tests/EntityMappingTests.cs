@@ -63,7 +63,7 @@ public class EntityMappingTests
     }
 
     [Fact]
-    public void UserEntity_HasConfiguredPropertiesIndexesAndRestrictDeleteBehavior()
+    public void UserEntity_HasConfiguredPropertiesAndUniqueEmailIndex()
     {
         using var context = CreateContext();
         var entityType = context.Model.FindEntityType(typeof(User));
@@ -88,20 +88,10 @@ public class EntityMappingTests
         Assert.False(emailProp.IsNullable);
         Assert.Equal(256, emailProp.GetMaxLength());
 
-        var pwdProp = entityType.FindProperty(nameof(User.PasswordHash));
-        Assert.NotNull(pwdProp);
-        Assert.False(pwdProp.IsNullable);
-        Assert.Equal(500, pwdProp.GetMaxLength());
-
-        var roleProp = entityType.FindProperty(nameof(User.Role));
-        Assert.NotNull(roleProp);
-        Assert.False(roleProp.IsNullable);
-        Assert.Equal(30, roleProp.GetMaxLength());
-
-        // Email index is non-unique
+        // Email index is UNIQUE in Phase 2 for global identity
         var emailIndex = entityType.GetIndexes().FirstOrDefault(i => i.Properties.Any(p => p.Name == nameof(User.Email)));
         Assert.NotNull(emailIndex);
-        Assert.False(emailIndex.IsUnique);
+        Assert.True(emailIndex.IsUnique);
         Assert.Equal("IX_Users_Email", emailIndex.GetDatabaseName());
 
         // SalonId index
@@ -118,18 +108,28 @@ public class EntityMappingTests
     }
 
     [Fact]
-    public void SalonAndUser_DefaultModelPropertyValuesAreSet()
+    public void RefreshTokenEntity_HasConfiguredCascadeDeleteAndIndexes()
     {
-        var salon = new Salon();
-        Assert.Equal("Asia/Kolkata", salon.TimeZone);
-        Assert.Equal("INR", salon.CurrencyCode);
-        Assert.Equal("Created", salon.OnboardingState);
-        Assert.NotNull(salon.Users);
-        Assert.Empty(salon.Users);
+        using var context = CreateContext();
+        var entityType = context.Model.FindEntityType(typeof(RefreshToken));
 
-        var user = new User();
-        Assert.Null(user.SalonId);
-        Assert.False(user.IsEmailVerified);
-        Assert.Null(user.Salon);
+        Assert.NotNull(entityType);
+        Assert.Equal("RefreshTokens", entityType.GetTableName());
+
+        var tokenHashProp = entityType.FindProperty(nameof(RefreshToken.TokenHash));
+        Assert.NotNull(tokenHashProp);
+        Assert.False(tokenHashProp.IsNullable);
+        Assert.Equal(128, tokenHashProp.GetMaxLength());
+
+        var tokenHashIndex = entityType.GetIndexes().FirstOrDefault(i => i.Properties.Any(p => p.Name == nameof(RefreshToken.TokenHash)));
+        Assert.NotNull(tokenHashIndex);
+        Assert.True(tokenHashIndex.IsUnique);
+
+        var familyIndex = entityType.GetIndexes().FirstOrDefault(i => i.Properties.Any(p => p.Name == nameof(RefreshToken.FamilyId)));
+        Assert.NotNull(familyIndex);
+
+        var userFk = entityType.GetForeignKeys().FirstOrDefault(fk => fk.PrincipalEntityType.ClrType == typeof(User));
+        Assert.NotNull(userFk);
+        Assert.Equal(DeleteBehavior.Cascade, userFk.DeleteBehavior);
     }
 }

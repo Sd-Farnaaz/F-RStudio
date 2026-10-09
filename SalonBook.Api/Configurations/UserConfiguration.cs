@@ -23,6 +23,12 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasMaxLength(256);
 
+        // Global unique email index:
+        // Ensures unique identity across SalonBook platform, preventing cross-tenant identity collisions.
+        builder.HasIndex(u => u.Email)
+            .IsUnique()
+            .HasDatabaseName("IX_Users_Email");
+
         builder.Property(u => u.PasswordHash)
             .IsRequired()
             .HasMaxLength(500);
@@ -35,28 +41,39 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(u => u.IsActive)
+            .IsRequired()
+            .HasDefaultValue(true);
+
         builder.Property(u => u.CreatedAtUtc)
             .IsRequired();
 
-        // Index on SalonId to optimize tenant-scoped user lookups and foreign key joins
+        builder.Property(u => u.UpdatedAtUtc)
+            .IsRequired(false);
+
+        builder.Property(u => u.LastLoginAtUtc)
+            .IsRequired(false);
+
+        // Index on SalonId for fast tenant queries
         builder.HasIndex(u => u.SalonId)
             .HasDatabaseName("IX_Users_SalonId");
 
-        // Index on Email for login lookup performance.
-        // NOTE FOR PHASE 2: This is a non-unique index in Phase 1.
-        // During Phase 2 auth architecture, decide whether email uniqueness is:
-        // Option A: Global unique across all tenants (unique index on Email).
-        // Option B: Tenant-scoped unique (composite unique index on SalonId + Email, allowing same customer email across different salons).
-        builder.HasIndex(u => u.Email)
-            .HasDatabaseName("IX_Users_Email");
-
-        // Explicit foreign key relationship and delete behavior
-        // DeleteBehavior.Restrict prevents cascading delete of user accounts when a salon is deleted
+        // Restrict delete behavior on Salon -> Users
         builder.HasOne(u => u.Salon)
             .WithMany(s => s.Users)
             .HasForeignKey(u => u.SalonId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Users_Salons_SalonId");
+
+        // Cascade delete tokens when user is deleted
+        builder.HasMany(u => u.RefreshTokens)
+            .WithOne(rt => rt.User)
+            .HasForeignKey(rt => rt.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(u => u.PasswordResetTokens)
+            .WithOne(prt => prt.User)
+            .HasForeignKey(prt => prt.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
-

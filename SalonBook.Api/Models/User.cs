@@ -5,8 +5,10 @@ public class User
     public int Id { get; set; }
 
     /// <summary>
-    /// Nullable foreign key to Salon for initial platform-level account model.
-    /// A null SalonId represents platform administrators or users without an assigned salon.
+    /// Nullable foreign key to Salon.
+    /// SuperAdmin: null (platform-wide).
+    /// Admin: assigned to specific Salon.
+    /// User (Customer): null (global customer account).
     /// </summary>
     public int? SalonId { get; set; }
 
@@ -20,9 +22,18 @@ public class User
 
     public bool IsEmailVerified { get; set; } = false;
 
+    public bool IsActive { get; set; } = true;
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
-    // Navigation property
-    public Salon? Salon { get; set; }
-}
+    public DateTime? UpdatedAtUtc { get; set; }
 
+    public DateTime? LastLoginAtUtc { get; set; }
+
+    // Navigation properties
+    public Salon? Salon { get; set; }
+
+    public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+
+    public ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = new List<PasswordResetToken>();
+}
