@@ -23,6 +23,7 @@ public class HealthController : ControllerBase
 
     /// <summary>
     /// Database-aware health check endpoint.
+    /// Safely checks connectivity without leaking internal exception or infrastructure details to clients.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -31,7 +32,6 @@ public class HealthController : ControllerBase
     {
         bool dbCanConnect = false;
         string dbStatus = "Unknown";
-        string? dbError = null;
 
         try
         {
@@ -40,9 +40,9 @@ public class HealthController : ControllerBase
         }
         catch (Exception ex)
         {
-            dbStatus = "Error";
-            dbError = ex.Message;
-            _logger.LogError(ex, "Health check failed to connect to database.");
+            dbStatus = "Unreachable";
+            // Log full exception details securely on the server side
+            _logger.LogError(ex, "Health check failed: unable to connect to the database.");
         }
 
         var healthReport = new
@@ -55,8 +55,7 @@ public class HealthController : ControllerBase
             {
                 provider = "Microsoft.EntityFrameworkCore.SqlServer",
                 status = dbStatus,
-                canConnect = dbCanConnect,
-                error = dbError
+                canConnect = dbCanConnect
             }
         };
 
@@ -68,4 +67,3 @@ public class HealthController : ControllerBase
         return Ok(healthReport);
     }
 }
-
