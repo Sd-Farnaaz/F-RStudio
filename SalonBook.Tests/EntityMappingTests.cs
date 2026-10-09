@@ -60,6 +60,37 @@ public class EntityMappingTests
         var onboardingProp = entityType.FindProperty(nameof(Salon.OnboardingState));
         Assert.NotNull(onboardingProp);
         Assert.Equal("Created", onboardingProp.GetDefaultValue());
+
+        var activeProp = entityType.FindProperty(nameof(Salon.IsActive));
+        Assert.NotNull(activeProp);
+        Assert.Equal(true, activeProp.GetDefaultValue());
+    }
+
+    [Fact]
+    public void ServiceEntity_HasConfiguredPropertiesAndPrecision()
+    {
+        using var context = CreateContext();
+        var entityType = context.Model.FindEntityType(typeof(Service));
+
+        Assert.NotNull(entityType);
+        Assert.Equal("Services", entityType.GetTableName());
+
+        var priceProp = entityType.FindProperty(nameof(Service.Price));
+        Assert.NotNull(priceProp);
+        Assert.Equal(18, priceProp.GetPrecision());
+        Assert.Equal(2, priceProp.GetScale());
+
+        var durationProp = entityType.FindProperty(nameof(Service.DurationMinutes));
+        Assert.NotNull(durationProp);
+        Assert.False(durationProp.IsNullable);
+
+        var activeProp = entityType.FindProperty(nameof(Service.IsActive));
+        Assert.NotNull(activeProp);
+        Assert.Equal(true, activeProp.GetDefaultValue());
+
+        var salonFk = entityType.GetForeignKeys().FirstOrDefault(fk => fk.PrincipalEntityType.ClrType == typeof(Salon));
+        Assert.NotNull(salonFk);
+        Assert.Equal(DeleteBehavior.Restrict, salonFk.DeleteBehavior);
     }
 
     [Fact]

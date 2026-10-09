@@ -140,10 +140,28 @@ namespace SalonBook.Api.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AddressLine")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
                     b.Property<string>("BusinessType")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ContactEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Country")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasDefaultValue("India");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
@@ -154,6 +172,15 @@ namespace SalonBook.Api.Data.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("nvarchar(3)")
                         .HasDefaultValue("INR");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -167,8 +194,24 @@ namespace SalonBook.Api.Data.Migrations
                         .HasColumnType("nvarchar(30)")
                         .HasDefaultValue("Created");
 
+                    b.Property<string>("OpeningHoursJson")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("PostalCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<string>("Slug")
                         .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("State")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
@@ -179,13 +222,76 @@ namespace SalonBook.Api.Data.Migrations
                         .HasColumnType("nvarchar(100)")
                         .HasDefaultValue("Asia/Kolkata");
 
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Slug")
                         .IsUnique()
                         .HasDatabaseName("IX_Salons_Slug");
 
+                    b.HasIndex("City", "IsActive")
+                        .HasDatabaseName("IX_Salons_City_IsActive");
+
                     b.ToTable("Salons", (string)null);
+                });
+
+            modelBuilder.Entity("SalonBook.Api.Models.Service", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("SalonId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalonId")
+                        .HasDatabaseName("IX_Services_SalonId");
+
+                    b.HasIndex("SalonId", "Category")
+                        .HasDatabaseName("IX_Services_SalonId_Category");
+
+                    b.HasIndex("SalonId", "IsActive")
+                        .HasDatabaseName("IX_Services_SalonId_IsActive");
+
+                    b.ToTable("Services", (string)null);
                 });
 
             modelBuilder.Entity("SalonBook.Api.Models.User", b =>
@@ -272,6 +378,18 @@ namespace SalonBook.Api.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("SalonBook.Api.Models.Service", b =>
+                {
+                    b.HasOne("SalonBook.Api.Models.Salon", "Salon")
+                        .WithMany("Services")
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Services_Salons_SalonId");
+
+                    b.Navigation("Salon");
+                });
+
             modelBuilder.Entity("SalonBook.Api.Models.User", b =>
                 {
                     b.HasOne("SalonBook.Api.Models.Salon", "Salon")
@@ -285,6 +403,8 @@ namespace SalonBook.Api.Data.Migrations
 
             modelBuilder.Entity("SalonBook.Api.Models.Salon", b =>
                 {
+                    b.Navigation("Services");
+
                     b.Navigation("Users");
                 });
 

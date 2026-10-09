@@ -10,15 +10,41 @@ public class Salon
 
     public string BusinessType { get; set; } = string.Empty;
 
+    public string? Description { get; set; }
+
+    public string? AddressLine { get; set; }
+
+    public string? City { get; set; }
+
+    public string? State { get; set; }
+
+    public string? PostalCode { get; set; }
+
+    public string? Country { get; set; } = "India";
+
+    public string? PhoneNumber { get; set; }
+
+    public string? ContactEmail { get; set; }
+
+    /// <summary>
+    /// Serialized opening hours specification for days of week.
+    /// </summary>
+    public string? OpeningHoursJson { get; set; }
+
     public string TimeZone { get; set; } = "Asia/Kolkata";
 
     public string CurrencyCode { get; set; } = "INR";
 
     public string OnboardingState { get; set; } = "Created";
 
+    public bool IsActive { get; set; } = true;
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
-    // Navigation property
-    public ICollection<User> Users { get; set; } = new List<User>();
-}
+    public DateTime? UpdatedAtUtc { get; set; }
 
+    // Navigation properties
+    public ICollection<User> Users { get; set; } = new List<User>();
+
+    public ICollection<Service> Services { get; set; } = new List<Service>();
+}

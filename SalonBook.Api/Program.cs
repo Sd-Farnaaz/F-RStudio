@@ -169,6 +169,26 @@ if (args.Length >= 4 && args[0] == "--seed-superadmin")
     return;
 }
 
+// Automatic SuperAdmin Provisioning on startup if configured in appsettings
+var superAdminConfig = app.Configuration.GetSection("SuperAdmin");
+var configSaEmail = superAdminConfig["Email"];
+var configSaPassword = superAdminConfig["Password"];
+var configSaFullName = superAdminConfig["FullName"] ?? "Super Administrator";
+if (!string.IsNullOrWhiteSpace(configSaEmail) && !string.IsNullOrWhiteSpace(configSaPassword))
+{
+    using var scope = app.Services.CreateScope();
+    var provisioningService = scope.ServiceProvider.GetRequiredService<ISuperAdminProvisioningService>();
+    try
+    {
+        await provisioningService.ProvisionSuperAdminAsync(configSaEmail, configSaFullName, configSaPassword);
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogWarning(ex, "Failed to provision configured default SuperAdmin account on startup.");
+    }
+}
+
 // 12. Centralized Exception Handling Middleware
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
