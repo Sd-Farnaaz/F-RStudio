@@ -85,6 +85,31 @@ public class AppointmentResponse
     public DateTime? CancelledAtUtc { get; set; }
 
     public string? CancellationReason { get; set; }
+
+    // Direct Payment Details
+    public decimal AdvanceAmountRequired { get; set; }
+
+    public decimal AmountPaid { get; set; }
+
+    public string PaymentStatus { get; set; } = "NotRequired";
+
+    public string? PaymentMethod { get; set; }
+
+    public string? PaymentTransactionReference { get; set; }
+
+    public string? PaymentProofUrl { get; set; }
+
+    public DateTime? PaymentSubmittedAtUtc { get; set; }
+
+    public DateTime? PaymentVerifiedAtUtc { get; set; }
+
+    public string? PaymentVerifiedBy { get; set; }
+
+    public string? PaymentNotes { get; set; }
+
+    public string? SalonUpiId { get; set; }
+
+    public string? SalonQrCodeImageUrl { get; set; }
 }
 
 public class AppointmentCalendarItemResponse

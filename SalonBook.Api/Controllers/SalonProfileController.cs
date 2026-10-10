@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SalonBook.Api.Data;
@@ -15,15 +16,18 @@ public class SalonProfileController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ISalonImageStorageService _salonImageStorageService;
     private readonly ILogger<SalonProfileController> _logger;
 
     public SalonProfileController(
         ApplicationDbContext dbContext,
         ICurrentUserService currentUserService,
+        ISalonImageStorageService salonImageStorageService,
         ILogger<SalonProfileController> logger)
     {
         _dbContext = dbContext;
         _currentUserService = currentUserService;
+        _salonImageStorageService = salonImageStorageService;
         _logger = logger;
     }
 
@@ -113,6 +117,107 @@ public class SalonProfileController : ControllerBase
         return Ok(MapToProfileResponse(salon));
     }
 
+    /// <summary>
+    /// Upload or replace the salon's logo/profile image.
+    /// Validates file type, size (max 5MB), and actual image binary magic bytes.
+    /// </summary>
+    [HttpPost("logo")]
+    [HttpPost("image")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(SalonProfileResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UploadLogo(IFormFile file, CancellationToken cancellationToken)
+    {
+        var salonId = _currentUserService.SalonId;
+        if (!salonId.HasValue)
+        {
+            return Forbid();
+        }
+
+        var salon = await _dbContext.Salons
+            .FirstOrDefaultAsync(s => s.Id == salonId.Value, cancellationToken);
+
+        if (salon == null)
+        {
+            return NotFound(new { message = "Salon profile not found." });
+        }
+
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new { message = "Please select a valid image file to upload." });
+        }
+
+        try
+        {
+            var oldLogoUrl = salon.LogoUrl;
+            var newLogoUrl = await _salonImageStorageService.SaveSalonLogoAsync(salon.Id, file, cancellationToken);
+
+            // If replacing an existing logo, remove the old file
+            if (!string.IsNullOrWhiteSpace(oldLogoUrl) && !oldLogoUrl.Equals(newLogoUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                await _salonImageStorageService.DeleteSalonLogoAsync(salon.Id, oldLogoUrl, cancellationToken);
+            }
+
+            salon.LogoUrl = newLogoUrl;
+            salon.UpdatedAtUtc = DateTime.UtcNow;
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Salon logo updated successfully for Salon ID {SalonId}: {LogoUrl}", salon.Id, newLogoUrl);
+
+            return Ok(MapToProfileResponse(salon));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Remove the salon's logo/profile image.
+    /// </summary>
+    [HttpDelete("logo")]
+    [HttpDelete("image")]
+    [ProducesResponseType(typeof(SalonProfileResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteLogo(CancellationToken cancellationToken)
+    {
+        var salonId = _currentUserService.SalonId;
+        if (!salonId.HasValue)
+        {
+            return Forbid();
+        }
+
+        var salon = await _dbContext.Salons
+            .FirstOrDefaultAsync(s => s.Id == salonId.Value, cancellationToken);
+
+        if (salon == null)
+        {
+            return NotFound(new { message = "Salon profile not found." });
+        }
+
+        if (!string.IsNullOrWhiteSpace(salon.LogoUrl))
+        {
+            await _salonImageStorageService.DeleteSalonLogoAsync(salon.Id, salon.LogoUrl, cancellationToken);
+            salon.LogoUrl = null;
+            salon.UpdatedAtUtc = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Salon logo removed successfully for Salon ID {SalonId}", salon.Id);
+        }
+
+        return Ok(MapToProfileResponse(salon));
+    }
+
     private static SalonProfileResponse MapToProfileResponse(Salon salon)
     {
         return new SalonProfileResponse
@@ -132,6 +237,7 @@ public class SalonProfileController : ControllerBase
             OpeningHoursJson = salon.OpeningHoursJson,
             TimeZone = salon.TimeZone,
             CurrencyCode = salon.CurrencyCode,
+            LogoUrl = salon.LogoUrl,
             OnboardingState = salon.OnboardingState,
             IsActive = salon.IsActive,
             CreatedAtUtc = salon.CreatedAtUtc,
@@ -139,4 +245,3 @@ public class SalonProfileController : ControllerBase
         };
     }
 }
-

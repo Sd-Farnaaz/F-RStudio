@@ -64,6 +64,18 @@ public class EntityMappingTests
         var activeProp = entityType.FindProperty(nameof(Salon.IsActive));
         Assert.NotNull(activeProp);
         Assert.Equal(true, activeProp.GetDefaultValue());
+
+        var upiProp = entityType.FindProperty(nameof(Salon.UpiId));
+        Assert.NotNull(upiProp);
+        Assert.Equal(100, upiProp.GetMaxLength());
+
+        var isAdvanceProp = entityType.FindProperty(nameof(Salon.IsAdvancePaymentRequired));
+        Assert.NotNull(isAdvanceProp);
+        Assert.Equal(false, isAdvanceProp.GetDefaultValue());
+
+        var logoProp = entityType.FindProperty(nameof(Salon.LogoUrl));
+        Assert.NotNull(logoProp);
+        Assert.Equal(500, logoProp.GetMaxLength());
     }
 
     [Fact]
@@ -87,6 +99,10 @@ public class EntityMappingTests
         var activeProp = entityType.FindProperty(nameof(Service.IsActive));
         Assert.NotNull(activeProp);
         Assert.Equal(true, activeProp.GetDefaultValue());
+
+        var imageProp = entityType.FindProperty(nameof(Service.ImageUrl));
+        Assert.NotNull(imageProp);
+        Assert.Equal(500, imageProp.GetMaxLength());
 
         var salonFk = entityType.GetForeignKeys().FirstOrDefault(fk => fk.PrincipalEntityType.ClrType == typeof(Salon));
         Assert.NotNull(salonFk);
@@ -161,6 +177,16 @@ public class EntityMappingTests
         var statusProp = entityType.FindProperty(nameof(Appointment.Status));
         Assert.NotNull(statusProp);
         Assert.Equal("Confirmed", statusProp.GetDefaultValue());
+
+        var advRequiredProp = entityType.FindProperty(nameof(Appointment.AdvanceAmountRequired));
+        Assert.NotNull(advRequiredProp);
+        Assert.Equal(18, advRequiredProp.GetPrecision());
+        Assert.Equal(2, advRequiredProp.GetScale());
+        Assert.Equal(0.00m, advRequiredProp.GetDefaultValue());
+
+        var payStatusProp = entityType.FindProperty(nameof(Appointment.PaymentStatus));
+        Assert.NotNull(payStatusProp);
+        Assert.Equal("NotRequired", payStatusProp.GetDefaultValue());
 
         var staffStartIdx = entityType.GetIndexes().FirstOrDefault(i => i.Properties.Any(p => p.Name == nameof(Appointment.StaffId)) && i.Properties.Any(p => p.Name == nameof(Appointment.StartAtUtc)));
         Assert.NotNull(staffStartIdx);

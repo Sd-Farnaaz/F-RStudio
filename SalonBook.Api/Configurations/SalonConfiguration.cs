@@ -92,6 +92,25 @@ public class SalonConfiguration : IEntityTypeConfiguration<Salon>
             .HasPrecision(18, 2)
             .HasDefaultValue(1200000.00m);
 
+        builder.Property(s => s.UpiId)
+            .HasMaxLength(100);
+
+        builder.Property(s => s.QrCodeImageUrl)
+            .HasMaxLength(500);
+
+        builder.Property(s => s.LogoUrl)
+            .HasMaxLength(500);
+
+        builder.Property(s => s.IsAdvancePaymentRequired)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(s => s.AdvancePaymentType)
+            .HasMaxLength(20);
+
+        builder.Property(s => s.AdvancePaymentValue)
+            .HasPrecision(18, 2);
+
         builder.Property(s => s.CreatedAtUtc)
             .IsRequired();
 

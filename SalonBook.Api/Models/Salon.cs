@@ -47,6 +47,20 @@ public class Salon
 
     public decimal AnnualRevenueTarget { get; set; } = 1200000.00m;
 
+    // Direct UPI and Advance Payment Settings
+    public string? UpiId { get; set; }
+
+    public string? QrCodeImageUrl { get; set; }
+
+    public bool IsAdvancePaymentRequired { get; set; } = false;
+
+    public string? AdvancePaymentType { get; set; } // "Fixed", "Percentage"
+
+    public decimal? AdvancePaymentValue { get; set; }
+
+    // Salon Branding & Media
+    public string? LogoUrl { get; set; }
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedAtUtc { get; set; }

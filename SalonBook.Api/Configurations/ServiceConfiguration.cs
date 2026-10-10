@@ -33,6 +33,9 @@ public class ServiceConfiguration : IEntityTypeConfiguration<Service>
         builder.Property(s => s.DurationMinutes)
             .IsRequired();
 
+        builder.Property(s => s.ImageUrl)
+            .HasMaxLength(500);
+
         builder.Property(s => s.IsActive)
             .IsRequired()
             .HasDefaultValue(true);

@@ -30,6 +30,18 @@ namespace SalonBook.Api.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<decimal>("AdvanceAmountRequired")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0.00m);
+
+                    b.Property<decimal>("AmountPaid")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0.00m);
+
                     b.Property<string>("CancellationReason")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -52,6 +64,38 @@ namespace SalonBook.Api.Data.Migrations
 
                     b.Property<DateTime>("EndAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("PaymentMethod")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("PaymentNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("PaymentProofUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("PaymentStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("NotRequired");
+
+                    b.Property<DateTime?>("PaymentSubmittedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PaymentTransactionReference")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("PaymentVerifiedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("PaymentVerifiedByUserId")
+                        .HasColumnType("int");
 
                     b.Property<decimal>("PriceAtBooking")
                         .HasPrecision(18, 2)
@@ -86,10 +130,15 @@ namespace SalonBook.Api.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("PaymentVerifiedByUserId");
+
                     b.HasIndex("ServiceId");
 
                     b.HasIndex("CustomerId", "StartAtUtc")
                         .HasDatabaseName("IX_Appointments_CustomerId_StartAtUtc");
+
+                    b.HasIndex("SalonId", "PaymentStatus")
+                        .HasDatabaseName("IX_Appointments_SalonId_PaymentStatus");
 
                     b.HasIndex("SalonId", "StartAtUtc")
                         .HasDatabaseName("IX_Appointments_SalonId_StartAtUtc");
@@ -369,6 +418,14 @@ namespace SalonBook.Api.Data.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
 
+                    b.Property<string>("AdvancePaymentType")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal?>("AdvancePaymentValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<decimal>("AnnualRevenueTarget")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(18, 2)
@@ -417,6 +474,11 @@ namespace SalonBook.Api.Data.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
 
+                    b.Property<bool>("IsAdvancePaymentRequired")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<bool>("IsVerified")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
@@ -428,6 +490,10 @@ namespace SalonBook.Api.Data.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)")
                         .HasDefaultValue("NotSubmitted");
+
+                    b.Property<string>("LogoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -453,6 +519,10 @@ namespace SalonBook.Api.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("QrCodeImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -471,6 +541,10 @@ namespace SalonBook.Api.Data.Migrations
 
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("UpiId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.HasKey("Id");
 
@@ -506,6 +580,10 @@ namespace SalonBook.Api.Data.Migrations
 
                     b.Property<int>("DurationMinutes")
                         .HasColumnType("int");
+
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -868,6 +946,12 @@ namespace SalonBook.Api.Data.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Appointments_Users_CustomerId");
 
+                    b.HasOne("SalonBook.Api.Models.User", "PaymentVerifiedByUser")
+                        .WithMany()
+                        .HasForeignKey("PaymentVerifiedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Appointments_Users_PaymentVerifiedByUserId");
+
                     b.HasOne("SalonBook.Api.Models.Salon", "Salon")
                         .WithMany("Appointments")
                         .HasForeignKey("SalonId")
@@ -890,6 +974,8 @@ namespace SalonBook.Api.Data.Migrations
                         .HasConstraintName("FK_Appointments_Staff_StaffId");
 
                     b.Navigation("Customer");
+
+                    b.Navigation("PaymentVerifiedByUser");
 
                     b.Navigation("Salon");
 

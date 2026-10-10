@@ -169,6 +169,24 @@ public class BookingService : IBookingService
                 throw new InvalidOperationException("The selected time slot is already booked for this staff member.");
             }
 
+            decimal advanceAmountRequired = 0.00m;
+            string paymentStatus = PaymentStatuses.NotRequired;
+
+            if (salon.IsAdvancePaymentRequired && salon.AdvancePaymentValue.HasValue && salon.AdvancePaymentValue.Value > 0)
+            {
+                if (string.Equals(salon.AdvancePaymentType, AdvancePaymentTypes.Percentage, StringComparison.OrdinalIgnoreCase))
+                {
+                    advanceAmountRequired = Math.Round(service.Price * (salon.AdvancePaymentValue.Value / 100m), 2);
+                }
+                else
+                {
+                    advanceAmountRequired = salon.AdvancePaymentValue.Value;
+                }
+
+                advanceAmountRequired = Math.Min(service.Price, Math.Max(0m, advanceAmountRequired));
+                paymentStatus = PaymentStatuses.Pending;
+            }
+
             var appointment = new Appointment
             {
                 SalonId = salon.Id,
@@ -182,6 +200,9 @@ public class BookingService : IBookingService
                 ServiceNameAtBooking = service.Name,
                 DurationMinutesAtBooking = service.DurationMinutes,
                 CustomerNotes = request.CustomerNotes?.Trim(),
+                AdvanceAmountRequired = advanceAmountRequired,
+                AmountPaid = 0.00m,
+                PaymentStatus = paymentStatus,
                 CreatedAtUtc = DateTime.UtcNow
             };
 
@@ -266,6 +287,7 @@ public class BookingService : IBookingService
             .Include(a => a.Customer)
             .Include(a => a.Staff)
             .Include(a => a.Service)
+            .Include(a => a.PaymentVerifiedByUser)
             .FirstAsync(a => a.Id == appointmentId, cancellationToken);
 
         return new AppointmentResponse
@@ -292,7 +314,19 @@ public class BookingService : IBookingService
             CreatedAtUtc = appointment.CreatedAtUtc,
             UpdatedAtUtc = appointment.UpdatedAtUtc,
             CancelledAtUtc = appointment.CancelledAtUtc,
-            CancellationReason = appointment.CancellationReason
+            CancellationReason = appointment.CancellationReason,
+            AdvanceAmountRequired = appointment.AdvanceAmountRequired,
+            AmountPaid = appointment.AmountPaid,
+            PaymentStatus = appointment.PaymentStatus,
+            PaymentMethod = appointment.PaymentMethod,
+            PaymentTransactionReference = appointment.PaymentTransactionReference,
+            PaymentProofUrl = appointment.PaymentProofUrl,
+            PaymentSubmittedAtUtc = appointment.PaymentSubmittedAtUtc,
+            PaymentVerifiedAtUtc = appointment.PaymentVerifiedAtUtc,
+            PaymentVerifiedBy = appointment.PaymentVerifiedByUser != null ? appointment.PaymentVerifiedByUser.FullName : null,
+            PaymentNotes = appointment.PaymentNotes,
+            SalonUpiId = appointment.Salon.UpiId,
+            SalonQrCodeImageUrl = appointment.Salon.QrCodeImageUrl
         };
     }
 

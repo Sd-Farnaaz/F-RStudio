@@ -22,6 +22,8 @@ public class Service
     /// </summary>
     public int DurationMinutes { get; set; } = 30;
 
+    public string? ImageUrl { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;

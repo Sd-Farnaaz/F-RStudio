@@ -67,6 +67,8 @@ public class ServiceResponse
 
     public int DurationMinutes { get; set; }
 
+    public string? ImageUrl { get; set; }
+
     public bool IsActive { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
@@ -87,5 +89,7 @@ public class PublicServiceResponse
     public decimal Price { get; set; }
 
     public int DurationMinutes { get; set; }
+
+    public string? ImageUrl { get; set; }
 }
 

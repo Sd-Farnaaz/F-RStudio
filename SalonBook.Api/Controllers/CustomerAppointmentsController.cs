@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SalonBook.Api.Common;
 using SalonBook.Api.Data;
 using SalonBook.Api.DTOs;
 using SalonBook.Api.Models;
@@ -205,6 +206,97 @@ public class CustomerAppointmentsController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Submit payment transaction reference (e.g. UTR / UPI Ref) and optional proof for a booking.
+    /// </summary>
+    [HttpPost("{id:int}/payment-proof")]
+    [ProducesResponseType(typeof(AppointmentResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SubmitPaymentProof(
+        int id,
+        [FromBody] SubmitPaymentProofRequest request,
+        CancellationToken cancellationToken)
+    {
+        var customerId = _currentUserService.UserId;
+        if (!customerId.HasValue)
+        {
+            return Forbid();
+        }
+
+        var appointment = await _dbContext.Appointments
+            .Include(a => a.Salon)
+            .Include(a => a.Customer)
+            .Include(a => a.Staff)
+            .Include(a => a.Service)
+            .Include(a => a.PaymentVerifiedByUser)
+            .FirstOrDefaultAsync(a => a.Id == id && a.CustomerId == customerId.Value, cancellationToken);
+
+        if (appointment == null)
+        {
+            return NotFound(new { message = "Appointment not found in your bookings." });
+        }
+
+        if (AppointmentStatuses.TerminalStatuses.Contains(appointment.Status))
+        {
+            return BadRequest(new { message = $"Cannot submit payment proof for an appointment in '{appointment.Status}' status." });
+        }
+
+        if (appointment.PaymentStatus == PaymentStatuses.Paid)
+        {
+            return BadRequest(new { message = "This appointment has already been fully paid and verified." });
+        }
+
+        if (request.AmountPaid.HasValue && request.AmountPaid.Value > appointment.PriceAtBooking)
+        {
+            return BadRequest(new { message = $"Submitted amount ({request.AmountPaid.Value}) cannot exceed total appointment price of {appointment.PriceAtBooking}." });
+        }
+
+        var cleanRef = request.PaymentTransactionReference.Trim();
+
+        var isDuplicateRef = await _dbContext.Appointments.AnyAsync(a =>
+            a.SalonId == appointment.SalonId &&
+            a.Id != appointment.Id &&
+            a.PaymentTransactionReference == cleanRef &&
+            (a.PaymentStatus == PaymentStatuses.Paid || a.PaymentStatus == PaymentStatuses.PartiallyPaid || a.PaymentStatus == PaymentStatuses.Pending),
+            cancellationToken);
+
+        if (isDuplicateRef)
+        {
+            return Conflict(new { message = $"Payment transaction reference '{cleanRef}' has already been submitted for another appointment at this salon." });
+        }
+
+        appointment.PaymentTransactionReference = cleanRef;
+        appointment.PaymentMethod = string.IsNullOrWhiteSpace(request.PaymentMethod) ? "UPI" : request.PaymentMethod.Trim();
+        appointment.PaymentProofUrl = request.PaymentProofUrl?.Trim();
+        appointment.PaymentSubmittedAtUtc = DateTime.UtcNow;
+
+        if (request.AmountPaid.HasValue && request.AmountPaid.Value > 0)
+        {
+            appointment.AmountPaid = request.AmountPaid.Value;
+        }
+        else if (appointment.AdvanceAmountRequired > 0 && appointment.AmountPaid == 0)
+        {
+            appointment.AmountPaid = appointment.AdvanceAmountRequired;
+        }
+
+        if (appointment.PaymentStatus == PaymentStatuses.NotRequired)
+        {
+            appointment.PaymentStatus = PaymentStatuses.Pending;
+        }
+
+        appointment.UpdatedAtUtc = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Customer ID {CustomerId} submitted payment reference '{Ref}' for Appointment ID {AppointmentId}.",
+            customerId.Value, appointment.PaymentTransactionReference, appointment.Id);
+
+        return Ok(MapToResponse(appointment));
+    }
+
     private static AppointmentResponse MapToResponse(Appointment a)
     {
         return new AppointmentResponse
@@ -231,7 +323,19 @@ public class CustomerAppointmentsController : ControllerBase
             CreatedAtUtc = a.CreatedAtUtc,
             UpdatedAtUtc = a.UpdatedAtUtc,
             CancelledAtUtc = a.CancelledAtUtc,
-            CancellationReason = a.CancellationReason
+            CancellationReason = a.CancellationReason,
+            AdvanceAmountRequired = a.AdvanceAmountRequired,
+            AmountPaid = a.AmountPaid,
+            PaymentStatus = a.PaymentStatus,
+            PaymentMethod = a.PaymentMethod,
+            PaymentTransactionReference = a.PaymentTransactionReference,
+            PaymentProofUrl = a.PaymentProofUrl,
+            PaymentSubmittedAtUtc = a.PaymentSubmittedAtUtc,
+            PaymentVerifiedAtUtc = a.PaymentVerifiedAtUtc,
+            PaymentVerifiedBy = a.PaymentVerifiedByUser != null ? a.PaymentVerifiedByUser.FullName : null,
+            PaymentNotes = a.PaymentNotes,
+            SalonUpiId = a.Salon != null ? a.Salon.UpiId : null,
+            SalonQrCodeImageUrl = a.Salon != null ? a.Salon.QrCodeImageUrl : null
         };
     }
 }

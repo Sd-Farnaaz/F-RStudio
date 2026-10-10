@@ -288,6 +288,107 @@ public class AdminAppointmentsController : ControllerBase
         return Ok(calendarItems);
     }
 
+    /// <summary>
+    /// Manually verify and record a customer's payment status, amount paid, and transaction reference.
+    /// </summary>
+    [HttpPost("{id:int}/verify-payment")]
+    [ProducesResponseType(typeof(AppointmentResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> VerifyPayment(
+        int id,
+        [FromBody] VerifyAppointmentPaymentRequest request,
+        CancellationToken cancellationToken)
+    {
+        var salonId = _currentUserService.SalonId;
+        var adminUserId = _currentUserService.UserId;
+        if (!salonId.HasValue || !adminUserId.HasValue)
+        {
+            return Forbid();
+        }
+
+        if (!PaymentStatuses.All.Contains(request.PaymentStatus))
+        {
+            return BadRequest(new { message = $"Invalid payment status '{request.PaymentStatus}'. Valid statuses: {string.Join(", ", PaymentStatuses.All)}" });
+        }
+
+        var appointment = await _dbContext.Appointments
+            .Include(a => a.Salon)
+            .Include(a => a.Customer)
+            .Include(a => a.Staff)
+            .Include(a => a.Service)
+            .Include(a => a.PaymentVerifiedByUser)
+            .FirstOrDefaultAsync(a => a.Id == id && a.SalonId == salonId.Value, cancellationToken);
+
+        if (appointment == null)
+        {
+            return NotFound(new { message = "Appointment not found in your salon." });
+        }
+
+        if (!PaymentStatuses.IsValidTransition(appointment.PaymentStatus, request.PaymentStatus))
+        {
+            return BadRequest(new { message = $"Cannot transition payment from '{appointment.PaymentStatus}' to '{request.PaymentStatus}'." });
+        }
+
+        if (request.AmountPaid.HasValue && request.AmountPaid.Value > appointment.PriceAtBooking)
+        {
+            return BadRequest(new { message = $"Verified amount paid ({request.AmountPaid.Value}) cannot exceed total appointment price of {appointment.PriceAtBooking}." });
+        }
+
+        if (request.PaymentStatus == PaymentStatuses.Refunded && appointment.AmountPaid == 0)
+        {
+            return BadRequest(new { message = "Cannot process refund for an appointment with zero amount paid." });
+        }
+
+        appointment.PaymentStatus = request.PaymentStatus;
+
+        if (request.AmountPaid.HasValue)
+        {
+            appointment.AmountPaid = request.AmountPaid.Value;
+        }
+        else if (request.PaymentStatus == PaymentStatuses.Paid && appointment.AmountPaid == 0)
+        {
+            appointment.AmountPaid = appointment.PriceAtBooking;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.PaymentMethod))
+        {
+            appointment.PaymentMethod = request.PaymentMethod.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.PaymentTransactionReference))
+        {
+            appointment.PaymentTransactionReference = request.PaymentTransactionReference.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Notes))
+        {
+            appointment.PaymentNotes = request.Notes.Trim();
+        }
+
+        appointment.PaymentVerifiedAtUtc = DateTime.UtcNow;
+        appointment.PaymentVerifiedByUserId = adminUserId.Value;
+        appointment.UpdatedAtUtc = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Payment for Appointment ID {AppointmentId} verified as '{PaymentStatus}' with amount {Amount} by Admin {Email}.",
+            appointment.Id, appointment.PaymentStatus, appointment.AmountPaid, _currentUserService.Email);
+
+        try
+        {
+            await _notificationService.DispatchAppointmentEventAsync(appointment, "AppointmentStatusChanged", cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to dispatch notification for payment verification of appointment {AppointmentId}.", appointment.Id);
+        }
+
+        return Ok(MapToResponse(appointment));
+    }
+
     private static AppointmentResponse MapToResponse(Appointment a)
     {
         return new AppointmentResponse
@@ -314,7 +415,19 @@ public class AdminAppointmentsController : ControllerBase
             CreatedAtUtc = a.CreatedAtUtc,
             UpdatedAtUtc = a.UpdatedAtUtc,
             CancelledAtUtc = a.CancelledAtUtc,
-            CancellationReason = a.CancellationReason
+            CancellationReason = a.CancellationReason,
+            AdvanceAmountRequired = a.AdvanceAmountRequired,
+            AmountPaid = a.AmountPaid,
+            PaymentStatus = a.PaymentStatus,
+            PaymentMethod = a.PaymentMethod,
+            PaymentTransactionReference = a.PaymentTransactionReference,
+            PaymentProofUrl = a.PaymentProofUrl,
+            PaymentSubmittedAtUtc = a.PaymentSubmittedAtUtc,
+            PaymentVerifiedAtUtc = a.PaymentVerifiedAtUtc,
+            PaymentVerifiedBy = a.PaymentVerifiedByUser != null ? a.PaymentVerifiedByUser.FullName : null,
+            PaymentNotes = a.PaymentNotes,
+            SalonUpiId = a.Salon != null ? a.Salon.UpiId : null,
+            SalonQrCodeImageUrl = a.Salon != null ? a.Salon.QrCodeImageUrl : null
         };
     }
 }

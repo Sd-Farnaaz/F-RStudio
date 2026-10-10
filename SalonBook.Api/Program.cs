@@ -54,6 +54,7 @@ builder.Services.AddScoped<ISlugService, SlugService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<ISuperAdminProvisioningService, SuperAdminProvisioningService>();
 builder.Services.AddScoped<IMediaStorageService, LocalMediaStorageService>();
+builder.Services.AddScoped<ISalonImageStorageService, LocalSalonImageStorageService>();
 builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();

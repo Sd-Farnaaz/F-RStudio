@@ -49,6 +49,40 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
         builder.Property(a => a.CancelledAtUtc)
             .IsRequired(false);
 
+        // Direct Payment Tracking
+        builder.Property(a => a.AdvanceAmountRequired)
+            .IsRequired()
+            .HasPrecision(18, 2)
+            .HasDefaultValue(0.00m);
+
+        builder.Property(a => a.AmountPaid)
+            .IsRequired()
+            .HasPrecision(18, 2)
+            .HasDefaultValue(0.00m);
+
+        builder.Property(a => a.PaymentStatus)
+            .IsRequired()
+            .HasMaxLength(30)
+            .HasDefaultValue("NotRequired");
+
+        builder.Property(a => a.PaymentMethod)
+            .HasMaxLength(50);
+
+        builder.Property(a => a.PaymentTransactionReference)
+            .HasMaxLength(100);
+
+        builder.Property(a => a.PaymentProofUrl)
+            .HasMaxLength(500);
+
+        builder.Property(a => a.PaymentSubmittedAtUtc)
+            .IsRequired(false);
+
+        builder.Property(a => a.PaymentVerifiedAtUtc)
+            .IsRequired(false);
+
+        builder.Property(a => a.PaymentNotes)
+            .HasMaxLength(500);
+
         // Indexes for performance and concurrency conflict lookups
         builder.HasIndex(a => new { a.StaffId, a.StartAtUtc })
             .HasDatabaseName("IX_Appointments_StaffId_StartAtUtc");
@@ -61,6 +95,9 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
 
         builder.HasIndex(a => new { a.SalonId, a.Status, a.StartAtUtc })
             .HasDatabaseName("IX_Appointments_SalonId_Status_StartAtUtc");
+
+        builder.HasIndex(a => new { a.SalonId, a.PaymentStatus })
+            .HasDatabaseName("IX_Appointments_SalonId_PaymentStatus");
 
         builder.HasIndex(a => new { a.CustomerId, a.StartAtUtc })
             .HasDatabaseName("IX_Appointments_CustomerId_StartAtUtc");
@@ -89,6 +126,12 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
             .HasForeignKey(a => a.ServiceId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Appointments_Services_ServiceId");
+
+        builder.HasOne(a => a.PaymentVerifiedByUser)
+            .WithMany()
+            .HasForeignKey(a => a.PaymentVerifiedByUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Appointments_Users_PaymentVerifiedByUserId");
     }
 }
 

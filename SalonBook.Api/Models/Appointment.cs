@@ -34,7 +34,29 @@ public class Appointment
 
     public string? CancellationReason { get; set; }
 
+    // Direct Payment Tracking
+    public decimal AdvanceAmountRequired { get; set; } = 0.00m;
+
+    public decimal AmountPaid { get; set; } = 0.00m;
+
+    public string PaymentStatus { get; set; } = "NotRequired"; // NotRequired, Pending, PartiallyPaid, Paid, Failed, Refunded
+
+    public string? PaymentMethod { get; set; } // UPI, Cash, Card, DirectQR, None
+
+    public string? PaymentTransactionReference { get; set; }
+
+    public string? PaymentProofUrl { get; set; }
+
+    public DateTime? PaymentSubmittedAtUtc { get; set; }
+
+    public DateTime? PaymentVerifiedAtUtc { get; set; }
+
+    public int? PaymentVerifiedByUserId { get; set; }
+
+    public string? PaymentNotes { get; set; }
+
     // Navigation properties
+    public User? PaymentVerifiedByUser { get; set; }
     public Salon Salon { get; set; } = null!;
 
     public User Customer { get; set; } = null!;

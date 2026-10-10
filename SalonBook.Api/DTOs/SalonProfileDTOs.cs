@@ -79,6 +79,8 @@ public class SalonProfileResponse
 
     public string CurrencyCode { get; set; } = string.Empty;
 
+    public string? LogoUrl { get; set; }
+
     public string OnboardingState { get; set; } = string.Empty;
 
     public bool IsActive { get; set; }
@@ -119,5 +121,7 @@ public class PublicSalonResponse
     public string TimeZone { get; set; } = string.Empty;
 
     public string CurrencyCode { get; set; } = string.Empty;
+
+    public string? LogoUrl { get; set; }
 }
 

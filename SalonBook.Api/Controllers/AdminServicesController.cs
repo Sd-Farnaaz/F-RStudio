@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SalonBook.Api.Data;
@@ -15,15 +16,18 @@ public class AdminServicesController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ISalonImageStorageService _salonImageStorageService;
     private readonly ILogger<AdminServicesController> _logger;
 
     public AdminServicesController(
         ApplicationDbContext dbContext,
         ICurrentUserService currentUserService,
+        ISalonImageStorageService salonImageStorageService,
         ILogger<AdminServicesController> logger)
     {
         _dbContext = dbContext;
         _currentUserService = currentUserService;
+        _salonImageStorageService = salonImageStorageService;
         _logger = logger;
     }
 
@@ -235,6 +239,105 @@ public class AdminServicesController : ControllerBase
     }
 
     /// <summary>
+    /// Upload or replace the image for a service belonging to the authenticated administrator's salon.
+    /// </summary>
+    [HttpPost("{id:int}/image")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(ServiceResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UploadServiceImage(int id, IFormFile file, CancellationToken cancellationToken)
+    {
+        var salonId = _currentUserService.SalonId;
+        if (!salonId.HasValue)
+        {
+            return Forbid();
+        }
+
+        var service = await _dbContext.Services
+            .FirstOrDefaultAsync(s => s.Id == id && s.SalonId == salonId.Value, cancellationToken);
+
+        if (service == null)
+        {
+            return NotFound(new { message = "Service not found in your salon catalog." });
+        }
+
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new { message = "Please select a valid image file to upload." });
+        }
+
+        try
+        {
+            var oldImageUrl = service.ImageUrl;
+            var newImageUrl = await _salonImageStorageService.SaveServiceImageAsync(salonId.Value, service.Id, file, cancellationToken);
+
+            // Clean up old image if replacing
+            if (!string.IsNullOrWhiteSpace(oldImageUrl) && !oldImageUrl.Equals(newImageUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                await _salonImageStorageService.DeleteServiceImageAsync(salonId.Value, service.Id, oldImageUrl, cancellationToken);
+            }
+
+            service.ImageUrl = newImageUrl;
+            service.UpdatedAtUtc = DateTime.UtcNow;
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Service ID {ServiceId} image updated for Salon ID {SalonId}: {ImageUrl}",
+                service.Id, salonId.Value, newImageUrl);
+
+            return Ok(MapToServiceResponse(service));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Remove the image for a service belonging to the authenticated administrator's salon.
+    /// </summary>
+    [HttpDelete("{id:int}/image")]
+    [ProducesResponseType(typeof(ServiceResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteServiceImage(int id, CancellationToken cancellationToken)
+    {
+        var salonId = _currentUserService.SalonId;
+        if (!salonId.HasValue)
+        {
+            return Forbid();
+        }
+
+        var service = await _dbContext.Services
+            .FirstOrDefaultAsync(s => s.Id == id && s.SalonId == salonId.Value, cancellationToken);
+
+        if (service == null)
+        {
+            return NotFound(new { message = "Service not found in your salon catalog." });
+        }
+
+        if (!string.IsNullOrWhiteSpace(service.ImageUrl))
+        {
+            await _salonImageStorageService.DeleteServiceImageAsync(salonId.Value, service.Id, service.ImageUrl, cancellationToken);
+            service.ImageUrl = null;
+            service.UpdatedAtUtc = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Service ID {ServiceId} image removed for Salon ID {SalonId}", service.Id, salonId.Value);
+        }
+
+        return Ok(MapToServiceResponse(service));
+    }
+
+    /// <summary>
     /// Delete a service from the salon catalog.
     /// </summary>
     [HttpDelete("{id:int}")]
@@ -258,6 +361,12 @@ public class AdminServicesController : ControllerBase
             return NotFound(new { message = "Service not found in your salon catalog." });
         }
 
+        // Clean up image file if present
+        if (!string.IsNullOrWhiteSpace(service.ImageUrl))
+        {
+            await _salonImageStorageService.DeleteServiceImageAsync(salonId.Value, service.Id, service.ImageUrl, cancellationToken);
+        }
+
         _dbContext.Services.Remove(service);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -278,10 +387,10 @@ public class AdminServicesController : ControllerBase
             Category = service.Category,
             Price = service.Price,
             DurationMinutes = service.DurationMinutes,
+            ImageUrl = service.ImageUrl,
             IsActive = service.IsActive,
             CreatedAtUtc = service.CreatedAtUtc,
             UpdatedAtUtc = service.UpdatedAtUtc
         };
     }
 }
-

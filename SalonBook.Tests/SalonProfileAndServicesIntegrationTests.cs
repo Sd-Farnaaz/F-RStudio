@@ -344,9 +344,10 @@ public class SalonProfileAndServicesIntegrationTests : IClassFixture<CustomWebAp
         var (token, salonId, slug) = await RegisterSalonAndAdminAsync();
 
         // Update profile with City
+        var uniqueName = $"Royal Lounge {slug}";
         var updateReq = new UpdateSalonProfileRequest
         {
-            Name = "Royal Hair Lounge",
+            Name = uniqueName,
             BusinessType = "Hair Salon",
             City = "Pune",
             State = "Maharashtra",
@@ -395,7 +396,7 @@ public class SalonProfileAndServicesIntegrationTests : IClassFixture<CustomWebAp
         res2.EnsureSuccessStatusCode();
 
         // 1. GET /api/salons (Public list)
-        var publicSalonsRes = await _client.GetAsync($"/api/salons?city=Pune&search=Royal");
+        var publicSalonsRes = await _client.GetAsync($"/api/salons?city=Pune&search={slug}");
         Assert.Equal(HttpStatusCode.OK, publicSalonsRes.StatusCode);
         var pagedSalons = await publicSalonsRes.Content.ReadFromJsonAsync<PagedResult<PublicSalonResponse>>();
         Assert.NotNull(pagedSalons);
@@ -406,7 +407,7 @@ public class SalonProfileAndServicesIntegrationTests : IClassFixture<CustomWebAp
         Assert.Equal(HttpStatusCode.OK, getSlugRes.StatusCode);
         var salonDetail = await getSlugRes.Content.ReadFromJsonAsync<PublicSalonResponse>();
         Assert.NotNull(salonDetail);
-        Assert.Equal("Royal Hair Lounge", salonDetail.Name);
+        Assert.Equal(uniqueName, salonDetail.Name);
         Assert.Equal("Pune", salonDetail.City);
 
         // 3. GET /api/salons/{slug}/services (Public service catalog)

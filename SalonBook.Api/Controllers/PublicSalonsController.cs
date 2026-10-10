@@ -24,6 +24,7 @@ public class PublicSalonsController : ControllerBase
     [ProducesResponseType(typeof(PagedResult<PublicSalonResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSalons(
         [FromQuery] string? q,
+        [FromQuery] string? search,
         [FromQuery] string? city,
         [FromQuery] string? businessType,
         [FromQuery] int page = 1,
@@ -47,12 +48,13 @@ public class PublicSalonsController : ControllerBase
             query = query.Where(s => s.BusinessType.ToLower() == businessType.Trim().ToLower());
         }
 
-        if (!string.IsNullOrWhiteSpace(q))
+        var textSearch = !string.IsNullOrWhiteSpace(q) ? q : search;
+        if (!string.IsNullOrWhiteSpace(textSearch))
         {
-            var searchTerm = q.Trim().ToLower();
-            query = query.Where(s => s.Name.ToLower().Contains(searchTerm) ||
-                                     (s.Description != null && s.Description.ToLower().Contains(searchTerm)) ||
-                                     (s.City != null && s.City.ToLower().Contains(searchTerm)));
+            var term = textSearch.Trim().ToLower();
+            query = query.Where(s => s.Name.ToLower().Contains(term) ||
+                                     (s.Description != null && s.Description.ToLower().Contains(term)) ||
+                                     (s.City != null && s.City.ToLower().Contains(term)));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
@@ -157,7 +159,8 @@ public class PublicSalonsController : ControllerBase
                 Description = s.Description,
                 Category = s.Category,
                 Price = s.Price,
-                DurationMinutes = s.DurationMinutes
+                DurationMinutes = s.DurationMinutes,
+                ImageUrl = s.ImageUrl
             })
             .ToListAsync(cancellationToken);
 
@@ -190,7 +193,8 @@ public class PublicSalonsController : ControllerBase
             ContactEmail = salon.ContactEmail,
             OpeningHoursJson = salon.OpeningHoursJson,
             TimeZone = salon.TimeZone,
-            CurrencyCode = salon.CurrencyCode
+            CurrencyCode = salon.CurrencyCode,
+            LogoUrl = salon.LogoUrl
         };
     }
 }
