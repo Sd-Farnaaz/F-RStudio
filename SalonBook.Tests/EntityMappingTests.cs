@@ -145,6 +145,34 @@ public class EntityMappingTests
     }
 
     [Fact]
+    public void AppointmentEntity_HasConfiguredPropertiesAndRestrictiveForeignKeys()
+    {
+        using var context = CreateContext();
+        var entityType = context.Model.FindEntityType(typeof(Appointment));
+
+        Assert.NotNull(entityType);
+        Assert.Equal("Appointments", entityType.GetTableName());
+
+        var priceProp = entityType.FindProperty(nameof(Appointment.PriceAtBooking));
+        Assert.NotNull(priceProp);
+        Assert.Equal(18, priceProp.GetPrecision());
+        Assert.Equal(2, priceProp.GetScale());
+
+        var statusProp = entityType.FindProperty(nameof(Appointment.Status));
+        Assert.NotNull(statusProp);
+        Assert.Equal("Confirmed", statusProp.GetDefaultValue());
+
+        var staffStartIdx = entityType.GetIndexes().FirstOrDefault(i => i.Properties.Any(p => p.Name == nameof(Appointment.StaffId)) && i.Properties.Any(p => p.Name == nameof(Appointment.StartAtUtc)));
+        Assert.NotNull(staffStartIdx);
+
+        // Verify foreign keys use Restrict delete behavior
+        foreach (var fk in entityType.GetForeignKeys())
+        {
+            Assert.Equal(DeleteBehavior.Restrict, fk.DeleteBehavior);
+        }
+    }
+
+    [Fact]
     public void StaffEntity_HasConfiguredPropertiesAndRelationships()
     {
         using var context = CreateContext();

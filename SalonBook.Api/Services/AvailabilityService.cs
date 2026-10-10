@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SalonBook.Api.Common;
 using SalonBook.Api.Data;
 using SalonBook.Api.DTOs;
 using SalonBook.Api.Models;
@@ -92,6 +93,21 @@ public class AvailabilityService : IAvailabilityService
                 .ThenInclude(sch => sch.Breaks)
             .ToListAsync(cancellationToken);
 
+        // Fetch existing blocking appointments for staff on target day
+        var staffIds = staffList.Select(s => s.Id).ToList();
+        var targetDayStartLocal = targetDate.ToDateTime(TimeOnly.MinValue);
+        var targetDayEndLocal = targetDate.ToDateTime(TimeOnly.MaxValue);
+        var targetDayStartUtc = TimeZoneInfo.ConvertTimeToUtc(targetDayStartLocal, salonTz);
+        var targetDayEndUtc = TimeZoneInfo.ConvertTimeToUtc(targetDayEndLocal, salonTz);
+
+        var existingAppointments = await _dbContext.Appointments
+            .AsNoTracking()
+            .Where(a => staffIds.Contains(a.StaffId) &&
+                        AppointmentStatuses.BlockingStatuses.Contains(a.Status) &&
+                        a.StartAtUtc < targetDayEndUtc &&
+                        targetDayStartUtc < a.EndAtUtc)
+            .ToListAsync(cancellationToken);
+
         var slotStaffMap = new SortedDictionary<TimeSpan, (TimeSpan EndTime, List<PublicStaffResponse> Staff)>();
 
         const int slotStepMinutes = 15; // 15-minute slot alignment
@@ -103,6 +119,8 @@ public class AvailabilityService : IAvailabilityService
             {
                 continue;
             }
+
+            var staffBookings = existingAppointments.Where(a => a.StaffId == staff.Id).ToList();
 
             var current = schedule.StartTime;
             while (current + duration <= schedule.EndTime)
@@ -116,7 +134,12 @@ public class AvailabilityService : IAvailabilityService
                 // Check today past time
                 var isPastToday = targetDate == localToday && slotStart <= localNow.TimeOfDay;
 
-                if (!overlapsBreak && !isPastToday)
+                // Check overlapping blocking appointments
+                var slotStartUtc = TimeZoneInfo.ConvertTimeToUtc(targetDate.ToDateTime(TimeOnly.FromTimeSpan(slotStart)), salonTz);
+                var slotEndUtc = TimeZoneInfo.ConvertTimeToUtc(targetDate.ToDateTime(TimeOnly.FromTimeSpan(slotEnd)), salonTz);
+                var hasBookingOverlap = staffBookings.Any(a => a.StartAtUtc < slotEndUtc && slotStartUtc < a.EndAtUtc);
+
+                if (!overlapsBreak && !isPastToday && !hasBookingOverlap)
                 {
                     if (!slotStaffMap.TryGetValue(slotStart, out var entry))
                     {
@@ -180,7 +203,6 @@ public class AvailabilityService : IAvailabilityService
 
     private static TimeZoneInfo TryGetFallbackTimeZone(string timeZoneId)
     {
-        // Handle common cross-platform mappings
         if (timeZoneId.Equals("Asia/Kolkata", StringComparison.OrdinalIgnoreCase) ||
             timeZoneId.Equals("India Standard Time", StringComparison.OrdinalIgnoreCase))
         {
@@ -195,4 +217,3 @@ public class AvailabilityService : IAvailabilityService
         return TimeZoneInfo.Utc;
     }
 }
-

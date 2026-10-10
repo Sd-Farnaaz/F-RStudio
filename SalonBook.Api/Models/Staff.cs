@@ -24,5 +24,7 @@ public class Staff
     public Salon Salon { get; set; } = null!;
 
     public ICollection<StaffSchedule> Schedules { get; set; } = new List<StaffSchedule>();
+
+    public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
 }
 

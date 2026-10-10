@@ -61,4 +61,6 @@ public class Salon
     public ICollection<VendorComplianceLog> ComplianceLogs { get; set; } = new List<VendorComplianceLog>();
 
     public ICollection<Staff> StaffMembers { get; set; } = new List<Staff>();
+
+    public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
 }

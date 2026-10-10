@@ -20,6 +20,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Staff> Staff => Set<Staff>();
     public DbSet<StaffSchedule> StaffSchedules => Set<StaffSchedule>();
     public DbSet<StaffBreak> StaffBreaks => Set<StaffBreak>();
+    public DbSet<Appointment> Appointments => Set<Appointment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

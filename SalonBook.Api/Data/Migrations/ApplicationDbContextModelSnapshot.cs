@@ -22,6 +22,90 @@ namespace SalonBook.Api.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("SalonBook.Api.Models.Appointment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("CancelledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CustomerNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("DurationMinutesAtBooking")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EndAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("PriceAtBooking")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("SalonId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ServiceNameAtBooking")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("StaffId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("Confirmed");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ServiceId");
+
+                    b.HasIndex("CustomerId", "StartAtUtc")
+                        .HasDatabaseName("IX_Appointments_CustomerId_StartAtUtc");
+
+                    b.HasIndex("SalonId", "StartAtUtc")
+                        .HasDatabaseName("IX_Appointments_SalonId_StartAtUtc");
+
+                    b.HasIndex("StaffId", "StartAtUtc")
+                        .HasDatabaseName("IX_Appointments_StaffId_StartAtUtc");
+
+                    b.HasIndex("SalonId", "Status", "StartAtUtc")
+                        .HasDatabaseName("IX_Appointments_SalonId_Status_StartAtUtc");
+
+                    b.HasIndex("StaffId", "Status", "StartAtUtc")
+                        .HasDatabaseName("IX_Appointments_StaffId_Status_StartAtUtc");
+
+                    b.ToTable("Appointments", (string)null);
+                });
+
             modelBuilder.Entity("SalonBook.Api.Models.PasswordResetToken", b =>
                 {
                     b.Property<int>("Id")
@@ -634,6 +718,45 @@ namespace SalonBook.Api.Data.Migrations
                     b.ToTable("VendorPayouts", (string)null);
                 });
 
+            modelBuilder.Entity("SalonBook.Api.Models.Appointment", b =>
+                {
+                    b.HasOne("SalonBook.Api.Models.User", "Customer")
+                        .WithMany("Appointments")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Appointments_Users_CustomerId");
+
+                    b.HasOne("SalonBook.Api.Models.Salon", "Salon")
+                        .WithMany("Appointments")
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Appointments_Salons_SalonId");
+
+                    b.HasOne("SalonBook.Api.Models.Service", "Service")
+                        .WithMany("Appointments")
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Appointments_Services_ServiceId");
+
+                    b.HasOne("SalonBook.Api.Models.Staff", "Staff")
+                        .WithMany("Appointments")
+                        .HasForeignKey("StaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Appointments_Staff_StaffId");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Salon");
+
+                    b.Navigation("Service");
+
+                    b.Navigation("Staff");
+                });
+
             modelBuilder.Entity("SalonBook.Api.Models.PasswordResetToken", b =>
                 {
                     b.HasOne("SalonBook.Api.Models.User", "User")
@@ -741,6 +864,8 @@ namespace SalonBook.Api.Data.Migrations
 
             modelBuilder.Entity("SalonBook.Api.Models.Salon", b =>
                 {
+                    b.Navigation("Appointments");
+
                     b.Navigation("ComplianceLogs");
 
                     b.Navigation("Payouts");
@@ -752,8 +877,15 @@ namespace SalonBook.Api.Data.Migrations
                     b.Navigation("Users");
                 });
 
+            modelBuilder.Entity("SalonBook.Api.Models.Service", b =>
+                {
+                    b.Navigation("Appointments");
+                });
+
             modelBuilder.Entity("SalonBook.Api.Models.Staff", b =>
                 {
+                    b.Navigation("Appointments");
+
                     b.Navigation("Schedules");
                 });
 
@@ -764,6 +896,8 @@ namespace SalonBook.Api.Data.Migrations
 
             modelBuilder.Entity("SalonBook.Api.Models.User", b =>
                 {
+                    b.Navigation("Appointments");
+
                     b.Navigation("PasswordResetTokens");
 
                     b.Navigation("RefreshTokens");

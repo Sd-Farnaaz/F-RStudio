@@ -28,7 +28,9 @@ public class Service
 
     public DateTime? UpdatedAtUtc { get; set; }
 
-    // Navigation property
+    // Navigation properties
     public Salon Salon { get; set; } = null!;
+
+    public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
 }
 
