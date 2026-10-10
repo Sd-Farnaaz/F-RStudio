@@ -63,4 +63,6 @@ public class Salon
     public ICollection<Staff> StaffMembers { get; set; } = new List<Staff>();
 
     public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
+
+    public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 }

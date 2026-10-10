@@ -24,13 +24,16 @@ public interface IBookingService
 public class BookingService : IBookingService
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<BookingService> _logger;
 
     public BookingService(
         ApplicationDbContext dbContext,
+        INotificationService notificationService,
         ILogger<BookingService> logger)
     {
         _dbContext = dbContext;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -192,6 +195,15 @@ public class BookingService : IBookingService
         _logger.LogInformation("Appointment ID {AppointmentId} created successfully for Customer ID {CustomerId} at Salon ID {SalonId}.",
             createdAppointment.Id, customerId, salon.Id);
 
+        try
+        {
+            await _notificationService.DispatchAppointmentEventAsync(createdAppointment, "AppointmentCreated", cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to dispatch notification for created appointment {AppointmentId}.", createdAppointment.Id);
+        }
+
         // Fetch complete details for response
         return await GetAppointmentResponseByIdAsync(createdAppointment.Id, cancellationToken);
     }
@@ -233,6 +245,15 @@ public class BookingService : IBookingService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Appointment ID {AppointmentId} cancelled by Customer ID {CustomerId}.", appointmentId, customerId);
+
+        try
+        {
+            await _notificationService.DispatchAppointmentEventAsync(appointment, "AppointmentCancelled", cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to dispatch notification for cancelled appointment {AppointmentId}.", appointment.Id);
+        }
 
         return await GetAppointmentResponseByIdAsync(appointment.Id, cancellationToken);
     }

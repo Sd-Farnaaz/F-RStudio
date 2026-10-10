@@ -297,4 +297,66 @@ public class EntityMappingTests
         Assert.NotNull(userFk);
         Assert.Equal(DeleteBehavior.Cascade, userFk.DeleteBehavior);
     }
+
+    [Fact]
+    public void NotificationEntity_HasConfiguredPropertiesAndIndexes()
+    {
+        using var context = CreateContext();
+        var entityType = context.Model.FindEntityType(typeof(Notification));
+
+        Assert.NotNull(entityType);
+        Assert.Equal("Notifications", entityType.GetTableName());
+
+        var typeProp = entityType.FindProperty(nameof(Notification.Type));
+        Assert.NotNull(typeProp);
+        Assert.False(typeProp.IsNullable);
+        Assert.Equal(50, typeProp.GetMaxLength());
+
+        var channelProp = entityType.FindProperty(nameof(Notification.Channel));
+        Assert.NotNull(channelProp);
+        Assert.Equal("InApp", channelProp.GetDefaultValue());
+
+        var subjectProp = entityType.FindProperty(nameof(Notification.Subject));
+        Assert.NotNull(subjectProp);
+        Assert.False(subjectProp.IsNullable);
+        Assert.Equal(200, subjectProp.GetMaxLength());
+
+        var statusProp = entityType.FindProperty(nameof(Notification.Status));
+        Assert.NotNull(statusProp);
+        Assert.Equal("Pending", statusProp.GetDefaultValue());
+
+        var userFk = entityType.GetForeignKeys().FirstOrDefault(fk => fk.PrincipalEntityType.ClrType == typeof(User));
+        Assert.NotNull(userFk);
+        Assert.Equal(DeleteBehavior.Restrict, userFk.DeleteBehavior);
+    }
+
+    [Fact]
+    public void AppointmentReminderEntity_HasConfiguredPropertiesAndUniqueIndex()
+    {
+        using var context = CreateContext();
+        var entityType = context.Model.FindEntityType(typeof(AppointmentReminder));
+
+        Assert.NotNull(entityType);
+        Assert.Equal("AppointmentReminders", entityType.GetTableName());
+
+        var reminderTypeProp = entityType.FindProperty(nameof(AppointmentReminder.ReminderType));
+        Assert.NotNull(reminderTypeProp);
+        Assert.False(reminderTypeProp.IsNullable);
+        Assert.Equal(30, reminderTypeProp.GetMaxLength());
+
+        var statusProp = entityType.FindProperty(nameof(AppointmentReminder.Status));
+        Assert.NotNull(statusProp);
+        Assert.Equal("Pending", statusProp.GetDefaultValue());
+
+        var uniqueIndex = entityType.GetIndexes().FirstOrDefault(i =>
+            i.Properties.Any(p => p.Name == nameof(AppointmentReminder.AppointmentId)) &&
+            i.Properties.Any(p => p.Name == nameof(AppointmentReminder.ReminderType)));
+
+        Assert.NotNull(uniqueIndex);
+        Assert.True(uniqueIndex.IsUnique);
+
+        var apptFk = entityType.GetForeignKeys().FirstOrDefault(fk => fk.PrincipalEntityType.ClrType == typeof(Appointment));
+        Assert.NotNull(apptFk);
+        Assert.Equal(DeleteBehavior.Cascade, apptFk.DeleteBehavior);
+    }
 }

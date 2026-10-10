@@ -16,15 +16,18 @@ public class AdminAppointmentsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<AdminAppointmentsController> _logger;
 
     public AdminAppointmentsController(
         ApplicationDbContext dbContext,
         ICurrentUserService currentUserService,
+        INotificationService notificationService,
         ILogger<AdminAppointmentsController> logger)
     {
         _dbContext = dbContext;
         _currentUserService = currentUserService;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -206,6 +209,19 @@ public class AdminAppointmentsController : ControllerBase
 
         _logger.LogInformation("Appointment ID {AppointmentId} status transitioned from {OldStatus} to {NewStatus} by Admin {Email}.",
             appointment.Id, appointment.Status, request.Status, _currentUserService.Email);
+
+        try
+        {
+            var eventType = request.Status == AppointmentStatuses.Cancelled
+                ? "AppointmentCancelled"
+                : (request.Status == AppointmentStatuses.Confirmed ? "AppointmentConfirmed" : "AppointmentStatusChanged");
+
+            await _notificationService.DispatchAppointmentEventAsync(appointment, eventType, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to dispatch notification for updated appointment {AppointmentId}.", appointment.Id);
+        }
 
         return Ok(MapToResponse(appointment));
     }

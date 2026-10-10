@@ -21,6 +21,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<StaffSchedule> StaffSchedules => Set<StaffSchedule>();
     public DbSet<StaffBreak> StaffBreaks => Set<StaffBreak>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<AppointmentReminder> AppointmentReminders => Set<AppointmentReminder>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

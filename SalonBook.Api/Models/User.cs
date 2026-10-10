@@ -38,4 +38,6 @@ public class User
     public ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = new List<PasswordResetToken>();
 
     public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
+
+    public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 }

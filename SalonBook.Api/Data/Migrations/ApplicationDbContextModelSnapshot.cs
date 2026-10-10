@@ -106,6 +106,147 @@ namespace SalonBook.Api.Data.Migrations
                     b.ToTable("Appointments", (string)null);
                 });
 
+            modelBuilder.Entity("SalonBook.Api.Models.AppointmentReminder", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AppointmentId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("ProcessedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReminderType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("ScheduledForUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("Pending");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId", "ReminderType")
+                        .IsUnique()
+                        .HasDatabaseName("IX_AppointmentReminders_AppointmentId_ReminderType");
+
+                    b.HasIndex("Status", "ScheduledForUtc")
+                        .HasDatabaseName("IX_AppointmentReminders_Status_ScheduledForUtc");
+
+                    b.ToTable("AppointmentReminders", (string)null);
+                });
+
+            modelBuilder.Entity("SalonBook.Api.Models.Notification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AppointmentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("InApp");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("IsRead")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime?>("NextAttemptAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ReadAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("RecipientUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RetryCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<int?>("SalonId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("SentAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("Pending");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId")
+                        .HasDatabaseName("IX_Notifications_AppointmentId");
+
+                    b.HasIndex("SalonId", "CreatedAtUtc")
+                        .HasDatabaseName("IX_Notifications_SalonId_CreatedAtUtc");
+
+                    b.HasIndex("Status", "NextAttemptAtUtc")
+                        .HasDatabaseName("IX_Notifications_Status_NextAttemptAtUtc");
+
+                    b.HasIndex("RecipientUserId", "IsRead", "CreatedAtUtc")
+                        .HasDatabaseName("IX_Notifications_Recipient_IsRead_CreatedAtUtc");
+
+                    b.ToTable("Notifications", (string)null);
+                });
+
             modelBuilder.Entity("SalonBook.Api.Models.PasswordResetToken", b =>
                 {
                     b.Property<int>("Id")
@@ -757,6 +898,46 @@ namespace SalonBook.Api.Data.Migrations
                     b.Navigation("Staff");
                 });
 
+            modelBuilder.Entity("SalonBook.Api.Models.AppointmentReminder", b =>
+                {
+                    b.HasOne("SalonBook.Api.Models.Appointment", "Appointment")
+                        .WithMany("Reminders")
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_AppointmentReminders_Appointments_AppointmentId");
+
+                    b.Navigation("Appointment");
+                });
+
+            modelBuilder.Entity("SalonBook.Api.Models.Notification", b =>
+                {
+                    b.HasOne("SalonBook.Api.Models.Appointment", "Appointment")
+                        .WithMany("Notifications")
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Notifications_Appointments_AppointmentId");
+
+                    b.HasOne("SalonBook.Api.Models.User", "Recipient")
+                        .WithMany("Notifications")
+                        .HasForeignKey("RecipientUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Notifications_Users_RecipientUserId");
+
+                    b.HasOne("SalonBook.Api.Models.Salon", "Salon")
+                        .WithMany("Notifications")
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Notifications_Salons_SalonId");
+
+                    b.Navigation("Appointment");
+
+                    b.Navigation("Recipient");
+
+                    b.Navigation("Salon");
+                });
+
             modelBuilder.Entity("SalonBook.Api.Models.PasswordResetToken", b =>
                 {
                     b.HasOne("SalonBook.Api.Models.User", "User")
@@ -862,11 +1043,20 @@ namespace SalonBook.Api.Data.Migrations
                     b.Navigation("Salon");
                 });
 
+            modelBuilder.Entity("SalonBook.Api.Models.Appointment", b =>
+                {
+                    b.Navigation("Notifications");
+
+                    b.Navigation("Reminders");
+                });
+
             modelBuilder.Entity("SalonBook.Api.Models.Salon", b =>
                 {
                     b.Navigation("Appointments");
 
                     b.Navigation("ComplianceLogs");
+
+                    b.Navigation("Notifications");
 
                     b.Navigation("Payouts");
 
@@ -897,6 +1087,8 @@ namespace SalonBook.Api.Data.Migrations
             modelBuilder.Entity("SalonBook.Api.Models.User", b =>
                 {
                     b.Navigation("Appointments");
+
+                    b.Navigation("Notifications");
 
                     b.Navigation("PasswordResetTokens");
 

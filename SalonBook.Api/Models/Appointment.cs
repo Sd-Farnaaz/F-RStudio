@@ -42,5 +42,9 @@ public class Appointment
     public Staff Staff { get; set; } = null!;
 
     public Service Service { get; set; } = null!;
+
+    public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
+
+    public ICollection<AppointmentReminder> Reminders { get; set; } = new List<AppointmentReminder>();
 }
 
