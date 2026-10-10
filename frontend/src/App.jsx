@@ -31,6 +31,8 @@ import ServicesPage from './pages/dashboard/ServicesPage';
 import SalonProfilePage from './pages/dashboard/SalonProfilePage';
 import StaffPage from './pages/dashboard/StaffPage';
 import StaffSchedulePage from './pages/dashboard/StaffSchedulePage';
+import AdminAppointmentsPage from './pages/dashboard/AdminAppointmentsPage';
+import AdminCalendarPage from './pages/dashboard/AdminCalendarPage';
 
 // Not Found
 import NotFoundPage from './pages/public/NotFoundPage';
@@ -104,6 +106,8 @@ function App() {
           {/* Dashboards */}
           <Route path="/superadmin/dashboard" element={<ProtectedRoute allowedRoles={['SuperAdmin']}><SuperAdminDashboard /></ProtectedRoute>} />
           <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/admin/appointments" element={<ProtectedRoute allowedRoles={['Admin']}><AdminAppointmentsPage /></ProtectedRoute>} />
+          <Route path="/admin/calendar" element={<ProtectedRoute allowedRoles={['Admin']}><AdminCalendarPage /></ProtectedRoute>} />
           <Route path="/admin/services" element={<ProtectedRoute allowedRoles={['Admin']}><ServicesPage /></ProtectedRoute>} />
           <Route path="/admin/staff" element={<ProtectedRoute allowedRoles={['Admin']}><StaffPage /></ProtectedRoute>} />
           <Route path="/admin/staff/:id/schedule" element={<ProtectedRoute allowedRoles={['Admin']}><StaffSchedulePage /></ProtectedRoute>} />

@@ -32,9 +32,10 @@ export default function DashboardLayout({ children }) {
   } else if (role === 'Admin') {
     navigation = [
       { name: 'Dashboard', href: '/admin/dashboard', icon: Home },
-      { name: 'Services', href: '/admin/services', icon: Calendar },
+      { name: 'Appointments', href: '/admin/appointments', icon: Calendar },
+      { name: 'Calendar', href: '/admin/calendar', icon: Calendar },
+      { name: 'Services', href: '/admin/services', icon: Settings },
       { name: 'Staff', href: '/admin/staff', icon: Users },
-      { name: 'Customers', href: '#', icon: Users },
       { name: 'Salon Profile', href: '/admin/settings/salon', icon: Settings },
     ];
   } else {
@@ -43,6 +44,13 @@ export default function DashboardLayout({ children }) {
       { name: 'Account Settings', href: '#', icon: Settings },
     ];
   }
+
+  const getLogoLink = () => {
+    if (role === 'SuperAdmin') return '/superadmin/dashboard';
+    if (role === 'Admin') return '/admin/dashboard';
+    if (role === 'User') return '/';
+    return '/';
+  };
 
   return (
     <div className="h-[100dvh] overflow-hidden bg-ivory flex">
@@ -57,7 +65,7 @@ export default function DashboardLayout({ children }) {
       {/* Sidebar */}
       <div className={`fixed inset-y-0 left-0 w-72 bg-white border-r border-border-color flex flex-col transform transition-transform duration-300 ease-in-out z-50 lg:translate-x-0 lg:static shadow-xl lg:shadow-none ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-border-color">
-          <Link to="/" className="text-2xl font-serif font-semibold text-primary-rose">SalonBook</Link>
+          <Link to={getLogoLink()} className="text-2xl font-serif font-semibold text-primary-rose">SalonBook</Link>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-muted hover:text-deep-plum">
             <X className="w-6 h-6" />
           </button>

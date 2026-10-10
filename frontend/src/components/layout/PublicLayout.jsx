@@ -1,14 +1,30 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function PublicLayout({ children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user } = useAuth();
+
+  const getDashboardLink = () => {
+    if (!user) return '/login';
+    if (user.role === 'SuperAdmin') return '/superadmin/dashboard';
+    if (user.role === 'Admin') return '/admin/dashboard';
+    return '/my-bookings';
+  };
+
+  const getLogoLink = () => {
+    if (!user) return '/';
+    if (user.role === 'SuperAdmin') return '/superadmin/dashboard';
+    if (user.role === 'Admin') return '/admin/dashboard';
+    return '/';
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-ivory">
       <header className="px-6 py-4 flex justify-between items-center border-b border-border-color bg-white/90 backdrop-blur-md sticky top-0 z-50">
-        <Link to="/" className="text-2xl font-serif font-semibold text-primary-rose">SalonBook</Link>
+        <Link to={getLogoLink()} className="text-2xl font-serif font-semibold text-primary-rose">SalonBook</Link>
         
         {/* Desktop Navigation */}
         <nav className="hidden md:flex gap-8 text-sm font-medium text-muted">
@@ -19,8 +35,14 @@ export default function PublicLayout({ children }) {
         </nav>
         
         <div className="hidden md:flex gap-4 items-center">
-          <Link to="/login" className="px-4 py-2 text-sm font-medium text-deep-plum hover:text-primary-rose transition-colors">Log in</Link>
-          <Link to="/join" className="px-5 py-2.5 bg-primary-rose text-white text-sm font-medium rounded-lg hover:bg-primary-rose/90 transition-all shadow-sm">Get Started</Link>
+          {!user ? (
+            <>
+              <Link to="/login" className="px-4 py-2 text-sm font-medium text-deep-plum hover:text-primary-rose transition-colors">Log in</Link>
+              <Link to="/join" className="px-5 py-2.5 bg-primary-rose text-white text-sm font-medium rounded-lg hover:bg-primary-rose/90 transition-all shadow-sm">Get Started</Link>
+            </>
+          ) : (
+            <Link to={getDashboardLink()} className="px-5 py-2.5 bg-primary-rose text-white text-sm font-medium rounded-lg hover:bg-primary-rose/90 transition-all shadow-sm">Dashboard</Link>
+          )}
         </div>
 
         {/* Mobile menu button */}
@@ -42,8 +64,14 @@ export default function PublicLayout({ children }) {
             <Link to="/contact" onClick={() => setMobileMenuOpen(false)} className="hover:text-primary-rose transition-colors border-b border-border-color pb-4">Contact</Link>
           </nav>
           <div className="flex flex-col gap-4 mt-auto pt-8">
-            <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="w-full py-3 text-center text-deep-plum font-medium border border-border-color rounded-lg hover:bg-soft-blush transition-colors">Log in</Link>
-            <Link to="/join" onClick={() => setMobileMenuOpen(false)} className="w-full py-3 text-center bg-primary-rose text-white font-medium rounded-lg shadow-sm hover:bg-primary-rose/90 transition-colors">Get Started</Link>
+            {!user ? (
+              <>
+                <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="w-full py-3 text-center text-deep-plum font-medium border border-border-color rounded-lg hover:bg-soft-blush transition-colors">Log in</Link>
+                <Link to="/join" onClick={() => setMobileMenuOpen(false)} className="w-full py-3 text-center bg-primary-rose text-white font-medium rounded-lg shadow-sm hover:bg-primary-rose/90 transition-colors">Get Started</Link>
+              </>
+            ) : (
+              <Link to={getDashboardLink()} onClick={() => setMobileMenuOpen(false)} className="w-full py-3 text-center bg-primary-rose text-white font-medium rounded-lg shadow-sm hover:bg-primary-rose/90 transition-colors">Dashboard</Link>
+            )}
           </div>
         </div>
       )}

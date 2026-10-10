@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import PublicLayout from '../../components/layout/PublicLayout';
 import { publicService } from '../../services/publicService';
 import { availabilityService } from '../../services/availabilityService';
-import { MapPin, Clock, Phone, Mail, AlertCircle, Calendar } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { MapPin, Clock, Phone, Mail, AlertCircle, Calendar, CheckCircle } from 'lucide-react';
 
 export default function SalonDetailPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const { slug } = useParams();
+
   const [salon, setSalon] = useState(null);
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,9 +19,15 @@ export default function SalonDetailPage() {
   // Booking Flow State
   const [selectedServiceId, setSelectedServiceId] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
+  const [selectedTime, setSelectedTime] = useState('');
+  const [customerNotes, setCustomerNotes] = useState('');
   const [availability, setAvailability] = useState(null);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [availabilityError, setAvailabilityError] = useState('');
+  
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingError, setBookingError] = useState('');
+  const [bookingSuccess, setBookingSuccess] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -27,6 +37,8 @@ export default function SalonDetailPage() {
 
   useEffect(() => {
     if (selectedServiceId && selectedDate) {
+      setSelectedTime('');
+      setBookingError('');
       fetchAvailability();
     } else {
       setAvailability(null);
@@ -70,6 +82,44 @@ export default function SalonDetailPage() {
     }
   };
 
+  const handleBookAppointment = async () => {
+    if (!user) {
+      navigate('/login', { state: { from: `/salons/${slug}` } });
+      return;
+    }
+    
+    setBookingLoading(true);
+    setBookingError('');
+    
+    try {
+      // Import missing dependency above in your head: import { appointmentService, toUtcIso } from '../../services/appointmentService';
+      // Wait, since I'm replacing content, I should import it at top of file separately if needed.
+      // I will do that in another pass.
+      const { appointmentService, toUtcIso } = await import('../../services/appointmentService.js');
+      
+      const startAtUtc = toUtcIso(selectedDate, selectedTime, availability.timeZone);
+
+      const response = await appointmentService.createAppointment({
+        salonId: salon.id,
+        serviceId: parseInt(selectedServiceId, 10),
+        startAtUtc,
+        customerNotes: customerNotes || null
+      });
+
+      setBookingSuccess(response);
+      fetchAvailability(); // Refresh
+    } catch (err) {
+      if (err.status === 409) {
+        setBookingError('This time slot is no longer available. Please select another time.');
+        fetchAvailability(); // Refresh slots since conflict
+      } else {
+        setBookingError(err.message || 'Failed to book appointment.');
+      }
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <PublicLayout>
@@ -88,15 +138,29 @@ export default function SalonDetailPage() {
   }
 
   if (error || !salon) {
+    const isRecoverable = error && error !== 'Not Found' && !error.toLowerCase().includes('not found');
+    
     return (
       <PublicLayout>
         <div className="min-h-[60vh] flex flex-col items-center justify-center px-6 text-center">
           <AlertCircle className="w-16 h-16 text-muted mb-4 opacity-50" />
-          <h1 className="text-3xl font-serif font-medium text-deep-plum mb-4">Salon Not Found</h1>
+          <h1 className="text-3xl font-serif font-medium text-deep-plum mb-4">
+            {isRecoverable ? 'Failed to Load Salon' : 'Salon Not Found'}
+          </h1>
           <p className="text-muted max-w-md mb-8">{error || "The salon you're looking for doesn't exist or is currently unavailable."}</p>
-          <Link to="/salons" className="px-6 py-3 bg-primary-rose text-white font-medium rounded-md shadow-sm">
-            Browse Other Salons
-          </Link>
+          <div className="flex gap-4">
+            {isRecoverable && (
+              <button 
+                onClick={fetchData} 
+                className="px-6 py-3 bg-white border border-border-color text-deep-plum font-medium rounded-md shadow-sm hover:bg-soft-blush"
+              >
+                Try Again
+              </button>
+            )}
+            <Link to="/salons" className="px-6 py-3 bg-primary-rose text-white font-medium rounded-md shadow-sm hover:bg-primary-rose/90">
+              Browse Other Salons
+            </Link>
+          </div>
         </div>
       </PublicLayout>
     );
@@ -248,7 +312,15 @@ export default function SalonDetailPage() {
                       {availability.slots.map((slot, idx) => (
                         <button 
                           key={idx}
-                          className="px-3 py-2 text-sm font-medium text-deep-plum border border-border-color rounded-md hover:border-primary-rose hover:text-primary-rose transition-colors text-center"
+                          onClick={() => {
+                            setSelectedTime(slot.startTime);
+                            setBookingError('');
+                          }}
+                          className={`px-3 py-2 text-sm font-medium border rounded-md transition-colors text-center ${
+                            selectedTime === slot.startTime 
+                              ? 'bg-primary-rose text-white border-primary-rose' 
+                              : 'text-deep-plum border-border-color hover:border-primary-rose hover:text-primary-rose'
+                          }`}
                         >
                           {slot.startTime}
                         </button>
@@ -260,6 +332,53 @@ export default function SalonDetailPage() {
                   </div>
                 )}
               </div>
+
+              {/* Step 4 & 5: Notes & Confirm Booking */}
+              {selectedTime && (
+                <div className="pt-4 border-t border-border-color animate-in fade-in slide-in-from-top-4">
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-deep-plum mb-2">4. Add Notes (Optional)</label>
+                    <textarea 
+                      value={customerNotes}
+                      onChange={(e) => setCustomerNotes(e.target.value)}
+                      placeholder="Any specific requests?"
+                      maxLength={500}
+                      rows={2}
+                      className="w-full px-4 py-2.5 text-sm border border-border-color rounded-lg focus:ring-2 focus:ring-primary-rose/50 outline-none bg-white resize-none"
+                    />
+                  </div>
+
+                  {bookingError && (
+                    <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-100 flex items-start mb-4">
+                      <AlertCircle className="w-4 h-4 mr-2 shrink-0 mt-0.5" />
+                      <span>{bookingError}</span>
+                    </div>
+                  )}
+
+                  {bookingSuccess ? (
+                    <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+                      <CheckCircle className="w-8 h-8 text-success mx-auto mb-2" />
+                      <h4 className="font-medium text-success mb-1">Booking Confirmed!</h4>
+                      <p className="text-sm text-success/80 mb-3">Your appointment has been successfully scheduled.</p>
+                      <Link to="/my-bookings" className="text-sm font-medium text-success hover:underline">
+                        View My Bookings
+                      </Link>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={handleBookAppointment}
+                      disabled={bookingLoading}
+                      className="w-full py-3 bg-primary-rose text-white font-medium rounded-lg shadow-sm hover:bg-primary-rose/90 transition-all disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center"
+                    >
+                      {bookingLoading ? (
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      ) : (
+                        `Confirm Booking`
+                      )}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="bg-ivory p-5 border-t border-border-color">
