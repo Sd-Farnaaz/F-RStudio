@@ -13,6 +13,11 @@ export const adminService = {
   updateServiceStatus: (id, isActive) => fetchApi(`/api/admin/services/${id}/status`, { method: 'PATCH', body: { isActive } }),
   deleteService: (id) => fetchApi(`/api/admin/services/${id}`, { method: 'DELETE' }),
 
-  // Vendor Analytics
+  // Vendor Analytics & Dashboard
   getAnalyticsRevenue: () => fetchApi('/api/vendors/analytics/revenue', { method: 'GET' }),
+  getDashboardSummary: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return fetchApi(`/api/admin/dashboard/summary${query ? `?${query}` : ''}`, { method: 'GET' });
+  },
 };
+

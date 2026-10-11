@@ -1,7 +1,8 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Calendar, Users, Home, Settings, LogOut, Bell, Search, Menu, X } from 'lucide-react';
+import { Calendar, Users, Home, Settings, LogOut, Search, Menu, X, CreditCard, Compass, User as UserIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import NotificationBell from './NotificationBell';
 
 export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -36,19 +37,23 @@ export default function DashboardLayout({ children }) {
       { name: 'Calendar', href: '/admin/calendar', icon: Calendar },
       { name: 'Services', href: '/admin/services', icon: Settings },
       { name: 'Staff', href: '/admin/staff', icon: Users },
+      { name: 'Customers', href: '/admin/customers', icon: Users },
       { name: 'Salon Profile', href: '/admin/settings/salon', icon: Settings },
     ];
   } else {
     navigation = [
-      { name: 'My Bookings', href: '/my-bookings', icon: Calendar },
-      { name: 'Account Settings', href: '#', icon: Settings },
+      { name: 'Overview', href: '/my-bookings', icon: Home },
+      { name: 'My Appointments', href: '/my-bookings?tab=appointments', icon: Calendar },
+      { name: 'Payments', href: '/my-bookings?tab=payments', icon: CreditCard },
+      { name: 'Discover Salons', href: '/my-bookings?tab=salons', icon: Compass },
+      { name: 'Account Profile', href: '/my-bookings?tab=account', icon: UserIcon },
     ];
   }
 
   const getLogoLink = () => {
     if (role === 'SuperAdmin') return '/superadmin/dashboard';
     if (role === 'Admin') return '/admin/dashboard';
-    if (role === 'User') return '/';
+    if (role === 'User') return '/my-bookings';
     return '/';
   };
 
@@ -77,7 +82,10 @@ export default function DashboardLayout({ children }) {
               {role === 'Admin' ? 'Salon Management' : role === 'SuperAdmin' ? 'Platform' : 'My Account'}
             </div>
             {navigation.map((item) => {
-              const active = location.pathname === item.href;
+              const currentPath = location.pathname + location.search;
+              const active = item.href.includes('?') 
+                ? currentPath === item.href 
+                : location.pathname === item.href && (!location.search || location.search === '?tab=overview');
               return (
                 <Link
                   key={item.name}
@@ -136,10 +144,7 @@ export default function DashboardLayout({ children }) {
                 className="pl-9 pr-4 py-2 text-sm border border-border-color rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-rose/50 w-64 bg-ivory transition-shadow"
               />
             </div>
-            <button className="text-muted hover:text-primary-rose transition-colors relative p-2 rounded-full hover:bg-soft-blush">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary-rose rounded-full border border-white"></span>
-            </button>
+            <NotificationBell />
           </div>
         </header>
 

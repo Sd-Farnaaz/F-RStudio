@@ -9,14 +9,16 @@ export const appointmentService = {
   },
   getAppointment: (id) => fetchApi(`/api/appointments/${id}`, { method: 'GET' }),
   cancelAppointment: (id, reason) => fetchApi(`/api/appointments/${id}/cancel`, { method: 'POST', body: { reason } }),
+  submitPaymentProof: (id, data) => fetchApi(`/api/appointments/${id}/payment-proof`, { method: 'POST', body: data }),
 
   // Admin endpoints
-  getAdminAppointments: (params) => {
+  getAdminAppointments: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return fetchApi(`/api/admin/appointments${query ? `?${query}` : ''}`, { method: 'GET' });
   },
   getAdminAppointment: (id) => fetchApi(`/api/admin/appointments/${id}`, { method: 'GET' }),
   updateAppointmentStatus: (id, status, reason) => fetchApi(`/api/admin/appointments/${id}/status`, { method: 'PATCH', body: { status, reason } }),
+  verifyPayment: (id, data) => fetchApi(`/api/admin/appointments/${id}/verify-payment`, { method: 'POST', body: data }),
   getCalendar: (startUtc, endUtc, staffId) => {
     const params = { startUtc, endUtc };
     if (staffId) params.staffId = staffId;

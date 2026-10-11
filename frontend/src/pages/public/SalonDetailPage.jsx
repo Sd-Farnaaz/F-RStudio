@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import PublicLayout from '../../components/layout/PublicLayout';
 import { publicService } from '../../services/publicService';
 import { availabilityService } from '../../services/availabilityService';
+import { appointmentService, toUtcIso } from '../../services/appointmentService';
 import { useAuth } from '../../context/AuthContext';
 import { MapPin, Clock, Phone, Mail, AlertCircle, Calendar, CheckCircle } from 'lucide-react';
 
@@ -92,11 +93,6 @@ export default function SalonDetailPage() {
     setBookingError('');
     
     try {
-      // Import missing dependency above in your head: import { appointmentService, toUtcIso } from '../../services/appointmentService';
-      // Wait, since I'm replacing content, I should import it at top of file separately if needed.
-      // I will do that in another pass.
-      const { appointmentService, toUtcIso } = await import('../../services/appointmentService.js');
-      
       const startAtUtc = toUtcIso(selectedDate, selectedTime, availability.timeZone);
 
       const response = await appointmentService.createAppointment({
@@ -356,12 +352,21 @@ export default function SalonDetailPage() {
                   )}
 
                   {bookingSuccess ? (
-                    <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+                    <div className="text-center p-4 bg-green-50 rounded-xl border border-green-200 animate-in fade-in">
                       <CheckCircle className="w-8 h-8 text-success mx-auto mb-2" />
-                      <h4 className="font-medium text-success mb-1">Booking Confirmed!</h4>
-                      <p className="text-sm text-success/80 mb-3">Your appointment has been successfully scheduled.</p>
-                      <Link to="/my-bookings" className="text-sm font-medium text-success hover:underline">
-                        View My Bookings
+                      <h4 className="font-serif font-semibold text-success text-base mb-1">Booking Confirmed!</h4>
+                      <p className="text-xs text-success/90 mb-2">Your appointment has been registered successfully.</p>
+                      
+                      {bookingSuccess.advanceAmountRequired > 0 && (
+                        <div className="my-3 p-3 bg-white/80 rounded-lg border border-amber-200 text-left text-xs space-y-1">
+                          <span className="font-semibold text-amber-800 block">Advance Deposit Required:</span>
+                          <span className="text-sm font-bold text-deep-plum block">${bookingSuccess.advanceAmountRequired.toFixed(2)}</span>
+                          <p className="text-[11px] text-muted">Please visit My Bookings to submit your UPI transaction reference to secure this booking.</p>
+                        </div>
+                      )}
+
+                      <Link to="/my-bookings" className="inline-block mt-2 px-5 py-2.5 bg-primary-rose text-white text-xs font-semibold rounded-lg shadow-sm hover:bg-primary-rose/90 transition-colors">
+                        Proceed to My Bookings →
                       </Link>
                     </div>
                   ) : (

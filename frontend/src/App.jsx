@@ -33,6 +33,7 @@ import StaffPage from './pages/dashboard/StaffPage';
 import StaffSchedulePage from './pages/dashboard/StaffSchedulePage';
 import AdminAppointmentsPage from './pages/dashboard/AdminAppointmentsPage';
 import AdminCalendarPage from './pages/dashboard/AdminCalendarPage';
+import AdminCustomersPage from './pages/dashboard/AdminCustomersPage';
 
 // Not Found
 import NotFoundPage from './pages/public/NotFoundPage';
@@ -111,8 +112,10 @@ function App() {
           <Route path="/admin/services" element={<ProtectedRoute allowedRoles={['Admin']}><ServicesPage /></ProtectedRoute>} />
           <Route path="/admin/staff" element={<ProtectedRoute allowedRoles={['Admin']}><StaffPage /></ProtectedRoute>} />
           <Route path="/admin/staff/:id/schedule" element={<ProtectedRoute allowedRoles={['Admin']}><StaffSchedulePage /></ProtectedRoute>} />
+          <Route path="/admin/customers" element={<ProtectedRoute allowedRoles={['Admin']}><AdminCustomersPage /></ProtectedRoute>} />
           <Route path="/admin/settings/salon" element={<ProtectedRoute allowedRoles={['Admin']}><SalonProfilePage /></ProtectedRoute>} />
           <Route path="/my-bookings" element={<ProtectedRoute allowedRoles={['User']}><CustomerDashboard /></ProtectedRoute>} />
+          <Route path="/customer/dashboard" element={<ProtectedRoute allowedRoles={['User']}><CustomerDashboard /></ProtectedRoute>} />
 
           {/* Redirect old routes gracefully */}
           <Route path="/app/today" element={<Navigate to="/admin/dashboard" replace />} />

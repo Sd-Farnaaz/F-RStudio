@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { adminService } from '../../services/adminService';
-import { AlertCircle, CheckCircle2, Save, MapPin, Store, RotateCcw, ExternalLink, RefreshCw } from 'lucide-react';
+import { paymentService } from '../../services/paymentService';
+import { 
+  AlertCircle, CheckCircle2, Save, MapPin, Store, RotateCcw, ExternalLink, 
+  RefreshCw, CreditCard, QrCode, DollarSign, Info
+} from 'lucide-react';
 
 const REQUIRED_FIELDS = ['name', 'businessType'];
 const OPTIONAL_FIELDS = [
@@ -13,6 +17,8 @@ const OPTIONAL_FIELDS = [
 
 export default function SalonProfilePage() {
   const navigate = useNavigate();
+  
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'payments'
   
   const [initialProfile, setInitialProfile] = useState(null);
   const [profile, setProfile] = useState({
@@ -28,8 +34,24 @@ export default function SalonProfilePage() {
   const [success, setSuccess] = useState('');
   const [isDirty, setIsDirty] = useState(false);
 
+  // Payment Settings State
+  const [paymentSettings, setPaymentSettings] = useState({
+    upiId: '',
+    qrCodeImageUrl: '',
+    isAdvancePaymentRequired: false,
+    advancePaymentType: 'Fixed',
+    advancePaymentValue: '',
+    currencyCode: 'INR'
+  });
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentSaving, setPaymentSaving] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentSuccess, setPaymentSuccess] = useState('');
+  const [qrImgError, setQrImgError] = useState(false);
+
   useEffect(() => {
     fetchProfile();
+    fetchPaymentSettings();
   }, []);
 
   useEffect(() => {
@@ -135,6 +157,91 @@ export default function SalonProfilePage() {
     }
   };
 
+  const fetchPaymentSettings = async () => {
+    try {
+      setPaymentLoading(true);
+      setPaymentError('');
+      const data = await paymentService.getPaymentSettings();
+      setPaymentSettings({
+        upiId: data.upiId || '',
+        qrCodeImageUrl: data.qrCodeImageUrl || '',
+        isAdvancePaymentRequired: !!data.isAdvancePaymentRequired,
+        advancePaymentType: data.advancePaymentType || 'Fixed',
+        advancePaymentValue: data.advancePaymentValue !== null && data.advancePaymentValue !== undefined ? data.advancePaymentValue : '',
+        currencyCode: data.currencyCode || 'INR'
+      });
+      setQrImgError(false);
+    } catch (err) {
+      setPaymentError(err.message || 'Failed to load payment settings.');
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const handlePaymentChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setPaymentSettings(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+    if (name === 'qrCodeImageUrl') setQrImgError(false);
+  };
+
+  const handlePaymentSubmit = async (e) => {
+    e.preventDefault();
+    setPaymentSaving(true);
+    setPaymentError('');
+    setPaymentSuccess('');
+
+    if (paymentSettings.isAdvancePaymentRequired) {
+      if (!paymentSettings.advancePaymentType) {
+        setPaymentError('Advance payment type is required.');
+        setPaymentSaving(false);
+        return;
+      }
+      const val = parseFloat(paymentSettings.advancePaymentValue);
+      if (isNaN(val) || val <= 0) {
+        setPaymentError('Advance payment value must be greater than 0.');
+        setPaymentSaving(false);
+        return;
+      }
+      if (paymentSettings.advancePaymentType === 'Percentage' && (val < 1 || val > 100)) {
+        setPaymentError('Advance payment percentage must be between 1% and 100%.');
+        setPaymentSaving(false);
+        return;
+      }
+    }
+
+    try {
+      const payload = {
+        upiId: paymentSettings.upiId?.trim() || null,
+        qrCodeImageUrl: paymentSettings.qrCodeImageUrl?.trim() || null,
+        isAdvancePaymentRequired: paymentSettings.isAdvancePaymentRequired,
+        advancePaymentType: paymentSettings.isAdvancePaymentRequired ? paymentSettings.advancePaymentType : null,
+        advancePaymentValue: paymentSettings.isAdvancePaymentRequired && paymentSettings.advancePaymentValue !== '' 
+          ? parseFloat(paymentSettings.advancePaymentValue) 
+          : null
+      };
+
+      const res = await paymentService.updatePaymentSettings(payload);
+      setPaymentSuccess('Payment & advance deposit settings saved successfully!');
+      setPaymentSettings(prev => ({
+        ...prev,
+        upiId: res.upiId || '',
+        qrCodeImageUrl: res.qrCodeImageUrl || '',
+        isAdvancePaymentRequired: !!res.isAdvancePaymentRequired,
+        advancePaymentType: res.advancePaymentType || 'Fixed',
+        advancePaymentValue: res.advancePaymentValue !== null && res.advancePaymentValue !== undefined ? res.advancePaymentValue : '',
+        currencyCode: res.currencyCode || prev.currencyCode
+      }));
+      setTimeout(() => setPaymentSuccess(''), 4000);
+    } catch (err) {
+      setPaymentError(err.message || 'Failed to update payment settings.');
+    } finally {
+      setPaymentSaving(false);
+    }
+  };
+
   // Completion calculation
   const allTrackedFields = [...REQUIRED_FIELDS, ...OPTIONAL_FIELDS];
   const filledFields = allTrackedFields.filter(f => profile[f] && profile[f].trim() !== '');
@@ -173,25 +280,65 @@ export default function SalonProfilePage() {
           )}
         </div>
 
-        {error && (
+        {/* Navigation Tabs */}
+        <div className="flex border-b border-border-color mb-8 gap-8">
+          <button
+            type="button"
+            onClick={() => setActiveTab('profile')}
+            className={`pb-4 text-sm font-medium border-b-2 transition-all flex items-center gap-2 ${
+              activeTab === 'profile'
+                ? 'border-primary-rose text-primary-rose'
+                : 'border-transparent text-muted hover:text-deep-plum'
+            }`}
+          >
+            <Store className="w-4 h-4" /> Business Profile & Location
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('payments')}
+            className={`pb-4 text-sm font-medium border-b-2 transition-all flex items-center gap-2 ${
+              activeTab === 'payments'
+                ? 'border-primary-rose text-primary-rose'
+                : 'border-transparent text-muted hover:text-deep-plum'
+            }`}
+          >
+            <CreditCard className="w-4 h-4" /> Payment & Advance Deposit Settings
+          </button>
+        </div>
+
+        {/* Alerts for Profile or Payment tab */}
+        {activeTab === 'profile' && error && (
           <div className="mb-6 p-4 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200 flex items-center shadow-sm">
             <AlertCircle className="w-5 h-5 mr-3 shrink-0" /> {error}
           </div>
         )}
         
-        {success && (
+        {activeTab === 'profile' && success && (
           <div className="mb-6 p-4 bg-green-50 text-green-700 text-sm rounded-xl border border-green-200 flex items-center shadow-sm animate-in fade-in slide-in-from-top-2">
             <CheckCircle2 className="w-5 h-5 mr-3 shrink-0" /> {success}
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          
-          {/* Main Editor Column */}
-          <div className="flex-1">
-            <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-border-color overflow-hidden">
-              
-              {/* Profile Completion Bar */}
+        {activeTab === 'payments' && paymentError && (
+          <div className="mb-6 p-4 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200 flex items-center shadow-sm">
+            <AlertCircle className="w-5 h-5 mr-3 shrink-0" /> {paymentError}
+          </div>
+        )}
+        
+        {activeTab === 'payments' && paymentSuccess && (
+          <div className="mb-6 p-4 bg-green-50 text-green-700 text-sm rounded-xl border border-green-200 flex items-center shadow-sm animate-in fade-in slide-in-from-top-2">
+            <CheckCircle2 className="w-5 h-5 mr-3 shrink-0" /> {paymentSuccess}
+          </div>
+        )}
+
+        {activeTab === 'profile' && (
+          <div className="flex flex-col lg:flex-row gap-8">
+            
+            {/* Main Editor Column */}
+            <div className="flex-1">
+              <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-border-color overflow-hidden">
+                
+                {/* Profile Completion Bar */}
               <div className="bg-ivory/50 px-6 py-4 border-b border-border-color flex items-center justify-between">
                 <span className="text-sm font-medium text-deep-plum">Profile Completion</span>
                 <div className="flex items-center gap-3 w-1/2">
@@ -462,6 +609,214 @@ export default function SalonProfilePage() {
           </div>
           
         </div>
+      )}
+
+      {/* Payment Settings Tab */}
+      {activeTab === 'payments' && (
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Main Payment Settings Form */}
+          <div className="flex-1">
+            <form onSubmit={handlePaymentSubmit} className="bg-white rounded-2xl shadow-sm border border-border-color overflow-hidden">
+              <div className="bg-ivory/50 px-6 py-4 border-b border-border-color flex items-center justify-between">
+                <div>
+                  <h3 className="font-serif font-medium text-deep-plum text-lg">UPI & Advance Payment Configuration</h3>
+                  <p className="text-xs text-muted">Set up how customers pay advance deposits when booking appointments</p>
+                </div>
+                <span className="text-xs px-2.5 py-1 bg-white border border-border-color rounded-full text-muted font-mono font-medium">
+                  Currency: {paymentSettings.currencyCode}
+                </span>
+              </div>
+
+              <div className="p-6 sm:p-8 space-y-8">
+                {/* Section 1: Advance Deposit Requirement */}
+                <section className="space-y-4">
+                  <div className="flex items-start gap-3 p-4 bg-ivory/60 rounded-xl border border-border-color">
+                    <input
+                      type="checkbox"
+                      id="isAdvancePaymentRequired"
+                      name="isAdvancePaymentRequired"
+                      checked={paymentSettings.isAdvancePaymentRequired}
+                      onChange={handlePaymentChange}
+                      className="mt-1 h-4 w-4 rounded border-border-color text-primary-rose focus:ring-primary-rose/50"
+                    />
+                    <label htmlFor="isAdvancePaymentRequired" className="text-sm cursor-pointer select-none">
+                      <span className="font-semibold text-deep-plum block">Require Advance Deposit for Bookings</span>
+                      <span className="text-xs text-muted leading-relaxed block mt-0.5">
+                        When enabled, newly created appointments will require customers to transfer an advance deposit and submit their payment transaction reference (UTR) for verification.
+                      </span>
+                    </label>
+                  </div>
+
+                  {paymentSettings.isAdvancePaymentRequired && (
+                    <div className="p-5 bg-white rounded-xl border border-border-color shadow-sm space-y-5 animate-in fade-in slide-in-from-top-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted">Advance Deposit Calculation</h4>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div>
+                          <label className="block text-xs font-medium text-deep-plum mb-1.5">
+                            Deposit Calculation Type <span className="text-primary-rose">*</span>
+                          </label>
+                          <select
+                            name="advancePaymentType"
+                            value={paymentSettings.advancePaymentType}
+                            onChange={handlePaymentChange}
+                            className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-lg text-sm text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none transition-all"
+                          >
+                            <option value="Fixed">Fixed Amount</option>
+                            <option value="Percentage">Percentage of Service Price</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-deep-plum mb-1.5">
+                            {paymentSettings.advancePaymentType === 'Percentage' ? 'Percentage (1% - 100%)' : `Fixed Amount (${paymentSettings.currencyCode})`} <span className="text-primary-rose">*</span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              name="advancePaymentValue"
+                              value={paymentSettings.advancePaymentValue}
+                              onChange={handlePaymentChange}
+                              min={paymentSettings.advancePaymentType === 'Percentage' ? '1' : '0.01'}
+                              max={paymentSettings.advancePaymentType === 'Percentage' ? '100' : '1000000'}
+                              step={paymentSettings.advancePaymentType === 'Percentage' ? '1' : '0.01'}
+                              placeholder={paymentSettings.advancePaymentType === 'Percentage' ? 'e.g. 20' : 'e.g. 200'}
+                              className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-lg text-sm text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none transition-all"
+                            />
+                            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted">
+                              {paymentSettings.advancePaymentType === 'Percentage' ? '%' : paymentSettings.currencyCode}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-muted flex items-center gap-1.5 bg-soft-blush/40 p-2.5 rounded-lg border border-border-color/60">
+                        <Info className="w-4 h-4 text-primary-rose shrink-0" />
+                        {paymentSettings.advancePaymentType === 'Percentage'
+                          ? `Customers will be required to pay ${paymentSettings.advancePaymentValue || '0'}% of the service price as advance.`
+                          : `Customers will be required to pay a flat ${paymentSettings.currencyCode} ${paymentSettings.advancePaymentValue || '0'} advance for each booking.`}
+                      </p>
+                    </div>
+                  )}
+                </section>
+
+                {/* Section 2: UPI & QR Code Settings */}
+                <section className="space-y-5 pt-4 border-t border-border-color">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted">UPI & Payment Receiving Details</h4>
+
+                  <div>
+                    <label className="block text-xs font-medium text-deep-plum mb-1.5">
+                      Salon UPI ID / VPA
+                    </label>
+                    <input
+                      type="text"
+                      name="upiId"
+                      value={paymentSettings.upiId}
+                      onChange={handlePaymentChange}
+                      maxLength={100}
+                      placeholder="e.g. yoursalon@okaxis or 9876543210@upi"
+                      className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-lg text-sm text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none transition-all font-mono text-xs"
+                    />
+                    <p className="text-[11px] text-muted mt-1">Customers can tap to copy this UPI address to make instant transfers.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-deep-plum mb-1.5">
+                      QR Code Image URL
+                    </label>
+                    <input
+                      type="url"
+                      name="qrCodeImageUrl"
+                      value={paymentSettings.qrCodeImageUrl}
+                      onChange={handlePaymentChange}
+                      maxLength={500}
+                      placeholder="https://example.com/images/salon-upi-qr.png"
+                      className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-lg text-sm text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none transition-all text-xs"
+                    />
+                    <p className="text-[11px] text-muted mt-1">Publicly accessible image URL for your UPI QR code scanner image.</p>
+                  </div>
+                </section>
+              </div>
+
+              {/* Footer Actions */}
+              <div className="bg-ivory/50 px-6 sm:px-8 py-4 border-t border-border-color flex justify-between items-center">
+                <button
+                  type="button"
+                  onClick={fetchPaymentSettings}
+                  disabled={paymentSaving}
+                  className="px-4 py-2 border border-border-color bg-white text-muted hover:text-deep-plum hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Reset
+                </button>
+                <button
+                  type="submit"
+                  disabled={paymentSaving}
+                  className="px-6 py-2.5 bg-primary-rose text-white rounded-lg text-sm font-medium hover:bg-primary-rose/90 transition-all shadow-sm flex items-center gap-2 disabled:opacity-60"
+                >
+                  {paymentSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Save Payment Settings
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Right Preview Column: QR Code & Deposit Rules */}
+          <div className="w-full lg:w-[380px] shrink-0 space-y-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-border-color p-6 text-center">
+              <h4 className="text-sm font-serif font-medium text-deep-plum mb-1">Customer QR Code Preview</h4>
+              <p className="text-xs text-muted mb-4">Live preview of your scanner shown to booking customers</p>
+
+              {paymentSettings.qrCodeImageUrl && !qrImgError ? (
+                <div className="p-4 bg-ivory/40 rounded-xl border border-border-color inline-block">
+                  <img
+                    src={paymentSettings.qrCodeImageUrl}
+                    alt="Salon UPI QR Code"
+                    className="w-48 h-48 object-contain mx-auto rounded-lg bg-white p-2 border border-border-color shadow-sm"
+                    onError={() => setQrImgError(true)}
+                  />
+                  {paymentSettings.upiId && (
+                    <p className="mt-3 text-xs font-mono font-medium text-deep-plum bg-white px-2.5 py-1 rounded border border-border-color truncate max-w-[200px] mx-auto">
+                      {paymentSettings.upiId}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="py-12 px-4 bg-ivory/30 rounded-xl border border-dashed border-border-color flex flex-col items-center justify-center">
+                  <QrCode className="w-12 h-12 text-muted/30 mb-2" />
+                  <p className="text-xs font-medium text-deep-plum">No QR Code Configured</p>
+                  <p className="text-[11px] text-muted max-w-[200px] mt-1">Provide a valid image URL to preview your scanner</p>
+                </div>
+              )}
+
+              <div className="mt-6 pt-5 border-t border-border-color text-left space-y-2.5 text-xs">
+                <div className="flex justify-between text-muted">
+                  <span>Advance Required:</span>
+                  <span className="font-semibold text-deep-plum">
+                    {paymentSettings.isAdvancePaymentRequired ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                {paymentSettings.isAdvancePaymentRequired && (
+                  <div className="flex justify-between text-muted">
+                    <span>Deposit Rule:</span>
+                    <span className="font-semibold text-primary-rose">
+                      {paymentSettings.advancePaymentType === 'Percentage'
+                        ? `${paymentSettings.advancePaymentValue || 0}% of booking`
+                        : `${paymentSettings.currencyCode} ${paymentSettings.advancePaymentValue || 0}`}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between text-muted">
+                  <span>UPI ID:</span>
+                  <span className="font-mono text-deep-plum truncate max-w-[150px]">
+                    {paymentSettings.upiId || 'Not set'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       </div>
     </DashboardLayout>
   );
