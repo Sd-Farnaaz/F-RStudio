@@ -63,7 +63,7 @@ public class AdminCustomersController : ControllerBase
             FullName = request.FullName.Trim(),
             Email = normalizedEmail,
             Role = Roles.User, // Strictly enforce customer role - cannot create Admin or SuperAdmin
-            SalonId = null,    // Customer accounts are global across all salons
+            SalonId = salonId.Value, // Scoped to this salon so customers don't leak across salons
             IsActive = true,
             IsEmailVerified = true,
             CreatedAtUtc = DateTime.UtcNow
@@ -81,7 +81,7 @@ public class AdminCustomersController : ControllerBase
     }
 
     /// <summary>
-    /// Get a customer by ID.
+    /// Get a customer by ID belonging to the authenticated admin's salon.
     /// </summary>
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(CustomerResponse), StatusCodes.Status200OK)]
@@ -98,7 +98,10 @@ public class AdminCustomersController : ControllerBase
 
         var customer = await _dbContext.Users
             .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Id == id && u.Role == Roles.User, cancellationToken);
+            .FirstOrDefaultAsync(u => u.Id == id &&
+                                      u.Role == Roles.User &&
+                                      (u.SalonId == salonId.Value ||
+                                       u.Appointments.Any(a => a.SalonId == salonId.Value)), cancellationToken);
 
         if (customer == null)
         {
@@ -109,7 +112,7 @@ public class AdminCustomersController : ControllerBase
     }
 
     /// <summary>
-    /// Search or list customers.
+    /// Search or list customers belonging to the authenticated admin's salon.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<CustomerResponse>), StatusCodes.Status200OK)]
@@ -132,7 +135,9 @@ public class AdminCustomersController : ControllerBase
 
         var query = _dbContext.Users
             .AsNoTracking()
-            .Where(u => u.Role == Roles.User);
+            .Where(u => u.Role == Roles.User &&
+                        (u.SalonId == salonId.Value ||
+                         u.Appointments.Any(a => a.SalonId == salonId.Value)));
 
         if (!string.IsNullOrWhiteSpace(search))
         {

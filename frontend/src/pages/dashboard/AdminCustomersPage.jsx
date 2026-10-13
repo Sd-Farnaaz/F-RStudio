@@ -45,7 +45,7 @@ export default function AdminCustomersPage() {
       };
       const res = await customerService.getCustomers(params);
       setCustomers(res.items || res || []);
-      setTotalCount(res.totalCount || (res.items || res || []).length);
+      setTotalCount(res.totalCount ?? (res.items || res || []).length);
     } catch (err) {
       setError(err.message || 'Failed to load customer list.');
     } finally {
