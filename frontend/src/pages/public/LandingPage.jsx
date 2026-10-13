@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import PublicLayout from '../../components/layout/PublicLayout';
 import { publicService } from '../../services/publicService';
+import SalonCard from '../../components/common/SalonCard';
 import { 
   ArrowRight, 
   Calendar, 
@@ -219,64 +220,9 @@ export default function LandingPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {salons.map(salon => {
-                const locationText = [salon.city, salon.state].filter(Boolean).join(', ') || salon.country || 'Location Available';
-
-                return (
-                  <div 
-                    key={salon.id}
-                    className="bg-ivory rounded-3xl p-6 border border-border-color/80 hover:border-dusty-rose shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between group"
-                  >
-                    <div>
-                      {/* Salon Avatar / Crest */}
-                      <div className="flex items-center gap-4 mb-5">
-                        {salon.logoUrl ? (
-                          <img 
-                            src={salon.logoUrl} 
-                            alt={salon.name} 
-                            className="w-14 h-14 rounded-2xl object-cover border border-border-color bg-white shrink-0"
-                          />
-                        ) : (
-                          <div className="w-14 h-14 rounded-2xl bg-white border border-border-color flex items-center justify-center text-deep-plum font-serif text-2xl font-bold shrink-0 shadow-2xs">
-                            {salon.name?.charAt(0) || 'S'}
-                          </div>
-                        )}
-
-                        <div className="min-w-0">
-                          <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-rose bg-soft-blush px-2.5 py-0.5 rounded-full border border-dusty-rose/40 inline-block mb-1">
-                            {salon.businessType || 'Beauty Salon'}
-                          </span>
-                          <h3 className="font-serif text-xl font-medium text-deep-plum truncate group-hover:text-primary-rose transition-colors">
-                            {salon.name}
-                          </h3>
-                        </div>
-                      </div>
-
-                      {/* Location & Details */}
-                      <div className="space-y-2 text-xs text-muted mb-6">
-                        <div className="flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-primary-rose shrink-0" />
-                          <span className="truncate">{locationText}</span>
-                        </div>
-                        {salon.description && (
-                          <p className="line-clamp-2 text-muted leading-relaxed pt-1">
-                            {salon.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Card Action */}
-                    <Link
-                      to={`/salons/${salon.slug}`}
-                      className="w-full py-2.5 px-4 bg-white group-hover:bg-primary-rose text-deep-plum group-hover:text-white border border-border-color group-hover:border-primary-rose text-xs font-semibold rounded-xl text-center transition-all duration-200 flex items-center justify-center gap-1.5 shadow-2xs"
-                    >
-                      <span>View Services & Book</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                );
-              })}
+              {salons.map(salon => (
+                <SalonCard key={salon.id} salon={salon} />
+              ))}
             </div>
           )}
 
