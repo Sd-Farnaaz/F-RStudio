@@ -34,36 +34,49 @@ export default function SuperAdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-deep-plum px-4">
-      <div className="max-w-md w-full bg-ivory rounded-xl shadow-2xl p-8 border border-border-color">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-primary-rose rounded-full flex items-center justify-center mb-4">
-            <Shield className="w-8 h-8 text-white" />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-deep-plum via-[#3f2f32] to-[#2e2224] px-4 py-12 relative overflow-hidden">
+      {/* Decorative background glow */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary-rose/10 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="max-w-md w-full bg-ivory rounded-3xl shadow-2xl p-8 sm:p-10 border border-border-color relative z-10 space-y-6">
+        <div className="flex flex-col items-center text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-soft-blush to-rose-tint rounded-2xl border border-dusty-rose/40 flex items-center justify-center mb-4 shadow-2xs">
+            <Shield className="w-8 h-8 text-primary-rose" />
           </div>
-          <h1 className="text-3xl font-serif font-semibold text-deep-plum">SalonBook</h1>
-          <p className="text-muted mt-1 text-sm font-medium uppercase tracking-wider">Platform Administration</p>
+          <span className="text-xs font-semibold uppercase tracking-widest text-primary-rose bg-soft-blush px-3 py-1 rounded-full border border-dusty-rose/30 mb-2">
+            Platform Governance
+          </span>
+          <h1 className="text-3xl font-serif font-medium text-deep-plum">SalonBook</h1>
+          <p className="text-muted mt-1 text-xs">Sign in to platform root administrative console</p>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 text-red-700 text-sm rounded-md border border-red-200">
-            {error}
+          <div className="p-4 bg-rose-50 text-rose-800 text-xs rounded-2xl border border-rose-200 leading-relaxed flex items-start gap-2">
+            <Shield className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <span>{error}</span>
           </div>
         )}
         
-        <form onSubmit={handleLogin} className="space-y-5">
+        <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-deep-plum mb-2">Email</label>
+            <label className="block text-xs font-semibold text-deep-plum mb-1.5">
+              SuperAdmin Email
+            </label>
             <input 
               type="email" 
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
-              className="w-full px-4 py-2 border border-border-color rounded-md focus:outline-none focus:ring-2 focus:ring-primary-rose/50 bg-white" 
+              placeholder="e.g. superadmin@salonbook.com"
+              className="w-full px-4 py-2.5 bg-white text-xs border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-rose/50 text-deep-plum placeholder:text-muted/60 transition-all" 
             />
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-deep-plum mb-2">Password</label>
+            <label className="block text-xs font-semibold text-deep-plum mb-1.5">
+              Master Password
+            </label>
             <div className="relative">
               <input 
                 type={showPassword ? "text" : "password"}
@@ -71,36 +84,38 @@ export default function SuperAdminLoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
-                className="w-full px-4 py-2 border border-border-color rounded-md focus:outline-none focus:ring-2 focus:ring-primary-rose/50 bg-white pr-10" 
+                placeholder="••••••••••••"
+                className="w-full px-4 py-2.5 bg-white text-xs border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-rose/50 text-deep-plum pr-10 transition-all" 
               />
               <button
                 type="button"
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted hover:text-deep-plum focus:outline-none"
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-muted hover:text-deep-plum focus:outline-none"
                 onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input id="remember-me" type="checkbox" className="h-4 w-4 text-primary-rose focus:ring-primary-rose border-gray-300 rounded" />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-deep-plum">Remember me</label>
-            </div>
-            <div className="text-sm">
-              <a href="#" className="font-medium text-primary-rose hover:underline">Forgot password?</a>
             </div>
           </div>
 
           <button 
             type="submit" 
             disabled={isLoading}
-            className="w-full py-2.5 bg-deep-plum text-white font-medium rounded-md hover:bg-deep-plum/90 transition-all shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+            className="w-full py-3 bg-deep-plum text-white font-semibold text-xs rounded-xl hover:bg-deep-plum/90 transition-all shadow-sm hover:shadow-md disabled:opacity-70 disabled:cursor-not-allowed mt-2"
           >
-            {isLoading ? 'Authenticating...' : 'Sign In as SuperAdmin'}
+            {isLoading ? 'Verifying Credentials...' : 'Authenticate Platform Console'}
           </button>
         </form>
+
+        <div className="pt-4 border-t border-border-color/80 text-center">
+          <a 
+            href="/" 
+            className="text-xs text-muted hover:text-deep-plum font-medium transition-colors"
+          >
+            ← Return to SalonBook Public Portal
+          </a>
+        </div>
       </div>
     </div>
   );

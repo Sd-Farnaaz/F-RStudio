@@ -26,6 +26,10 @@ import SuperAdminLoginPage from './pages/auth/SuperAdminLoginPage';
 // Dashboards
 import AdminDashboard from './pages/dashboard/AdminDashboard';
 import SuperAdminDashboard from './pages/dashboard/SuperAdminDashboard';
+import SuperAdminSalonsPage from './pages/dashboard/SuperAdminSalonsPage';
+import SuperAdminSalonDetailPage from './pages/dashboard/SuperAdminSalonDetailPage';
+import SuperAdminKycPage from './pages/dashboard/SuperAdminKycPage';
+import SuperAdminUsersPage from './pages/dashboard/SuperAdminUsersPage';
 import CustomerDashboard from './pages/dashboard/CustomerDashboard';
 import ServicesPage from './pages/dashboard/ServicesPage';
 import SalonProfilePage from './pages/dashboard/SalonProfilePage';
@@ -104,8 +108,12 @@ function App() {
           {/* Shared Auth */}
           <Route path="/forgot-password" element={<PublicAuthRoute><ForgotPasswordPage /></PublicAuthRoute>} />
 
-          {/* Dashboards */}
+          {/* SuperAdmin Platform Management */}
           <Route path="/superadmin/dashboard" element={<ProtectedRoute allowedRoles={['SuperAdmin']}><SuperAdminDashboard /></ProtectedRoute>} />
+          <Route path="/superadmin/salons" element={<ProtectedRoute allowedRoles={['SuperAdmin']}><SuperAdminSalonsPage /></ProtectedRoute>} />
+          <Route path="/superadmin/salons/:id" element={<ProtectedRoute allowedRoles={['SuperAdmin']}><SuperAdminSalonDetailPage /></ProtectedRoute>} />
+          <Route path="/superadmin/kyc" element={<ProtectedRoute allowedRoles={['SuperAdmin']}><SuperAdminKycPage /></ProtectedRoute>} />
+          <Route path="/superadmin/users" element={<ProtectedRoute allowedRoles={['SuperAdmin']}><SuperAdminUsersPage /></ProtectedRoute>} />
           <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
           <Route path="/admin/appointments" element={<ProtectedRoute allowedRoles={['Admin']}><AdminAppointmentsPage /></ProtectedRoute>} />
           <Route path="/admin/calendar" element={<ProtectedRoute allowedRoles={['Admin']}><AdminCalendarPage /></ProtectedRoute>} />

@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Calendar, Users, Home, Settings, LogOut, Search, Menu, X, CreditCard, Compass, User as UserIcon } from 'lucide-react';
+import { Calendar, Users, Home, Settings, LogOut, Search, Menu, X, CreditCard, Compass, User as UserIcon, Store, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import NotificationBell from './NotificationBell';
@@ -29,6 +29,9 @@ export default function DashboardLayout({ children }) {
   if (role === 'SuperAdmin') {
     navigation = [
       { name: 'Overview', href: '/superadmin/dashboard', icon: Home },
+      { name: 'Salon Management', href: '/superadmin/salons', icon: Store },
+      { name: 'KYC Verification', href: '/superadmin/kyc', icon: ShieldCheck },
+      { name: 'User Management', href: '/superadmin/users', icon: Users },
     ];
   } else if (role === 'Admin') {
     navigation = [
@@ -144,7 +147,7 @@ export default function DashboardLayout({ children }) {
                 className="pl-9 pr-4 py-2 text-sm border border-border-color rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-rose/50 w-64 bg-ivory transition-shadow"
               />
             </div>
-            <NotificationBell />
+            {role !== 'SuperAdmin' && <NotificationBell />}
           </div>
         </header>
 
