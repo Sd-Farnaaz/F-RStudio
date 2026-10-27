@@ -13,6 +13,13 @@ public class SuperAdminOverviewResponse
     public int TotalAppointments { get; set; }
     public decimal TotalGrossRevenue { get; set; }
     public string PlatformHealth { get; set; } = "Healthy";
+
+    // Cross-phase platform insights
+    public int TotalVerifiedReviews { get; set; }
+    public int TotalConsultationCards { get; set; }
+    public decimal TotalPendingEscrow { get; set; }
+    public decimal MonthlyRecurringRevenue { get; set; }
+
     public List<SuperAdminRecentSalonItem> RecentSalons { get; set; } = new();
 }
 
@@ -26,6 +33,7 @@ public class SuperAdminRecentSalonItem
     public bool IsActive { get; set; }
     public bool IsVerified { get; set; }
     public string KycStatus { get; set; } = string.Empty;
+    public string SubscriptionTier { get; set; } = "Starter";
     public DateTime CreatedAtUtc { get; set; }
 }
 
@@ -49,6 +57,13 @@ public class SuperAdminSalonResponse
     public int TotalServices { get; set; }
     public int TotalAppointments { get; set; }
     public DateTime CreatedAtUtc { get; set; }
+
+    // Phase 1, 2, 3 Cross-Phase Attributes
+    public string SubscriptionTier { get; set; } = "Starter";
+    public double AverageRating { get; set; }
+    public int TotalReviews { get; set; }
+    public int TotalConsultationCards { get; set; }
+    public decimal TotalPendingEscrow { get; set; }
 }
 
 public class SuperAdminSalonDetailResponse : SuperAdminSalonResponse
@@ -61,6 +76,53 @@ public class SuperAdminSalonDetailResponse : SuperAdminSalonResponse
     public string CurrencyCode { get; set; } = string.Empty;
     public string? LogoUrl { get; set; }
     public decimal TotalRevenue { get; set; }
+
+    // Detailed Phase 2 & 3 Attributes
+    public string SubscriptionBillingCycle { get; set; } = "Monthly";
+    public string SubscriptionStatus { get; set; } = "Active";
+    public decimal SubscriptionPrice { get; set; }
+    public DateTime? SubscriptionRenewsAtUtc { get; set; }
+    public string? GstNumber { get; set; }
+    public string? UpiId { get; set; }
+    public bool IsAdvancePaymentRequired { get; set; }
+    public string? AdvancePaymentType { get; set; }
+    public decimal? AdvancePaymentValue { get; set; }
+    public int TotalFormulaRecords { get; set; }
+    public decimal TotalDisbursedEscrow { get; set; }
+}
+
+public class SuperAdminSettlementItem
+{
+    public int Id { get; set; }
+    public int SalonId { get; set; }
+    public string SalonName { get; set; } = string.Empty;
+    public string SalonCity { get; set; } = string.Empty;
+    public string EscrowTransactionId { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public decimal CommissionAmount { get; set; }
+    public decimal NetAmount { get; set; }
+    public string CurrencyCode { get; set; } = "INR";
+    public string Status { get; set; } = string.Empty;
+    public string? UtrNumber { get; set; }
+    public DateTime? DisbursedAtUtc { get; set; }
+    public string? Notes { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+}
+
+public class SuperAdminSettlementsResponse
+{
+    public decimal TotalPendingEscrow { get; set; }
+    public decimal TotalProcessedSettlement { get; set; }
+    public decimal TotalDisbursed { get; set; }
+    public PagedResult<SuperAdminSettlementItem> Settlements { get; set; } = new();
+}
+
+public class DisburseSettlementRequest
+{
+    [Required(ErrorMessage = "Bank UTR or reference number is required.")]
+    public string UtrNumber { get; set; } = string.Empty;
+
+    public string? Notes { get; set; }
 }
 
 public class UpdateSalonStatusRequest

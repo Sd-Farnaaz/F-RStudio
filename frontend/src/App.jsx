@@ -30,6 +30,7 @@ import SuperAdminSalonsPage from './pages/dashboard/SuperAdminSalonsPage';
 import SuperAdminSalonDetailPage from './pages/dashboard/SuperAdminSalonDetailPage';
 import SuperAdminKycPage from './pages/dashboard/SuperAdminKycPage';
 import SuperAdminUsersPage from './pages/dashboard/SuperAdminUsersPage';
+import SuperAdminSettlementsPage from './pages/dashboard/SuperAdminSettlementsPage';
 import CustomerDashboard from './pages/dashboard/CustomerDashboard';
 import ServicesPage from './pages/dashboard/ServicesPage';
 import SalonProfilePage from './pages/dashboard/SalonProfilePage';
@@ -118,6 +119,7 @@ function App() {
           <Route path="/superadmin/salons/:id" element={<ProtectedRoute allowedRoles={['SuperAdmin']}><SuperAdminSalonDetailPage /></ProtectedRoute>} />
           <Route path="/superadmin/kyc" element={<ProtectedRoute allowedRoles={['SuperAdmin']}><SuperAdminKycPage /></ProtectedRoute>} />
           <Route path="/superadmin/users" element={<ProtectedRoute allowedRoles={['SuperAdmin']}><SuperAdminUsersPage /></ProtectedRoute>} />
+          <Route path="/superadmin/settlements" element={<ProtectedRoute allowedRoles={['SuperAdmin']}><SuperAdminSettlementsPage /></ProtectedRoute>} />
           <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
           <Route path="/admin/appointments" element={<ProtectedRoute allowedRoles={['Admin']}><AdminAppointmentsPage /></ProtectedRoute>} />
           <Route path="/admin/calendar" element={<ProtectedRoute allowedRoles={['Admin']}><AdminCalendarPage /></ProtectedRoute>} />

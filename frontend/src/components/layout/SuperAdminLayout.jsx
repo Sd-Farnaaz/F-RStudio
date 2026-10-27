@@ -5,6 +5,7 @@ import {
   Store, 
   ShieldCheck, 
   Users, 
+  DollarSign,
   LogOut, 
   Menu, 
   X, 
@@ -31,6 +32,12 @@ const NAV_ITEMS = [
     name: 'KYC Verification', 
     href: '/superadmin/kyc', 
     icon: ShieldCheck,
+    exact: true 
+  },
+  { 
+    name: 'Vendor Settlements', 
+    href: '/superadmin/settlements', 
+    icon: DollarSign,
     exact: true 
   },
   { 

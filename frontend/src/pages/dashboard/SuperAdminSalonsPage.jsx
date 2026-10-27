@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import SuperAdminLayout from '../../components/layout/SuperAdminLayout';
 import { superAdminService } from '../../services/superAdminService';
+import { subscriptionService } from '../../services/subscriptionService';
 import { 
   Store, 
   Search, 
@@ -22,7 +23,14 @@ import {
   MapPin, 
   Users, 
   Scissors, 
-  Calendar 
+  Calendar,
+  Star,
+  FileText,
+  Sparkles,
+  TrendingUp,
+  Zap,
+  CreditCard,
+  Edit3
 } from 'lucide-react';
 
 export default function SuperAdminSalonsPage() {
@@ -32,11 +40,13 @@ export default function SuperAdminSalonsPage() {
   const initialSearch = searchParams.get('search') || '';
   const initialActive = searchParams.get('isActive') || 'all';
   const initialKyc = searchParams.get('kycStatus') || 'all';
+  const initialTier = searchParams.get('tier') || 'all';
   const initialPage = parseInt(searchParams.get('page') || '1', 10);
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [activeFilter, setActiveFilter] = useState(initialActive);
   const [kycFilter, setKycFilter] = useState(initialKyc);
+  const [tierFilter, setTierFilter] = useState(initialTier);
   const [currentPage, setCurrentPage] = useState(isNaN(initialPage) ? 1 : initialPage);
 
   const [salons, setSalons] = useState([]);
@@ -54,6 +64,7 @@ export default function SuperAdminSalonsPage() {
   // Modals for Actions
   const [statusModal, setStatusModal] = useState({ isOpen: false, salon: null, isActive: false, reason: '', isSubmitting: false, error: '' });
   const [kycModal, setKycModal] = useState({ isOpen: false, salon: null, kycStatus: 'Verified', isVerified: true, notes: '', isSubmitting: false, error: '' });
+  const [tierModal, setTierModal] = useState({ isOpen: false, salon: null, tier: 'Growth', billingCycle: 'Monthly', isSubmitting: false, error: '' });
 
   const fetchSalons = useCallback(async (params) => {
     try {
@@ -75,6 +86,10 @@ export default function SuperAdminSalonsPage() {
 
       if (params.kycStatus !== 'all' && params.kycStatus !== undefined) {
         queryParams.kycStatus = params.kycStatus;
+      }
+
+      if (params.subscriptionTier !== 'all' && params.subscriptionTier !== undefined) {
+        queryParams.subscriptionTier = params.subscriptionTier;
       }
 
       const res = await superAdminService.getSalons(queryParams);
@@ -102,6 +117,7 @@ export default function SuperAdminSalonsPage() {
       search: searchTerm,
       isActive: activeFilter,
       kycStatus: kycFilter,
+      subscriptionTier: tierFilter,
       page: currentPage
     });
 
@@ -109,9 +125,10 @@ export default function SuperAdminSalonsPage() {
     if (searchTerm) nextParams.set('search', searchTerm);
     if (activeFilter !== 'all') nextParams.set('isActive', activeFilter);
     if (kycFilter !== 'all') nextParams.set('kycStatus', kycFilter);
+    if (tierFilter !== 'all') nextParams.set('tier', tierFilter);
     if (currentPage > 1) nextParams.set('page', currentPage.toString());
     setSearchParams(nextParams, { replace: true });
-  }, [searchTerm, activeFilter, kycFilter, currentPage, fetchSalons, setSearchParams]);
+  }, [searchTerm, activeFilter, kycFilter, tierFilter, currentPage, fetchSalons, setSearchParams]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -120,6 +137,7 @@ export default function SuperAdminSalonsPage() {
       search: searchTerm,
       isActive: activeFilter,
       kycStatus: kycFilter,
+      subscriptionTier: tierFilter,
       page: 1
     });
   };
@@ -128,6 +146,7 @@ export default function SuperAdminSalonsPage() {
     setSearchTerm('');
     setActiveFilter('all');
     setKycFilter('all');
+    setTierFilter('all');
     setCurrentPage(1);
   };
 
@@ -196,6 +215,37 @@ export default function SuperAdminSalonsPage() {
     }
   };
 
+  // Tier Assignment Action Handler (Phase 3)
+  const openTierModal = (salon) => {
+    setTierModal({
+      isOpen: true,
+      salon,
+      tier: salon.subscriptionTier || 'Growth',
+      billingCycle: 'Monthly',
+      isSubmitting: false,
+      error: ''
+    });
+  };
+
+  const submitTierChange = async (e) => {
+    e.preventDefault();
+    if (!tierModal.salon) return;
+    try {
+      setTierModal(prev => ({ ...prev, isSubmitting: true, error: '' }));
+      await subscriptionService.adminAssignTier(tierModal.salon.id, {
+        tier: tierModal.tier,
+        billingCycle: tierModal.billingCycle
+      });
+
+      setSalons(prev => prev.map(s => 
+        s.id === tierModal.salon.id ? { ...s, subscriptionTier: tierModal.tier } : s
+      ));
+      setTierModal({ isOpen: false, salon: null, tier: 'Growth', billingCycle: 'Monthly', isSubmitting: false, error: '' });
+    } catch (err) {
+      setTierModal(prev => ({ ...prev, isSubmitting: false, error: err.message || 'Failed to reassign subscription tier' }));
+    }
+  };
+
   const getKycBadge = (status, isVerified) => {
     const normalized = (status || '').toLowerCase();
     if (isVerified || normalized === 'verified') {
@@ -229,7 +279,33 @@ export default function SuperAdminSalonsPage() {
     );
   };
 
-  const hasActiveFilters = searchTerm.trim() !== '' || activeFilter !== 'all' || kycFilter !== 'all';
+  const getTierBadge = (tier) => {
+    const t = (tier || 'Starter').toLowerCase();
+    if (t.includes('luxury')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+          <Sparkles className="w-3 h-3 text-purple-600" />
+          Luxury Pro
+        </span>
+      );
+    }
+    if (t.includes('growth')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+          <TrendingUp className="w-3 h-3 text-amber-600" />
+          Growth Studio
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-stone-100 text-stone-700 border border-stone-200">
+        <Zap className="w-3 h-3 text-stone-500" />
+        Starter Solo
+      </span>
+    );
+  };
+
+  const hasActiveFilters = searchTerm.trim() !== '' || activeFilter !== 'all' || kycFilter !== 'all' || tierFilter !== 'all';
 
   return (
     <SuperAdminLayout 
@@ -259,7 +335,7 @@ export default function SuperAdminSalonsPage() {
             )}
           </div>
 
-          <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+          <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
             {/* Search Input */}
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
@@ -312,6 +388,23 @@ export default function SuperAdminSalonsPage() {
                 <option value="Pending">Pending KYC Review</option>
                 <option value="Rejected">Rejected KYC</option>
                 <option value="NotSubmitted">Not Submitted</option>
+              </select>
+            </div>
+
+            {/* Subscription Tier Filter (Phase 3) */}
+            <div>
+              <select
+                value={tierFilter}
+                onChange={(e) => {
+                  setTierFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full px-3.5 py-2.5 bg-ivory text-xs border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-rose/40 text-deep-plum font-medium transition-all"
+              >
+                <option value="all">SaaS Tier: All</option>
+                <option value="Starter">Starter Solo</option>
+                <option value="Growth">Growth Studio</option>
+                <option value="LuxuryPro">Luxury Pro</option>
               </select>
             </div>
 
@@ -399,7 +492,8 @@ export default function SuperAdminSalonsPage() {
                   <tr>
                     <th className="py-3.5 px-6">Salon Details</th>
                     <th className="py-3.5 px-6">Location</th>
-                    <th className="py-3.5 px-6">Administrator Contact</th>
+                    <th className="py-3.5 px-6">SaaS Tier</th>
+                    <th className="py-3.5 px-6 text-center">Quality & Dossiers</th>
                     <th className="py-3.5 px-6 text-center">Platform Scale</th>
                     <th className="py-3.5 px-6">KYC Status</th>
                     <th className="py-3.5 px-6">Directory Status</th>
@@ -439,22 +533,34 @@ export default function SuperAdminSalonsPage() {
                         </div>
                       </td>
 
-                      {/* Admin Contact */}
-                      <td className="py-4 px-6">
-                        <div className="space-y-0.5">
-                          <div className="font-medium text-deep-plum">{salon.adminFullName || 'Unassigned'}</div>
-                          {salon.adminEmail && (
-                            <div className="flex items-center gap-1 text-[11px] text-muted">
-                              <Mail className="w-3 h-3 text-muted/60" />
-                              <span className="truncate max-w-[160px]">{salon.adminEmail}</span>
-                            </div>
-                          )}
-                          {salon.phoneNumber && (
-                            <div className="flex items-center gap-1 text-[11px] text-muted">
-                              <Phone className="w-3 h-3 text-muted/60" />
-                              <span>{salon.phoneNumber}</span>
-                            </div>
-                          )}
+                      {/* SaaS Tier (Phase 3) */}
+                      <td className="py-4 px-6 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          {getTierBadge(salon.subscriptionTier)}
+                          <button
+                            type="button"
+                            onClick={() => openTierModal(salon)}
+                            className="p-1 rounded-lg text-muted hover:text-deep-plum hover:bg-ivory transition-colors"
+                            title="Reassign Subscription Tier"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+
+                      {/* Quality & Dossiers (Phases 1 & 2) */}
+                      <td className="py-4 px-6 text-center whitespace-nowrap">
+                        <div className="inline-flex items-center gap-3 px-2.5 py-1 rounded-xl bg-ivory border border-border-color text-[11px]">
+                          <span title="Reviews & Rating (Phase 1)" className="flex items-center gap-1 text-amber-700 font-medium">
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                            {salon.averageRating > 0 ? salon.averageRating.toFixed(1) : 'New'}
+                            <span className="text-muted text-[10px]">({salon.totalReviews})</span>
+                          </span>
+                          <span className="text-border-color">|</span>
+                          <span title="Client Consultation Dossiers (Phase 2)" className="flex items-center gap-1 text-deep-plum font-medium">
+                            <FileText className="w-3 h-3 text-muted" />
+                            {salon.totalConsultationCards} dossiers
+                          </span>
                         </div>
                       </td>
 
@@ -517,6 +623,15 @@ export default function SuperAdminSalonsPage() {
                           >
                             <Eye className="w-4 h-4" />
                           </Link>
+
+                          <button
+                            type="button"
+                            onClick={() => openTierModal(salon)}
+                            className="p-1.5 rounded-lg bg-ivory text-purple-700 border border-border-color hover:border-dusty-rose hover:bg-soft-blush transition-colors"
+                            title="Assign Subscription Plan Tier"
+                          >
+                            <CreditCard className="w-4 h-4" />
+                          </button>
 
                           <button
                             type="button"
@@ -729,6 +844,87 @@ export default function SuperAdminSalonsPage() {
                     className="px-4 py-2 bg-primary-rose text-white text-xs font-semibold rounded-xl hover:bg-primary-rose/90 shadow-2xs transition-all disabled:opacity-50"
                   >
                     {kycModal.isSubmitting ? 'Submitting...' : 'Save Decision'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 5. MODAL: ASSIGN SUBSCRIPTION PLAN TIER (PHASE 3)                         */}
+        {/* ========================================================================= */}
+        {tierModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-deep-plum/50 backdrop-blur-xs">
+            <div className="bg-white rounded-3xl max-w-md w-full border border-border-color shadow-xl overflow-hidden p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-serif text-xl font-medium text-deep-plum">
+                    Assign Subscription Tier
+                  </h3>
+                  <p className="text-xs text-muted mt-0.5">
+                    Modify SaaS entitlements for <strong>{tierModal.salon?.name}</strong>.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTierModal({ isOpen: false, salon: null, tier: 'Growth', billingCycle: 'Monthly', isSubmitting: false, error: '' })}
+                  className="text-muted hover:text-deep-plum p-1 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {tierModal.error && (
+                <div className="p-3 bg-rose-50 text-rose-700 text-xs rounded-xl border border-rose-200">
+                  {tierModal.error}
+                </div>
+              )}
+
+              <form onSubmit={submitTierChange} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-deep-plum mb-1.5">
+                    Select Plan Tier
+                  </label>
+                  <select
+                    value={tierModal.tier}
+                    onChange={(e) => setTierModal(prev => ({ ...prev, tier: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 bg-ivory text-xs border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-rose/40 text-deep-plum font-medium"
+                  >
+                    <option value="Starter">Starter Solo (₹999/mo - 1 Staff, Core POS)</option>
+                    <option value="Growth">Growth Studio (₹2,499/mo - Up to 5 Staff, Dossiers & Formulas)</option>
+                    <option value="LuxuryPro">Luxury Pro (₹4,999/mo - Unlimited Staff, Priority Escrow)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-deep-plum mb-1.5">
+                    Billing Cycle
+                  </label>
+                  <select
+                    value={tierModal.billingCycle}
+                    onChange={(e) => setTierModal(prev => ({ ...prev, billingCycle: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 bg-ivory text-xs border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-rose/40 text-deep-plum font-medium"
+                  >
+                    <option value="Monthly">Monthly Cycle</option>
+                    <option value="Annual">Annual Cycle (20% Savings)</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setTierModal({ isOpen: false, salon: null, tier: 'Growth', billingCycle: 'Monthly', isSubmitting: false, error: '' })}
+                    className="px-4 py-2 border border-border-color text-muted hover:text-deep-plum text-xs font-semibold rounded-xl hover:bg-ivory transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={tierModal.isSubmitting}
+                    className="px-4 py-2 bg-primary-rose text-white text-xs font-semibold rounded-xl hover:bg-primary-rose/90 shadow-2xs transition-all disabled:opacity-50"
+                  >
+                    {tierModal.isSubmitting ? 'Updating Tier...' : 'Save Plan Tier'}
                   </button>
                 </div>
               </form>
