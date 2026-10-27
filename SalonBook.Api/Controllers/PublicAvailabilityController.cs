@@ -21,7 +21,7 @@ public class PublicAvailabilityController : ControllerBase
     }
 
     /// <summary>
-    /// Calculate potential booking availability for a salon by slug, service, date, and optional staff.
+    /// Calculate potential booking availability for a salon by slug, service(s), date, and optional staff.
     /// Note: Final booking creation must revalidate availability within a database transaction.
     /// </summary>
     [HttpGet("api/salons/{slug}/availability")]
@@ -30,14 +30,29 @@ public class PublicAvailabilityController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSalonAvailability(
         string slug,
-        [FromQuery] int serviceId,
-        [FromQuery] string date,
+        [FromQuery] int? serviceId = null,
+        [FromQuery] string? serviceIds = null,
+        [FromQuery] string date = "",
         [FromQuery] int? staffId = null,
         CancellationToken cancellationToken = default)
     {
-        if (serviceId <= 0)
+        var idList = new List<int>();
+        if (!string.IsNullOrWhiteSpace(serviceIds))
         {
-            return BadRequest(new { message = "Valid 'serviceId' parameter is required." });
+            var parsed = serviceIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(s => int.TryParse(s, out var id) ? id : 0)
+                .Where(id => id > 0);
+            idList.AddRange(parsed);
+        }
+
+        if (serviceId.HasValue && serviceId.Value > 0 && !idList.Contains(serviceId.Value))
+        {
+            idList.Insert(0, serviceId.Value);
+        }
+
+        if (idList.Count == 0)
+        {
+            return BadRequest(new { message = "Valid 'serviceId' or comma-separated 'serviceIds' parameter is required." });
         }
 
         if (string.IsNullOrWhiteSpace(date))
@@ -47,7 +62,7 @@ public class PublicAvailabilityController : ControllerBase
 
         try
         {
-            var result = await _availabilityService.GetAvailabilityAsync(slug, serviceId, date, staffId, cancellationToken);
+            var result = await _availabilityService.GetAvailabilityAsync(slug, idList, date, staffId, cancellationToken);
             return Ok(result);
         }
         catch (KeyNotFoundException ex)
@@ -69,12 +84,13 @@ public class PublicAvailabilityController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAvailability(
         [FromQuery] string salonSlug,
-        [FromQuery] int serviceId,
-        [FromQuery] string date,
+        [FromQuery] int? serviceId = null,
+        [FromQuery] string? serviceIds = null,
+        [FromQuery] string date = "",
         [FromQuery] int? staffId = null,
         CancellationToken cancellationToken = default)
     {
-        return await GetSalonAvailability(salonSlug, serviceId, date, staffId, cancellationToken);
+        return await GetSalonAvailability(salonSlug, serviceId, serviceIds, date, staffId, cancellationToken);
     }
 }
 

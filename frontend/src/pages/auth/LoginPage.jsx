@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import AuthLayout from '../../components/layout/AuthLayout';
 import { authService } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -24,11 +24,11 @@ export default function LoginPage() {
     setIsLoading(true);
     
     try {
-      const response = await authService.userLogin({ email, password });
+      const response = await authService.userLogin({ email: email.trim(), password });
       login(response);
       navigate(from, { replace: true });
     } catch (err) {
-      setError(err.message || 'Failed to login');
+      setError(err.message || 'Invalid email or password.');
     } finally {
       setIsLoading(false);
     }
@@ -37,32 +37,40 @@ export default function LoginPage() {
   return (
     <AuthLayout 
       title="Welcome back" 
-      subtitle="Log in to manage your appointments and discover salons."
-      imageSrc="https://images.unsplash.com/photo-1562322140-8baeececf3df?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80"
+      subtitle="Sign in to your client account to manage appointments and browse salons."
+      imageSrc="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1200&q=80"
     >
       {error && (
-        <div className="mb-6 p-4 bg-red-50 text-red-700 text-sm rounded-md border border-red-200">
-          {error}
+        <div className="mb-6 p-4 bg-rose-50 text-rose-700 text-xs sm:text-sm rounded-2xl border border-rose-100 flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{error}</span>
         </div>
       )}
       
-      <form onSubmit={handleLogin} className="space-y-5">
+      <form onSubmit={handleLogin} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-deep-plum mb-2">Email</label>
+          <label className="block text-xs font-semibold uppercase tracking-wider text-deep-plum mb-1.5">
+            Email Address
+          </label>
           <input 
             type="email" 
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={isLoading}
-            className="w-full px-4 py-2 border border-border-color rounded-md focus:outline-none focus:ring-2 focus:ring-primary-rose/50 bg-white" 
+            className="w-full px-4 py-2.5 bg-ivory text-xs sm:text-sm text-deep-plum border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-rose/40 placeholder:text-muted/60 transition-all" 
             placeholder="you@example.com"
           />
         </div>
+
         <div>
-          <div className="flex justify-between items-center mb-2">
-            <label className="block text-sm font-medium text-deep-plum">Password</label>
-            <Link to="/forgot-password" className="text-sm text-primary-rose hover:underline">Forgot password?</Link>
+          <div className="flex justify-between items-center mb-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-deep-plum">
+              Password
+            </label>
+            <Link to="/forgot-password" className="text-xs text-primary-rose hover:underline font-medium">
+              Forgot password?
+            </Link>
           </div>
           <div className="relative">
             <input 
@@ -71,32 +79,53 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
-              className="w-full px-4 py-2 border border-border-color rounded-md focus:outline-none focus:ring-2 focus:ring-primary-rose/50 bg-white pr-10" 
+              className="w-full px-4 py-2.5 bg-ivory text-xs sm:text-sm text-deep-plum border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-rose/40 placeholder:text-muted/60 pr-10 transition-all" 
               placeholder="••••••••"
             />
             <button
               type="button"
               className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted hover:text-deep-plum focus:outline-none"
               onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
         </div>
-        <button 
-          type="submit" 
-          disabled={isLoading}
-          className="w-full py-2.5 bg-primary-rose text-white font-medium rounded-md hover:bg-primary-rose/90 transition-all shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center"
-        >
-          {isLoading ? 'Logging in...' : 'Log in'}
-        </button>
+
+        <div className="pt-2">
+          <button 
+            type="submit" 
+            disabled={isLoading}
+            className="w-full py-3.5 bg-primary-rose text-white text-xs sm:text-sm font-semibold rounded-2xl hover:bg-primary-rose/90 shadow-2xs hover:shadow-sm active:scale-[0.99] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Signing in...</span>
+              </>
+            ) : (
+              <>
+                <span>Sign in</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        </div>
       </form>
-      <div className="mt-8 text-center text-sm text-muted space-y-2">
+
+      <div className="mt-8 pt-6 border-t border-border-color/80 text-center text-xs text-muted space-y-2">
         <p>
-          Don't have an account? <Link to="/signup" className="text-primary-rose font-medium hover:underline">Sign up</Link>
+          Don't have an account yet?{' '}
+          <Link to="/signup" className="text-primary-rose font-semibold hover:underline">
+            Sign up as Client
+          </Link>
         </p>
-        <p>
-          Are you a salon owner? <Link to="/admin/register" className="text-primary-rose font-medium hover:underline">Register your salon</Link>
+        <p className="pt-1">
+          Are you a salon administrator?{' '}
+          <Link to="/admin/login" className="text-deep-plum font-semibold hover:text-primary-rose transition-colors">
+            Salon Admin Login →
+          </Link>
         </p>
       </div>
     </AuthLayout>

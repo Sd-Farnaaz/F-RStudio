@@ -58,6 +58,16 @@ public class NotificationService : INotificationService
                 await HandleAppointmentStatusChangedAsync(appt, salonAdmins, eventType, cancellationToken);
                 break;
 
+            case "PaymentProofSubmitted":
+                await HandlePaymentProofSubmittedAsync(appt, salonAdmins, cancellationToken);
+                break;
+
+            case "PaymentVerified":
+            case "PaymentRejected":
+            case "PaymentRefunded":
+                await HandlePaymentStatusEventAsync(appt, salonAdmins, eventType, cancellationToken);
+                break;
+
             default:
                 _logger.LogWarning("Unknown appointment notification event type: {EventType}", eventType);
                 break;
@@ -288,6 +298,137 @@ public class NotificationService : INotificationService
                 reminder.LastError = $"Appointment marked as {appt.Status}";
                 reminder.ProcessedAtUtc = DateTime.UtcNow;
             }
+        }
+    }
+
+    private async Task HandlePaymentProofSubmittedAsync(Appointment appt, List<User> salonAdmins, CancellationToken cancellationToken)
+    {
+        var currency = appt.Salon?.CurrencyCode ?? "INR";
+        var method = string.IsNullOrWhiteSpace(appt.PaymentMethod) ? "UPI" : appt.PaymentMethod;
+        var txnRef = string.IsNullOrWhiteSpace(appt.PaymentTransactionReference) ? "N/A" : appt.PaymentTransactionReference;
+
+        foreach (var admin in salonAdmins)
+        {
+            var adminInApp = new Notification
+            {
+                RecipientUserId = admin.Id,
+                SalonId = appt.SalonId,
+                AppointmentId = appt.Id,
+                Type = "PaymentProofSubmitted",
+                Channel = "InApp",
+                Subject = $"Payment Proof: {appt.Customer.FullName} (#{appt.Id})",
+                Message = $"{appt.Customer.FullName} submitted {method} payment proof (Ref: {txnRef}, {appt.AmountPaid} {currency}) for appointment #{appt.Id} ({appt.ServiceNameAtBooking}). Please verify.",
+                Status = "Sent",
+                SentAtUtc = DateTime.UtcNow,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            _dbContext.Notifications.Add(adminInApp);
+
+            if (!string.IsNullOrWhiteSpace(admin.Email))
+            {
+                var emailSubject = $"[SalonBook] Payment Proof Submitted for Appointment #{appt.Id}";
+                var emailBody = $"<p>Customer <strong>{appt.Customer.FullName}</strong> has submitted payment proof for appointment #{appt.Id}:</p>" +
+                                $"<ul>" +
+                                $"<li><strong>Service:</strong> {appt.ServiceNameAtBooking}</li>" +
+                                $"<li><strong>Amount Paid:</strong> {appt.AmountPaid} {currency}</li>" +
+                                $"<li><strong>Payment Method:</strong> {method}</li>" +
+                                $"<li><strong>Transaction Reference:</strong> {txnRef}</li>" +
+                                $"</ul>" +
+                                $"<p>Please log in to your SalonBook admin dashboard to review and verify this payment.</p>";
+
+                var emailResult = await _emailService.SendEmailAsync(admin.Email, emailSubject, emailBody, cancellationToken);
+
+                _dbContext.Notifications.Add(new Notification
+                {
+                    RecipientUserId = admin.Id,
+                    SalonId = appt.SalonId,
+                    AppointmentId = appt.Id,
+                    Type = "PaymentProofSubmitted",
+                    Channel = "Email",
+                    Subject = emailSubject,
+                    Message = emailBody,
+                    Status = emailResult.Success ? "Sent" : (emailResult.Skipped ? "Skipped" : "Failed"),
+                    SentAtUtc = emailResult.Success ? DateTime.UtcNow : null,
+                    ErrorMessage = emailResult.ErrorMessage,
+                    LastErrorCode = emailResult.ErrorCode,
+                    CreatedAtUtc = DateTime.UtcNow
+                });
+            }
+        }
+    }
+
+    private async Task HandlePaymentStatusEventAsync(Appointment appt, List<User> salonAdmins, string eventType, CancellationToken cancellationToken)
+    {
+        var currency = appt.Salon?.CurrencyCode ?? "INR";
+        var notesSuffix = string.IsNullOrWhiteSpace(appt.PaymentNotes) ? "" : $" Notes: {appt.PaymentNotes}";
+
+        string subject;
+        string message;
+
+        if (eventType == "PaymentVerified")
+        {
+            subject = $"Payment Verified: {appt.ServiceNameAtBooking}";
+            message = $"Your payment of {appt.AmountPaid} {currency} for {appt.ServiceNameAtBooking} at {appt.Salon.Name} has been verified as '{appt.PaymentStatus}'.{notesSuffix}";
+        }
+        else if (eventType == "PaymentRejected")
+        {
+            subject = $"Payment Not Verified: {appt.ServiceNameAtBooking}";
+            message = $"Your payment for {appt.ServiceNameAtBooking} at {appt.Salon.Name} was marked as '{appt.PaymentStatus}'.{notesSuffix} Please verify your transaction details or contact the salon.";
+        }
+        else if (eventType == "PaymentRefunded")
+        {
+            subject = $"Payment Refunded: {appt.ServiceNameAtBooking}";
+            message = $"A refund of {appt.AmountPaid} {currency} for {appt.ServiceNameAtBooking} at {appt.Salon.Name} has been recorded.{notesSuffix}";
+        }
+        else
+        {
+            subject = $"Payment Update: {appt.ServiceNameAtBooking}";
+            message = $"Payment status for your appointment ({appt.ServiceNameAtBooking} at {appt.Salon.Name}) is now '{appt.PaymentStatus}'.{notesSuffix}";
+        }
+
+        // Customer InApp Notification
+        _dbContext.Notifications.Add(new Notification
+        {
+            RecipientUserId = appt.CustomerId,
+            SalonId = appt.SalonId,
+            AppointmentId = appt.Id,
+            Type = eventType,
+            Channel = "InApp",
+            Subject = subject,
+            Message = message,
+            Status = "Sent",
+            SentAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        // Customer Email Notification
+        if (!string.IsNullOrWhiteSpace(appt.Customer.Email))
+        {
+            var emailSubject = $"[SalonBook] {subject}";
+            var emailBody = $"<p>Dear {appt.Customer.FullName},</p>" +
+                            $"<p>{message}</p>" +
+                            $"<p><strong>Appointment:</strong> #{appt.Id} - {appt.ServiceNameAtBooking}<br/>" +
+                            $"<strong>Salon:</strong> {appt.Salon.Name}<br/>" +
+                            $"<strong>Scheduled Time:</strong> {appt.StartAtUtc:yyyy-MM-dd HH:mm} UTC</p>" +
+                            $"<p>Thank you for using SalonBook!</p>";
+
+            var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, emailSubject, emailBody, cancellationToken);
+
+            _dbContext.Notifications.Add(new Notification
+            {
+                RecipientUserId = appt.CustomerId,
+                SalonId = appt.SalonId,
+                AppointmentId = appt.Id,
+                Type = eventType,
+                Channel = "Email",
+                Subject = emailSubject,
+                Message = emailBody,
+                Status = emailResult.Success ? "Sent" : (emailResult.Skipped ? "Skipped" : "Failed"),
+                SentAtUtc = emailResult.Success ? DateTime.UtcNow : null,
+                ErrorMessage = emailResult.ErrorMessage,
+                LastErrorCode = emailResult.ErrorCode,
+                CreatedAtUtc = DateTime.UtcNow
+            });
         }
     }
 

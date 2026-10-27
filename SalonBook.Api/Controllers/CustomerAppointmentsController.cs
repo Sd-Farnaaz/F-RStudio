@@ -17,17 +17,20 @@ public class CustomerAppointmentsController : ControllerBase
     private readonly ApplicationDbContext _dbContext;
     private readonly IBookingService _bookingService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<CustomerAppointmentsController> _logger;
 
     public CustomerAppointmentsController(
         ApplicationDbContext dbContext,
         IBookingService bookingService,
         ICurrentUserService currentUserService,
+        INotificationService notificationService,
         ILogger<CustomerAppointmentsController> logger)
     {
         _dbContext = dbContext;
         _bookingService = bookingService;
         _currentUserService = currentUserService;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -124,6 +127,7 @@ public class CustomerAppointmentsController : ControllerBase
             .Include(a => a.Customer)
             .Include(a => a.Staff)
             .Include(a => a.Service)
+            .Include(a => a.Review)
             .Select(a => MapToResponse(a))
             .ToListAsync(cancellationToken);
 
@@ -160,6 +164,7 @@ public class CustomerAppointmentsController : ControllerBase
             .Include(a => a.Customer)
             .Include(a => a.Staff)
             .Include(a => a.Service)
+            .Include(a => a.Review)
             .FirstOrDefaultAsync(a => a.Id == id && a.CustomerId == customerId.Value, cancellationToken);
 
         if (appointment == null)
@@ -294,6 +299,15 @@ public class CustomerAppointmentsController : ControllerBase
         _logger.LogInformation("Customer ID {CustomerId} submitted payment reference '{Ref}' for Appointment ID {AppointmentId}.",
             customerId.Value, appointment.PaymentTransactionReference, appointment.Id);
 
+        try
+        {
+            await _notificationService.DispatchAppointmentEventAsync(appointment, "PaymentProofSubmitted", cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to dispatch notification for payment proof submission of appointment {AppointmentId}.", appointment.Id);
+        }
+
         return Ok(MapToResponse(appointment));
     }
 
@@ -335,8 +349,168 @@ public class CustomerAppointmentsController : ControllerBase
             PaymentVerifiedBy = a.PaymentVerifiedByUser != null ? a.PaymentVerifiedByUser.FullName : null,
             PaymentNotes = a.PaymentNotes,
             SalonUpiId = a.Salon != null ? a.Salon.UpiId : null,
-            SalonQrCodeImageUrl = a.Salon != null ? a.Salon.QrCodeImageUrl : null
+            SalonQrCodeImageUrl = a.Salon != null ? a.Salon.QrCodeImageUrl : null,
+            HasReview = a.Review != null,
+            ReviewRating = a.Review != null ? a.Review.Rating : null,
+            ReviewId = a.Review != null ? a.Review.Id : null
         };
+    }
+
+    /// <summary>
+    /// Submit a verified review and rating for a completed appointment.
+    /// </summary>
+    [HttpPost("{id:int}/review")]
+    [ProducesResponseType(typeof(ReviewResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateAppointmentReview(
+        int id,
+        [FromBody] CreateReviewRequest request,
+        CancellationToken cancellationToken)
+    {
+        var customerId = _currentUserService.UserId;
+        if (!customerId.HasValue)
+        {
+            return Forbid();
+        }
+
+        var appointment = await _dbContext.Appointments
+            .Include(a => a.Salon)
+            .Include(a => a.Customer)
+            .Include(a => a.Staff)
+            .Include(a => a.Review)
+            .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
+
+        if (appointment == null)
+        {
+            return NotFound(new { message = $"Appointment with ID {id} was not found." });
+        }
+
+        if (appointment.CustomerId != customerId.Value)
+        {
+            return Forbid();
+        }
+
+        if (appointment.Status != "Completed")
+        {
+            return BadRequest(new { message = "Reviews can only be submitted for completed appointments." });
+        }
+
+        if (appointment.Review != null || await _dbContext.Reviews.AnyAsync(r => r.AppointmentId == id, cancellationToken))
+        {
+            return Conflict(new { message = "You have already submitted a review for this appointment." });
+        }
+
+        var review = new Review
+        {
+            SalonId = appointment.SalonId,
+            CustomerId = customerId.Value,
+            AppointmentId = appointment.Id,
+            StaffId = appointment.StaffId,
+            Rating = request.Rating,
+            CleanlinessRating = request.CleanlinessRating,
+            StaffRating = request.StaffRating,
+            ValueRating = request.ValueRating,
+            Title = request.Title?.Trim(),
+            Comment = request.Comment.Trim(),
+            PhotoUrlsJson = request.PhotoUrls != null && request.PhotoUrls.Count > 0
+                ? System.Text.Json.JsonSerializer.Serialize(request.PhotoUrls.Where(u => !string.IsNullOrWhiteSpace(u)).ToList())
+                : null,
+            IsVerifiedVisit = true,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        _dbContext.Reviews.Add(review);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var response = new ReviewResponse
+        {
+            Id = review.Id,
+            SalonId = review.SalonId,
+            SalonName = appointment.Salon?.Name ?? string.Empty,
+            CustomerId = review.CustomerId,
+            CustomerName = appointment.Customer?.FullName ?? "Verified Client",
+            AppointmentId = review.AppointmentId,
+            StaffId = review.StaffId,
+            StaffName = appointment.Staff?.FullName,
+            ServiceName = appointment.ServiceNameAtBooking,
+            Rating = review.Rating,
+            CleanlinessRating = review.CleanlinessRating,
+            StaffRating = review.StaffRating,
+            ValueRating = review.ValueRating,
+            Title = review.Title,
+            Comment = review.Comment,
+            PhotoUrls = request.PhotoUrls ?? new List<string>(),
+            IsVerifiedVisit = true,
+            CreatedAtUtc = review.CreatedAtUtc
+        };
+
+        return CreatedAtAction(nameof(GetAppointmentReview), new { id = appointment.Id }, response);
+    }
+
+    /// <summary>
+    /// Retrieve customer review submitted for an appointment.
+    /// </summary>
+    [HttpGet("{id:int}/review")]
+    [ProducesResponseType(typeof(ReviewResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAppointmentReview(int id, CancellationToken cancellationToken)
+    {
+        var customerId = _currentUserService.UserId;
+        if (!customerId.HasValue)
+        {
+            return Forbid();
+        }
+
+        var review = await _dbContext.Reviews
+            .AsNoTracking()
+            .Include(r => r.Salon)
+            .Include(r => r.Customer)
+            .Include(r => r.Staff)
+            .Include(r => r.Appointment)
+            .FirstOrDefaultAsync(r => r.AppointmentId == id, cancellationToken);
+
+        if (review == null)
+        {
+            return NotFound(new { message = "No review found for this appointment." });
+        }
+
+        if (review.CustomerId != customerId.Value)
+        {
+            return Forbid();
+        }
+
+        return Ok(new ReviewResponse
+        {
+            Id = review.Id,
+            SalonId = review.SalonId,
+            SalonName = review.Salon?.Name ?? string.Empty,
+            CustomerId = review.CustomerId,
+            CustomerName = review.Customer?.FullName ?? "Verified Client",
+            AppointmentId = review.AppointmentId,
+            StaffId = review.StaffId,
+            StaffName = review.Staff?.FullName,
+            ServiceName = review.Appointment?.ServiceNameAtBooking,
+            Rating = review.Rating,
+            CleanlinessRating = review.CleanlinessRating,
+            StaffRating = review.StaffRating,
+            ValueRating = review.ValueRating,
+            Title = review.Title,
+            Comment = review.Comment,
+            PhotoUrls = !string.IsNullOrWhiteSpace(review.PhotoUrlsJson)
+                ? (System.Text.Json.JsonSerializer.Deserialize<List<string>>(review.PhotoUrlsJson) ?? new List<string>())
+                : new List<string>(),
+            IsVerifiedVisit = review.IsVerifiedVisit,
+            OwnerReply = review.OwnerReply,
+            OwnerRepliedAtUtc = review.OwnerRepliedAtUtc,
+            CreatedAtUtc = review.CreatedAtUtc,
+            UpdatedAtUtc = review.UpdatedAtUtc
+        });
     }
 }
 

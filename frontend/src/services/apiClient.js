@@ -39,16 +39,18 @@ async function handleResponse(response) {
 }
 
 export async function fetchApi(endpoint, options = {}) {
-  const token = localStorage.getItem('accessToken');
+  const { skipAuth = false, ...fetchOptions } = options;
+  const token = !skipAuth ? localStorage.getItem('accessToken') : null;
+  const isGetOrHead = !fetchOptions.method || fetchOptions.method.toUpperCase() === 'GET' || fetchOptions.method.toUpperCase() === 'HEAD';
   
   const headers = {
-    'Content-Type': 'application/json',
+    ...(!isGetOrHead || fetchOptions.body ? { 'Content-Type': 'application/json' } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options.headers,
+    ...fetchOptions.headers,
   };
 
   const config = {
-    ...options,
+    ...fetchOptions,
     headers,
   };
 
@@ -59,8 +61,8 @@ export async function fetchApi(endpoint, options = {}) {
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
     
-    // Auto-refresh token if 401 and we have a refresh token
-    if (response.status === 401 && !options._retry && localStorage.getItem('refreshToken')) {
+    // Auto-refresh token if 401 and we have a refresh token (only for authenticated calls)
+    if (response.status === 401 && !options._retry && !skipAuth && localStorage.getItem('refreshToken')) {
       config._retry = true;
       try {
         const userRole = localStorage.getItem('userRole')?.toLowerCase() || 'user';

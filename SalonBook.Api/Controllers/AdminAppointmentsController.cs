@@ -379,7 +379,15 @@ public class AdminAppointmentsController : ControllerBase
 
         try
         {
-            await _notificationService.DispatchAppointmentEventAsync(appointment, "AppointmentStatusChanged", cancellationToken);
+            var eventType = appointment.PaymentStatus switch
+            {
+                PaymentStatuses.Paid or PaymentStatuses.PartiallyPaid => "PaymentVerified",
+                PaymentStatuses.Failed => "PaymentRejected",
+                PaymentStatuses.Refunded => "PaymentRefunded",
+                _ => "PaymentStatusChanged"
+            };
+
+            await _notificationService.DispatchAppointmentEventAsync(appointment, eventType, cancellationToken);
         }
         catch (Exception ex)
         {

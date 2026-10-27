@@ -11,6 +11,11 @@ public class CreateAppointmentRequest
     public int ServiceId { get; set; }
 
     /// <summary>
+    /// Optional additional service IDs for multi-service bundle bookings.
+    /// </summary>
+    public List<int>? AdditionalServiceIds { get; set; }
+
+    /// <summary>
     /// Optional specific staff member. If omitted, the server selects an available staff member.
     /// </summary>
     public int? StaffId { get; set; }
@@ -110,6 +115,12 @@ public class AppointmentResponse
     public string? SalonUpiId { get; set; }
 
     public string? SalonQrCodeImageUrl { get; set; }
+
+    public bool HasReview { get; set; }
+
+    public int? ReviewRating { get; set; }
+
+    public int? ReviewId { get; set; }
 }
 
 public class AppointmentCalendarItemResponse

@@ -1,75 +1,135 @@
 import PublicLayout from '../../components/layout/PublicLayout';
 import { Link } from 'react-router-dom';
-import { Sparkles, Scissors } from 'lucide-react';
+import { Sparkles, Scissors, ArrowRight, ShieldCheck, Check } from 'lucide-react';
 
 export default function JoinPage() {
   return (
     <PublicLayout>
-      <div className="max-w-6xl mx-auto px-6 py-20">
-        <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-5xl font-serif font-semibold text-deep-plum mb-4">
-            How would you like to use SalonBook?
-          </h1>
-          <p className="text-xl text-muted max-w-2xl mx-auto">
-            Whether you're booking your next beauty appointment or managing your salon, we've got you covered.
-          </p>
-        </div>
+      <div className="bg-ivory min-h-screen pb-20">
+        
+        {/* Header Hero */}
+        <section className="bg-gradient-to-b from-rose-tint/40 via-soft-blush/20 to-ivory border-b border-border-color py-16 sm:py-20">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-4">
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-soft-blush border border-dusty-rose/40 text-primary-rose text-xs font-semibold uppercase tracking-wider shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Get Started</span>
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          {/* Card 1: Customer */}
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-border-color hover:shadow-md transition-all group flex flex-col">
-            <div className="h-48 bg-rose-tint relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary-rose/20 to-deep-plum/20 mix-blend-multiply z-10" />
-              <img 
-                src="https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" 
-                alt="Client relaxing" 
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-            </div>
-            <div className="p-8 flex-1 flex flex-col">
-              <div className="w-12 h-12 bg-soft-blush rounded-full flex items-center justify-center mb-6">
-                <Sparkles className="w-6 h-6 text-primary-rose" />
-              </div>
-              <h2 className="text-2xl font-serif font-medium text-deep-plum mb-3">Book Beauty Services</h2>
-              <p className="text-muted flex-1 mb-8">
-                Discover top-rated salons, manage your appointments, and easily rebook your favorite stylists all in one place.
-              </p>
-              <Link 
-                to="/signup" 
-                className="block text-center w-full py-3 bg-white text-primary-rose font-medium rounded-md border border-primary-rose hover:bg-rose-tint transition-all"
-              >
-                Continue as Customer
-              </Link>
-            </div>
-          </div>
+            <h1 className="text-4xl sm:text-5xl font-serif font-medium text-deep-plum leading-tight">
+              How would you like to use SalonBook?
+            </h1>
 
-          {/* Card 2: Salon Owner */}
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-border-color hover:shadow-md transition-all group flex flex-col">
-            <div className="h-48 bg-rose-tint relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary-rose/20 to-deep-plum/20 mix-blend-multiply z-10" />
-              <img 
-                src="https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" 
-                alt="Salon owner working" 
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-            </div>
-            <div className="p-8 flex-1 flex flex-col">
-              <div className="w-12 h-12 bg-soft-blush rounded-full flex items-center justify-center mb-6">
-                <Scissors className="w-6 h-6 text-primary-rose" />
-              </div>
-              <h2 className="text-2xl font-serif font-medium text-deep-plum mb-3">Grow Your Salon</h2>
-              <p className="text-muted flex-1 mb-8">
-                Streamline operations, manage your team, reduce no-shows, and deliver an exceptional booking experience to your clients.
-              </p>
-              <Link 
-                to="/admin/register" 
-                className="block text-center w-full py-3 bg-primary-rose text-white font-medium rounded-md hover:bg-primary-rose/90 transition-all shadow-sm"
-              >
-                Register Your Salon
-              </Link>
-            </div>
+            <p className="text-base sm:text-lg text-muted max-w-xl mx-auto leading-relaxed">
+              Whether you are scheduling your next personal beauty visit or orchestrating operations for your salon team, choose your path below.
+            </p>
           </div>
-        </div>
+        </section>
+
+        {/* Choice Cards */}
+        <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+            
+            {/* Card 1: For Client */}
+            <div className="bg-white rounded-3xl p-8 sm:p-10 border border-border-color shadow-xs hover:shadow-md transition-all group flex flex-col justify-between">
+              <div>
+                <div className="w-14 h-14 rounded-2xl bg-soft-blush border border-dusty-rose/30 flex items-center justify-center text-primary-rose mb-6 shadow-2xs group-hover:scale-105 transition-transform">
+                  <Sparkles className="w-7 h-7" />
+                </div>
+
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted block mb-1">
+                  I'm a Client
+                </span>
+                <h2 className="font-serif text-3xl font-medium text-deep-plum mb-3">
+                  Book Beauty Treatments
+                </h2>
+                <p className="text-xs sm:text-sm text-muted leading-relaxed mb-6">
+                  Discover verified salons and studios, book appointments in real time, submit advance payment references, and track your booking ledger.
+                </p>
+
+                <div className="space-y-2.5 text-xs text-deep-plum mb-8">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary-rose shrink-0" />
+                    <span>Real-time calendar slot availability</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary-rose shrink-0" />
+                    <span>Transparent treatment durations & pricing</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary-rose shrink-0" />
+                    <span>Automated notifications and reminders</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <Link
+                  to="/signup"
+                  className="w-full py-3.5 bg-primary-rose text-white text-xs sm:text-sm font-semibold rounded-2xl hover:bg-primary-rose/90 shadow-2xs hover:shadow-sm active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+                >
+                  <span>Continue as Client</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+                <p className="text-[11px] text-muted text-center mt-3">
+                  Already have an account? <Link to="/login" className="text-primary-rose font-semibold hover:underline">Log in</Link>
+                </p>
+              </div>
+            </div>
+
+            {/* Card 2: For Salon Owner */}
+            <div className="bg-white rounded-3xl p-8 sm:p-10 border-2 border-primary-rose shadow-md group flex flex-col justify-between relative overflow-hidden">
+              <div className="absolute top-0 right-0 bg-primary-rose text-white text-[10px] font-bold uppercase tracking-wider px-4 py-1 rounded-bl-xl">
+                Free Platform Launch
+              </div>
+
+              <div>
+                <div className="w-14 h-14 rounded-2xl bg-soft-blush border border-dusty-rose/30 flex items-center justify-center text-primary-rose mb-6 shadow-2xs group-hover:scale-105 transition-transform">
+                  <Scissors className="w-7 h-7" />
+                </div>
+
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-primary-rose block mb-1">
+                  I'm a Salon Owner
+                </span>
+                <h2 className="font-serif text-3xl font-medium text-deep-plum mb-3">
+                  Manage & Grow Your Salon
+                </h2>
+                <p className="text-xs sm:text-sm text-muted leading-relaxed mb-6">
+                  Custom salon URL, specialist roster shifts, service catalog, double-booking protection, and UPI advance payment verification.
+                </p>
+
+                <div className="space-y-2.5 text-xs text-deep-plum mb-8">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary-rose shrink-0" />
+                    <span>Full salon management workspace & catalog</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary-rose shrink-0" />
+                    <span>UPI QR configuration and deposit ledger</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary-rose shrink-0" />
+                    <span>Zero platform subscription during early launch</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <Link
+                  to="/admin/register"
+                  className="w-full py-3.5 bg-deep-plum text-white text-xs sm:text-sm font-semibold rounded-2xl hover:bg-deep-plum/90 shadow-2xs hover:shadow-sm active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+                >
+                  <span>Register Your Salon Free</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+                <p className="text-[11px] text-muted text-center mt-3">
+                  Already registered? <Link to="/admin/login" className="text-primary-rose font-semibold hover:underline">Admin Login</Link>
+                </p>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
       </div>
     </PublicLayout>
   );

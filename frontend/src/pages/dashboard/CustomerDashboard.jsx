@@ -5,11 +5,13 @@ import { useAuth } from '../../context/AuthContext';
 import { appointmentService } from '../../services/appointmentService';
 import { paymentService } from '../../services/paymentService';
 import { publicService } from '../../services/publicService';
+import { reviewService } from '../../services/reviewService';
 import { 
   Calendar, MapPin, Clock, Scissors, User, XCircle, AlertCircle, 
   RefreshCw, CreditCard, QrCode, CheckCircle2, Copy, Check, ExternalLink, 
   X, Compass, Sparkles, ChevronRight, Search, ShieldCheck, DollarSign, 
-  Phone, Mail, Info, FileText, ArrowRight, Store
+  Phone, Mail, Info, FileText, ArrowRight, Store, Star, MessageSquare,
+  Camera, CornerDownRight, Image as ImageIcon, Send, ThumbsUp
 } from 'lucide-react';
 
 export default function CustomerDashboard() {
@@ -52,6 +54,107 @@ export default function CustomerDashboard() {
   // Appointment Details Modal State
   const [activeDetailsApt, setActiveDetailsApt] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+
+  // Verified Reviews Modal State
+  const [reviewingApt, setReviewingApt] = useState(null);
+  const [viewingReviewApt, setViewingReviewApt] = useState(null);
+  const [existingReviewData, setExistingReviewData] = useState(null);
+  const [loadingExistingReview, setLoadingExistingReview] = useState(false);
+  const [reviewForm, setReviewForm] = useState({
+    rating: 5,
+    cleanlinessRating: 5,
+    staffRating: 5,
+    valueRating: 5,
+    title: '',
+    comment: '',
+    photoUrls: []
+  });
+  const [photoInputUrl, setPhotoInputUrl] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewSuccess, setReviewSuccess] = useState('');
+
+  const handleOpenWriteReview = (apt) => {
+    setReviewingApt(apt);
+    setReviewError('');
+    setReviewSuccess('');
+    setPhotoInputUrl('');
+    setReviewForm({
+      rating: 5,
+      cleanlinessRating: 5,
+      staffRating: 5,
+      valueRating: 5,
+      title: '',
+      comment: '',
+      photoUrls: []
+    });
+  };
+
+  const handleOpenViewReview = async (apt) => {
+    setViewingReviewApt(apt);
+    setLoadingExistingReview(true);
+    setExistingReviewData(null);
+    try {
+      const data = await reviewService.getAppointmentReview(apt.id);
+      setExistingReviewData(data);
+    } catch (err) {
+      console.warn('Failed to load appointment review', err);
+    } finally {
+      setLoadingExistingReview(false);
+    }
+  };
+
+  const handleAddPhotoUrl = () => {
+    const url = photoInputUrl.trim();
+    if (!url) return;
+    if (reviewForm.photoUrls.includes(url)) {
+      setPhotoInputUrl('');
+      return;
+    }
+    setReviewForm(prev => ({
+      ...prev,
+      photoUrls: [...prev.photoUrls, url]
+    }));
+    setPhotoInputUrl('');
+  };
+
+  const handleRemovePhotoUrl = (idx) => {
+    setReviewForm(prev => ({
+      ...prev,
+      photoUrls: prev.photoUrls.filter((_, i) => i !== idx)
+    }));
+  };
+
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    if (!reviewingApt) return;
+    if (!reviewForm.comment || reviewForm.comment.trim().length < 5) {
+      setReviewError('Please write at least 5 characters in your review comment.');
+      return;
+    }
+    try {
+      setSubmittingReview(true);
+      setReviewError('');
+      const res = await reviewService.submitAppointmentReview(reviewingApt.id, reviewForm);
+      setReviewSuccess('Your verified review has been submitted successfully! Thank you for your feedback.');
+      
+      // Update local appointment state immediately
+      setAppointments(prev => prev.map(a => 
+        a.id === reviewingApt.id 
+          ? { ...a, hasReview: true, reviewRating: reviewForm.rating, reviewId: res.id }
+          : a
+      ));
+
+      setTimeout(() => {
+        setReviewingApt(null);
+        setReviewSuccess('');
+      }, 1800);
+    } catch (err) {
+      setReviewError(err.message || 'Failed to submit review');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   useEffect(() => {
     fetchAppointments();
@@ -788,6 +891,29 @@ export default function CustomerDashboard() {
                             </button>
                           )}
 
+                          {/* Completed Appointment Review Actions */}
+                          {apt.status === 'Completed' && (
+                            apt.hasReview ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenViewReview(apt)}
+                                className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                              >
+                                <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                                <span>Reviewed ({apt.reviewRating || 5}★)</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenWriteReview(apt)}
+                                className="px-3.5 py-2 bg-primary-rose text-white hover:bg-primary-rose/90 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+                              >
+                                <Star className="w-3.5 h-3.5 fill-white text-white" />
+                                <span>Rate & Review</span>
+                              </button>
+                            )
+                          )}
+
                           <button
                             onClick={() => openDetailsModal(apt)}
                             className="px-3.5 py-2 bg-white border border-border-color text-deep-plum text-xs font-medium rounded-lg hover:bg-ivory transition-colors"
@@ -1450,6 +1576,385 @@ export default function CustomerDashboard() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ----------------- MODAL: WRITE VERIFIED REVIEW ----------------- */}
+        {reviewingApt && (
+          <div className="fixed inset-0 z-50 bg-deep-plum/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+            <div className="bg-white rounded-3xl max-w-lg w-full border border-border-color shadow-2xl overflow-hidden my-8">
+              
+              {/* Header */}
+              <div className="px-6 py-5 border-b border-border-color bg-gradient-to-r from-soft-blush/60 to-ivory flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-serif font-bold text-deep-plum text-lg">Leave a Verified Review</span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold rounded-full">
+                      <ShieldCheck className="w-3 h-3 text-emerald-600" /> Verified Visit
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted mt-0.5">
+                    {reviewingApt.serviceName} at <strong className="text-deep-plum">{reviewingApt.salonName}</strong>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setReviewingApt(null)}
+                  className="p-1.5 rounded-full text-muted hover:text-deep-plum hover:bg-white/80 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+                {/* Success Alert */}
+                {reviewSuccess && (
+                  <div className="p-4 bg-emerald-50 text-emerald-800 text-xs rounded-2xl border border-emerald-200 flex items-start gap-2.5 animate-in fade-in">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-sm">Review Submitted!</p>
+                      <p className="mt-0.5">{reviewSuccess}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error Alert */}
+                {reviewError && (
+                  <div className="p-3.5 bg-rose-50 text-rose-700 text-xs rounded-xl border border-rose-200 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <span>{reviewError}</span>
+                  </div>
+                )}
+
+                {!reviewSuccess && (
+                  <form onSubmit={handleSubmitReview} className="space-y-5">
+                    {/* Overall Star Rating */}
+                    <div className="text-center p-4 bg-ivory/60 rounded-2xl border border-border-color space-y-2">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-muted">
+                        Overall Rating
+                      </label>
+                      <div className="flex items-center justify-center gap-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setReviewForm(prev => ({ ...prev, rating: star }))}
+                            className="p-1 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                          >
+                            <Star
+                              className={`w-8 h-8 transition-colors ${
+                                star <= reviewForm.rating
+                                  ? 'fill-amber-400 text-amber-400 drop-shadow-xs'
+                                  : 'text-gray-300 hover:text-amber-200'
+                              }`}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                      <span className="text-xs font-serif font-medium text-deep-plum block">
+                        {reviewForm.rating === 5 && 'Exceptional — 5 / 5 Stars'}
+                        {reviewForm.rating === 4 && 'Very Good — 4 / 5 Stars'}
+                        {reviewForm.rating === 3 && 'Average — 3 / 5 Stars'}
+                        {reviewForm.rating === 2 && 'Needs Improvement — 2 / 5 Stars'}
+                        {reviewForm.rating === 1 && 'Unsatisfactory — 1 / 5 Stars'}
+                      </span>
+                    </div>
+
+                    {/* Detailed Sub-Ratings (Cleanliness, Staff, Value) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-soft-blush/20 rounded-2xl border border-border-color text-xs">
+                      {/* Cleanliness */}
+                      <div className="space-y-1.5 text-center">
+                        <span className="text-muted block text-[11px] font-medium">Cleanliness</span>
+                        <div className="flex justify-center gap-1">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={() => setReviewForm(prev => ({ ...prev, cleanlinessRating: s }))}
+                              className="cursor-pointer"
+                            >
+                              <Star
+                                className={`w-4 h-4 ${
+                                  s <= reviewForm.cleanlinessRating
+                                    ? 'fill-amber-400 text-amber-400'
+                                    : 'text-gray-300'
+                                }`}
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Specialist Skill */}
+                      <div className="space-y-1.5 text-center">
+                        <span className="text-muted block text-[11px] font-medium">Staff Skill</span>
+                        <div className="flex justify-center gap-1">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={() => setReviewForm(prev => ({ ...prev, staffRating: s }))}
+                              className="cursor-pointer"
+                            >
+                              <Star
+                                className={`w-4 h-4 ${
+                                  s <= reviewForm.staffRating
+                                    ? 'fill-amber-400 text-amber-400'
+                                    : 'text-gray-300'
+                                }`}
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Value for Money */}
+                      <div className="space-y-1.5 text-center">
+                        <span className="text-muted block text-[11px] font-medium">Value for Money</span>
+                        <div className="flex justify-center gap-1">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={() => setReviewForm(prev => ({ ...prev, valueRating: s }))}
+                              className="cursor-pointer"
+                            >
+                              <Star
+                                className={`w-4 h-4 ${
+                                  s <= reviewForm.valueRating
+                                    ? 'fill-amber-400 text-amber-400'
+                                    : 'text-gray-300'
+                                }`}
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Review Title */}
+                    <div>
+                      <label className="block text-xs font-medium text-deep-plum mb-1.5">
+                        Headline / Title (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={200}
+                        value={reviewForm.title}
+                        onChange={(e) => setReviewForm(prev => ({ ...prev, title: e.target.value }))}
+                        placeholder="e.g. Flawless haircut and courteous staff!"
+                        className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-xl text-xs text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none transition-all"
+                      />
+                    </div>
+
+                    {/* Review Comment */}
+                    <div>
+                      <label className="block text-xs font-medium text-deep-plum mb-1.5">
+                        Your Detailed Review <span className="text-primary-rose">*</span>
+                      </label>
+                      <textarea
+                        rows={4}
+                        required
+                        minLength={5}
+                        maxLength={2000}
+                        value={reviewForm.comment}
+                        onChange={(e) => setReviewForm(prev => ({ ...prev, comment: e.target.value }))}
+                        placeholder="Tell other clients about your experience, the stylist's attention to detail, the salon ambiance, etc..."
+                        className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-xl text-xs text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none resize-none transition-all"
+                      />
+                      <span className="text-[10px] text-muted text-right block mt-1">
+                        {reviewForm.comment.length} / 2000 characters (minimum 5)
+                      </span>
+                    </div>
+
+                    {/* Photo Proof / Results Gallery */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-deep-plum">
+                        Add Photos of Results (Optional)
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          value={photoInputUrl}
+                          onChange={(e) => setPhotoInputUrl(e.target.value)}
+                          placeholder="Paste image URL (e.g. https://...)"
+                          className="flex-1 px-3 py-2 bg-white border border-border-color rounded-xl text-xs text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddPhotoUrl}
+                          className="px-3 py-2 bg-ivory hover:bg-soft-blush border border-border-color text-deep-plum text-xs font-medium rounded-xl transition-colors shrink-0 cursor-pointer"
+                        >
+                          + Add Photo
+                        </button>
+                      </div>
+
+                      {/* Photo Previews */}
+                      {reviewForm.photoUrls.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {reviewForm.photoUrls.map((url, i) => (
+                            <div key={i} className="relative group w-14 h-14 rounded-xl overflow-hidden border border-border-color shadow-2xs">
+                              <img src={url} alt={`Preview ${i + 1}`} className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePhotoUrl(i)}
+                                className="absolute top-1 right-1 p-0.5 bg-black/60 hover:bg-rose-600 text-white rounded-full transition-colors cursor-pointer"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="pt-2 flex justify-end gap-3 border-t border-border-color/80">
+                      <button
+                        type="button"
+                        onClick={() => setReviewingApt(null)}
+                        disabled={submittingReview}
+                        className="px-4 py-2.5 text-xs text-muted hover:text-deep-plum rounded-xl transition-colors cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submittingReview || !reviewForm.comment || reviewForm.comment.trim().length < 5}
+                        className="px-6 py-2.5 bg-primary-rose text-white text-xs font-semibold rounded-xl hover:bg-primary-rose/90 transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        {submittingReview ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Submitting Review...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Publish Verified Review</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ----------------- MODAL: VIEW EXISTING REVIEW ----------------- */}
+        {viewingReviewApt && (
+          <div className="fixed inset-0 z-50 bg-deep-plum/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+            <div className="bg-white rounded-3xl max-w-lg w-full border border-border-color shadow-2xl overflow-hidden my-8">
+              
+              <div className="px-6 py-4 border-b border-border-color bg-ivory/70 flex items-center justify-between">
+                <div>
+                  <h3 className="font-serif font-semibold text-deep-plum text-lg">Your Verified Review</h3>
+                  <p className="text-xs text-muted">{viewingReviewApt.salonName} — {viewingReviewApt.serviceName}</p>
+                </div>
+                <button
+                  onClick={() => setViewingReviewApt(null)}
+                  className="p-1.5 rounded-full text-muted hover:text-deep-plum hover:bg-white transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {loadingExistingReview ? (
+                  <div className="py-12 flex justify-center text-muted">
+                    <RefreshCw className="w-6 h-6 text-primary-rose animate-spin" />
+                  </div>
+                ) : !existingReviewData ? (
+                  <p className="text-xs text-muted py-6 text-center">Unable to load review details.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Score header */}
+                    <div className="flex items-center justify-between p-4 bg-soft-blush/30 rounded-2xl border border-border-color">
+                      <div>
+                        <div className="flex items-center gap-1 text-amber-500">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`w-5 h-5 ${
+                                star <= existingReviewData.rating
+                                  ? 'fill-amber-400 text-amber-400'
+                                  : 'text-gray-300'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-[11px] text-muted mt-1 block">
+                          Submitted on {new Date(existingReviewData.createdAtUtc).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold rounded-full">
+                        <Check className="w-3.5 h-3.5 text-emerald-600" /> Verified Visit
+                      </span>
+                    </div>
+
+                    {/* Title & Comment */}
+                    <div className="space-y-1.5">
+                      {existingReviewData.title && (
+                        <h4 className="font-serif font-semibold text-deep-plum text-base">
+                          {existingReviewData.title}
+                        </h4>
+                      )}
+                      <p className="text-xs text-muted leading-relaxed whitespace-pre-line bg-ivory/50 p-4 rounded-xl border border-border-color">
+                        {existingReviewData.comment}
+                      </p>
+                    </div>
+
+                    {/* Photos */}
+                    {existingReviewData.photoUrls && existingReviewData.photoUrls.length > 0 && (
+                      <div className="space-y-1.5">
+                        <span className="text-xs font-medium text-deep-plum block">Your Photos:</span>
+                        <div className="flex flex-wrap gap-2">
+                          {existingReviewData.photoUrls.map((url, i) => (
+                            <a
+                              key={i}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-16 h-16 rounded-xl overflow-hidden border border-border-color hover:border-primary-rose transition-all shadow-2xs"
+                            >
+                              <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Owner Response */}
+                    {existingReviewData.ownerReply ? (
+                      <div className="p-4 bg-soft-blush/40 rounded-2xl border border-dusty-rose/30 space-y-1.5 text-xs">
+                        <div className="flex items-center gap-1.5 font-semibold text-deep-plum">
+                          <CornerDownRight className="w-4 h-4 text-primary-rose" />
+                          <span>Response from Salon Manager</span>
+                        </div>
+                        <p className="text-muted leading-relaxed pl-5 whitespace-pre-line">
+                          {existingReviewData.ownerReply}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-ivory rounded-xl border border-border-color text-xs text-muted italic text-center">
+                        The salon manager has not responded to this review yet.
+                      </div>
+                    )}
+
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setViewingReviewApt(null)}
+                        className="px-5 py-2 bg-deep-plum text-white text-xs font-semibold rounded-xl hover:bg-deep-plum/90 transition-all cursor-pointer"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -123,5 +123,9 @@ public class PublicSalonResponse
     public string CurrencyCode { get; set; } = string.Empty;
 
     public string? LogoUrl { get; set; }
+
+    public double AverageRating { get; set; }
+
+    public int ReviewCount { get; set; }
 }
 
