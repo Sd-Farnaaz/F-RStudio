@@ -86,3 +86,4 @@ public class PosOrderResponse
     public DateTime CreatedAtUtc { get; set; }
     public PosReceiptResponse Receipt { get; set; } = null!;
 }
+

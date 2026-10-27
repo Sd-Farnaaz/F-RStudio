@@ -37,3 +37,4 @@ public class ClientFormulaRecord
 
     public Appointment? Appointment { get; set; }
 }
+

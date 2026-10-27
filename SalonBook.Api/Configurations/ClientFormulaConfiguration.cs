@@ -59,3 +59,4 @@ public class ClientFormulaConfiguration : IEntityTypeConfiguration<ClientFormula
         builder.HasIndex(f => f.ServiceDateUtc);
     }
 }
+

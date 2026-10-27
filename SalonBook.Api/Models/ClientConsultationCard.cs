@@ -31,3 +31,4 @@ public class ClientConsultationCard
 
     public User Customer { get; set; } = null!;
 }
+

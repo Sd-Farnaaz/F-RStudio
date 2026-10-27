@@ -44,3 +44,4 @@ public class ClientConsultationConfiguration : IEntityTypeConfiguration<ClientCo
             .IsUnique();
     }
 }
+

@@ -291,3 +291,4 @@ public class AdminPosController : ControllerBase
         return Ok(receipt);
     }
 }
+

@@ -106,3 +106,4 @@ public class ClientDossierResponse
     public List<ClientFormulaRecordResponse> Formulas { get; set; } = new();
     public List<ClientVisitHistoryItemResponse> VisitHistory { get; set; } = new();
 }
+

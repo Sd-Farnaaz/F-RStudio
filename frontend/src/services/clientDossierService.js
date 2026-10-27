@@ -6,3 +6,4 @@ export const clientDossierService = {
   addFormula: (customerId, data) => fetchApi(`/api/admin/customers/${customerId}/formulas`, { method: 'POST', body: data }),
   deleteFormula: (customerId, formulaId) => fetchApi(`/api/admin/customers/${customerId}/formulas/${formulaId}`, { method: 'DELETE' })
 };
+

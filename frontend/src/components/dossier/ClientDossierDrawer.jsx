@@ -586,3 +586,4 @@ export default function ClientDossierDrawer({ customerId, isOpen, onClose, staff
     </div>
   );
 }
+
