@@ -26,6 +26,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<ClientConsultationCard> ClientConsultationCards => Set<ClientConsultationCard>();
     public DbSet<ClientFormulaRecord> ClientFormulaRecords => Set<ClientFormulaRecord>();
+    public DbSet<SalonOffPeakRule> SalonOffPeakRules => Set<SalonOffPeakRule>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

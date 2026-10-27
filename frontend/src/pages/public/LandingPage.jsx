@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import PublicLayout from '../../components/layout/PublicLayout';
 import { publicService } from '../../services/publicService';
 import SalonCard from '../../components/common/SalonCard';
+import AiStylistModal from '../../components/ai/AiStylistModal';
 import { 
   ArrowRight, 
   Calendar, 
@@ -24,6 +25,7 @@ import {
 export default function LandingPage() {
   const [salons, setSalons] = useState([]);
   const [loadingSalons, setLoadingSalons] = useState(true);
+  const [showAiModal, setShowAiModal] = useState(false);
   const [activeJourney, setActiveJourney] = useState('clients'); // 'clients' | 'owners'
 
   useEffect(() => {
@@ -93,6 +95,15 @@ export default function LandingPage() {
                   <Store className="w-4 h-4 text-primary-rose" />
                   <span>Discover Salons</span>
                 </Link>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAiModal(true)}
+                  className="inline-flex items-center justify-center px-6 py-4 bg-gradient-to-r from-deep-plum/90 to-primary-rose text-white text-sm sm:text-base font-semibold rounded-2xl hover:opacity-95 shadow-2xs transition-all gap-2"
+                >
+                  <Sparkles className="w-4 h-4 text-accent-gold" />
+                  <span>AI Style Match</span>
+                </button>
               </div>
 
               {/* Real Platform Trust Highlights */}
@@ -483,6 +494,12 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* AI Stylist Assistant Modal */}
+      <AiStylistModal
+        isOpen={showAiModal}
+        onClose={() => setShowAiModal(false)}
+      />
     </PublicLayout>
   );
 }

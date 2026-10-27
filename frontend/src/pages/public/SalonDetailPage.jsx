@@ -5,6 +5,7 @@ import { publicService } from '../../services/publicService';
 import { availabilityService } from '../../services/availabilityService';
 import { appointmentService, toUtcIso } from '../../services/appointmentService';
 import { reviewService } from '../../services/reviewService';
+import AiStylistModal from '../../components/ai/AiStylistModal';
 import { useAuth } from '../../context/AuthContext';
 import { 
   MapPin, 
@@ -35,6 +36,7 @@ import {
   Camera,
   CornerDownRight,
   Image as ImageIcon,
+  Zap,
   X 
 } from 'lucide-react';
 
@@ -60,6 +62,7 @@ export default function SalonDetailPage() {
   const [availability, setAvailability] = useState(null);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [availabilityError, setAvailabilityError] = useState('');
+  const [showAiStylistModal, setShowAiStylistModal] = useState(false);
   
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState('');
@@ -546,6 +549,15 @@ export default function SalonDetailPage() {
                   >
                     <Calendar className="w-4 h-4 transition-transform group-hover:scale-110" />
                     <span>Book an Appointment</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowAiStylistModal(true)}
+                    className="px-6 py-2.5 bg-gradient-to-r from-deep-plum to-primary-rose text-white text-xs font-bold rounded-xl shadow-xs hover:opacity-95 active:scale-[0.99] transition-all flex items-center justify-center gap-2 group"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-accent-gold transition-transform group-hover:rotate-12" />
+                    <span>AI Style & Color Match</span>
                   </button>
 
                   <div className="flex items-center justify-start lg:justify-end gap-2 text-xs text-muted">
@@ -1597,13 +1609,27 @@ export default function SalonDetailPage() {
                                         key={idx}
                                         type="button"
                                         onClick={() => setSelectedTime(slot.startTime)}
-                                        className={`py-2 px-2 text-xs font-medium rounded-xl border transition-all text-center ${
+                                        className={`py-2 px-1 text-xs font-medium rounded-xl border transition-all text-center relative flex flex-col items-center justify-center gap-0.5 ${
                                           selectedTime === slot.startTime
                                             ? 'bg-primary-rose text-white border-primary-rose shadow-xs'
+                                            : slot.hasFlashDiscount
+                                            ? 'bg-amber-50/80 border-amber-300 text-deep-plum hover:border-primary-rose'
+                                            : slot.isGapOptimized
+                                            ? 'bg-rose-50/60 border-dusty-rose/60 text-deep-plum hover:border-primary-rose'
                                             : 'bg-white border-border-color hover:border-primary-rose hover:text-primary-rose text-deep-plum'
                                         }`}
+                                        title={slot.optimizationReason || (slot.hasFlashDiscount ? `${slot.discountPercentage}% OFF Flash Discount` : undefined)}
                                       >
-                                        {slot.startTime}
+                                        <span className="font-semibold">{slot.startTime}</span>
+                                        {slot.hasFlashDiscount ? (
+                                          <span className={`text-[9px] font-bold px-1 rounded ${selectedTime === slot.startTime ? 'bg-white/20 text-white' : 'text-amber-800 bg-amber-100'}`}>
+                                            ⚡ {slot.discountPercentage}%
+                                          </span>
+                                        ) : slot.isGapOptimized ? (
+                                          <span className={`text-[9px] font-bold px-1 rounded ${selectedTime === slot.startTime ? 'bg-white/20 text-white' : 'text-primary-rose bg-soft-blush'}`}>
+                                            ✨ Seamless
+                                          </span>
+                                        ) : null}
                                       </button>
                                     ))}
                                   </div>
@@ -1622,13 +1648,27 @@ export default function SalonDetailPage() {
                                         key={idx}
                                         type="button"
                                         onClick={() => setSelectedTime(slot.startTime)}
-                                        className={`py-2 px-2 text-xs font-medium rounded-xl border transition-all text-center ${
+                                        className={`py-2 px-1 text-xs font-medium rounded-xl border transition-all text-center relative flex flex-col items-center justify-center gap-0.5 ${
                                           selectedTime === slot.startTime
                                             ? 'bg-primary-rose text-white border-primary-rose shadow-xs'
+                                            : slot.hasFlashDiscount
+                                            ? 'bg-amber-50/80 border-amber-300 text-deep-plum hover:border-primary-rose'
+                                            : slot.isGapOptimized
+                                            ? 'bg-rose-50/60 border-dusty-rose/60 text-deep-plum hover:border-primary-rose'
                                             : 'bg-white border-border-color hover:border-primary-rose hover:text-primary-rose text-deep-plum'
                                         }`}
+                                        title={slot.optimizationReason || (slot.hasFlashDiscount ? `${slot.discountPercentage}% OFF Flash Discount` : undefined)}
                                       >
-                                        {slot.startTime}
+                                        <span className="font-semibold">{slot.startTime}</span>
+                                        {slot.hasFlashDiscount ? (
+                                          <span className={`text-[9px] font-bold px-1 rounded ${selectedTime === slot.startTime ? 'bg-white/20 text-white' : 'text-amber-800 bg-amber-100'}`}>
+                                            ⚡ {slot.discountPercentage}%
+                                          </span>
+                                        ) : slot.isGapOptimized ? (
+                                          <span className={`text-[9px] font-bold px-1 rounded ${selectedTime === slot.startTime ? 'bg-white/20 text-white' : 'text-primary-rose bg-soft-blush'}`}>
+                                            ✨ Seamless
+                                          </span>
+                                        ) : null}
                                       </button>
                                     ))}
                                   </div>
@@ -1647,13 +1687,27 @@ export default function SalonDetailPage() {
                                         key={idx}
                                         type="button"
                                         onClick={() => setSelectedTime(slot.startTime)}
-                                        className={`py-2 px-2 text-xs font-medium rounded-xl border transition-all text-center ${
+                                        className={`py-2 px-1 text-xs font-medium rounded-xl border transition-all text-center relative flex flex-col items-center justify-center gap-0.5 ${
                                           selectedTime === slot.startTime
                                             ? 'bg-primary-rose text-white border-primary-rose shadow-xs'
+                                            : slot.hasFlashDiscount
+                                            ? 'bg-amber-50/80 border-amber-300 text-deep-plum hover:border-primary-rose'
+                                            : slot.isGapOptimized
+                                            ? 'bg-rose-50/60 border-dusty-rose/60 text-deep-plum hover:border-primary-rose'
                                             : 'bg-white border-border-color hover:border-primary-rose hover:text-primary-rose text-deep-plum'
                                         }`}
+                                        title={slot.optimizationReason || (slot.hasFlashDiscount ? `${slot.discountPercentage}% OFF Flash Discount` : undefined)}
                                       >
-                                        {slot.startTime}
+                                        <span className="font-semibold">{slot.startTime}</span>
+                                        {slot.hasFlashDiscount ? (
+                                          <span className={`text-[9px] font-bold px-1 rounded ${selectedTime === slot.startTime ? 'bg-white/20 text-white' : 'text-amber-800 bg-amber-100'}`}>
+                                            ⚡ {slot.discountPercentage}%
+                                          </span>
+                                        ) : slot.isGapOptimized ? (
+                                          <span className={`text-[9px] font-bold px-1 rounded ${selectedTime === slot.startTime ? 'bg-white/20 text-white' : 'text-primary-rose bg-soft-blush'}`}>
+                                            ✨ Seamless
+                                          </span>
+                                        ) : null}
                                       </button>
                                     ))}
                                   </div>
@@ -1675,6 +1729,27 @@ export default function SalonDetailPage() {
                                     +{selectedSlot.availableStaff.length - 1} more
                                   </span>
                                 )}
+                              </div>
+                            )}
+
+                            {/* Flash Discount & Smart Gap Notice */}
+                            {selectedTime && selectedSlot?.hasFlashDiscount && (
+                              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center justify-between animate-fade-in">
+                                <div className="flex items-center gap-1.5 font-semibold">
+                                  <Zap className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                  <span>{selectedSlot.flashDiscountTitle || 'Off-Peak Flash Sale'}: {selectedSlot.discountPercentage}% OFF!</span>
+                                </div>
+                                <div className="text-right font-bold text-xs">
+                                  <span className="text-[11px] text-muted line-through mr-1">₹{selectedSlot.originalPrice}</span>
+                                  <span className="text-amber-800">₹{selectedSlot.discountedPrice}</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {selectedTime && selectedSlot?.isGapOptimized && !selectedSlot?.hasFlashDiscount && (
+                              <div className="p-2 rounded-xl bg-soft-blush/60 border border-dusty-rose/40 text-xs text-deep-plum flex items-center gap-1.5 animate-fade-in">
+                                <Sparkles className="w-3.5 h-3.5 text-primary-rose shrink-0" />
+                                <span className="text-[11px]"><strong>Smart Gap Choice:</strong> {selectedSlot.optimizationReason || 'Seamless scheduling prevents awkward wait times.'}</span>
                               </div>
                             )}
                           </div>
@@ -1730,10 +1805,26 @@ export default function SalonDetailPage() {
                               <span className="font-medium text-deep-plum">{selectedDate} @ {selectedTime}</span>
                             </div>
                             <div className="pt-2 border-t border-border-color/80 flex justify-between items-center text-sm">
-                              <span className="font-medium text-deep-plum">Package Total</span>
-                              <span className="font-serif font-bold text-base text-primary-rose">
-                                {formatCurrency(totalCartPrice)}
-                              </span>
+                              <div>
+                                <span className="font-medium text-deep-plum">Package Total</span>
+                                {selectedSlot?.hasFlashDiscount && (
+                                  <span className="block text-[10px] text-amber-700 font-bold">⚡ Flash Discount Applied</span>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                {selectedSlot?.hasFlashDiscount && selectedSlot?.discountedPrice != null ? (
+                                  <>
+                                    <span className="text-xs text-muted line-through mr-1.5">{formatCurrency(selectedSlot.originalPrice || totalCartPrice)}</span>
+                                    <span className="font-serif font-bold text-base text-primary-rose">
+                                      {formatCurrency(selectedSlot.discountedPrice)}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="font-serif font-bold text-base text-primary-rose">
+                                    {formatCurrency(totalCartPrice)}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
 
@@ -1852,6 +1943,17 @@ export default function SalonDetailPage() {
             </div>
           </div>
         )}
+
+        {/* AI Stylist Recommendation Modal */}
+        <AiStylistModal
+          isOpen={showAiStylistModal}
+          onClose={() => setShowAiStylistModal(false)}
+          salonSlug={slug}
+          onSelectService={(serviceId) => {
+            handleToggleService(serviceId);
+            scrollToBooking();
+          }}
+        />
 
       </div>
     </PublicLayout>

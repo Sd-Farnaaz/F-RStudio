@@ -92,6 +92,7 @@ public class AvailabilityService : IAvailabilityService
 
         var primaryService = services.First();
         var totalMinutes = services.Sum(s => s.DurationMinutes);
+        var totalPrice = services.Sum(s => s.Price);
         var combinedName = string.Join(" + ", services.Select(s => s.Name));
 
         var salonTz = GetTimeZoneInfo(salon.TimeZone);
@@ -105,6 +106,12 @@ public class AvailabilityService : IAvailabilityService
 
         var targetDayOfWeek = targetDate.DayOfWeek;
         var duration = TimeSpan.FromMinutes(totalMinutes);
+
+        // Fetch active Off-Peak Dynamic Rules for the salon
+        var offPeakRules = await _dbContext.SalonOffPeakRules
+            .AsNoTracking()
+            .Where(r => r.SalonId == salon.Id && r.IsActive)
+            .ToListAsync(cancellationToken);
 
         // Fetch staff and their schedules for that day
         var staffQuery = _dbContext.Staff
@@ -136,7 +143,7 @@ public class AvailabilityService : IAvailabilityService
                         targetDayStartUtc < a.EndAtUtc)
             .ToListAsync(cancellationToken);
 
-        var slotStaffMap = new SortedDictionary<TimeSpan, (TimeSpan EndTime, List<PublicStaffResponse> Staff)>();
+        var slotStaffMap = new SortedDictionary<TimeSpan, (TimeSpan EndTime, List<PublicStaffResponse> Staff, bool IsGapOptimized)>();
 
         const int slotStepMinutes = 15; // 15-minute slot alignment
 
@@ -169,13 +176,25 @@ public class AvailabilityService : IAvailabilityService
 
                 if (!overlapsBreak && !isPastToday && !hasBookingOverlap)
                 {
+                    // Smart Gap Optimization check:
+                    // Does this slot attach seamlessly to an existing booking (within 15 min),
+                    // or attach directly to shift start/end, avoiding awkward orphaned gaps?
+                    var touchesPriorBooking = staffBookings.Any(a => Math.Abs((slotStartUtc - a.EndAtUtc).TotalMinutes) <= 15);
+                    var touchesNextBooking = staffBookings.Any(a => Math.Abs((a.StartAtUtc - slotEndUtc).TotalMinutes) <= 15);
+                    var touchesShiftEdge = (slotStart == schedule.StartTime) || (slotEnd == schedule.EndTime);
+                    var isOptimized = touchesPriorBooking || touchesNextBooking || touchesShiftEdge;
+
                     if (!slotStaffMap.TryGetValue(slotStart, out var entry))
                     {
-                        entry = (slotEnd, new List<PublicStaffResponse>());
+                        entry = (slotEnd, new List<PublicStaffResponse>(), isOptimized);
                         slotStaffMap[slotStart] = entry;
                     }
+                    else if (isOptimized)
+                    {
+                        slotStaffMap[slotStart] = (entry.EndTime, entry.Staff, true);
+                    }
 
-                    entry.Staff.Add(new PublicStaffResponse
+                    slotStaffMap[slotStart].Staff.Add(new PublicStaffResponse
                     {
                         Id = staff.Id,
                         FullName = staff.FullName,
@@ -188,11 +207,48 @@ public class AvailabilityService : IAvailabilityService
             }
         }
 
-        var availableSlots = slotStaffMap.Select(kvp => new AvailabilitySlotResponse
+        var dayName = targetDayOfWeek.ToString();
+
+        var availableSlots = slotStaffMap.Select(kvp =>
         {
-            StartTime = FormatTimeSpan(kvp.Key),
-            EndTime = FormatTimeSpan(kvp.Value.EndTime),
-            AvailableStaff = kvp.Value.Staff
+            var startTs = kvp.Key;
+            var endTs = kvp.Value.EndTime;
+            var startStr = FormatTimeSpan(startTs);
+            var endStr = FormatTimeSpan(endTs);
+
+            // Check if any active Off-Peak Flash Discount applies to this slot
+            var matchingRule = offPeakRules.FirstOrDefault(r =>
+            {
+                var days = r.DaysOfWeek.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                var matchesDay = days.Any(d => d.Equals(dayName, StringComparison.OrdinalIgnoreCase));
+                if (!matchesDay) return false;
+
+                if (TimeSpan.TryParse(r.StartTime, out var rStart) && TimeSpan.TryParse(r.EndTime, out var rEnd))
+                {
+                    return startTs >= rStart && startTs < rEnd;
+                }
+                return false;
+            });
+
+            var hasDiscount = matchingRule != null;
+            decimal? discPct = hasDiscount ? matchingRule!.DiscountPercentage : null;
+            decimal? origPrice = hasDiscount ? totalPrice : null;
+            decimal? discPrice = hasDiscount ? Math.Round(totalPrice * (1m - (matchingRule!.DiscountPercentage / 100m)), 2) : null;
+            string? discTitle = hasDiscount ? matchingRule!.Name : null;
+
+            return new AvailabilitySlotResponse
+            {
+                StartTime = startStr,
+                EndTime = endStr,
+                AvailableStaff = kvp.Value.Staff,
+                IsGapOptimized = kvp.Value.IsGapOptimized,
+                OptimizationReason = kvp.Value.IsGapOptimized ? "Recommended slot: Seamlessly minimizes wait time" : null,
+                HasFlashDiscount = hasDiscount,
+                DiscountPercentage = discPct,
+                OriginalPrice = origPrice,
+                DiscountedPrice = discPrice,
+                FlashDiscountTitle = discTitle
+            };
         }).ToList();
 
         return new SalonAvailabilityResponse

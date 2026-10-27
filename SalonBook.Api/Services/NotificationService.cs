@@ -166,7 +166,7 @@ public class NotificationService : INotificationService
             }
         }
 
-        // 4. Schedule Reminders (24H and 2H before appointment start)
+        // 4. Schedule Reminders (24H, 2H before, and 1H post-visit thank-you)
         var reminder24HTime = appt.StartAtUtc.AddHours(-24);
         if (reminder24HTime > DateTime.UtcNow)
         {
@@ -192,6 +192,16 @@ public class NotificationService : INotificationService
                 CreatedAtUtc = DateTime.UtcNow
             });
         }
+
+        var reminderPostVisitTime = appt.EndAtUtc.AddHours(1);
+        _dbContext.AppointmentReminders.Add(new AppointmentReminder
+        {
+            AppointmentId = appt.Id,
+            ReminderType = "1HourAfter",
+            ScheduledForUtc = reminderPostVisitTime,
+            Status = "Pending",
+            CreatedAtUtc = DateTime.UtcNow
+        });
     }
 
     private async Task HandleAppointmentCancelledAsync(Appointment appt, List<User> salonAdmins, CancellationToken cancellationToken)
@@ -450,7 +460,9 @@ public class NotificationService : INotificationService
             return;
 
         var appt = reminder.Appointment;
-        if (appt == null || appt.Status == "Cancelled" || appt.Status == "Completed" || appt.Status == "NoShow")
+        var isPostVisit = reminder.ReminderType == "1HourAfter";
+
+        if (appt == null || appt.Status == "Cancelled" || appt.Status == "NoShow" || (!isPostVisit && appt.Status == "Completed"))
         {
             reminder.Status = "Skipped";
             reminder.LastError = $"Appointment is {appt?.Status ?? "missing"}";
@@ -459,10 +471,42 @@ public class NotificationService : INotificationService
             return;
         }
 
-        var reminderTypeName = reminder.ReminderType == "24Hours" ? "24 hours" : "2 hours";
-        var reminderNotificationType = reminder.ReminderType == "24Hours" ? "AppointmentReminder24H" : "AppointmentReminder2H";
+        string reminderTypeName;
+        string reminderNotificationType;
+        string inAppSubject;
+        string inAppMessage;
+        string whatsappSmsMessage;
 
-        // Create Customer Reminder InApp Notification
+        var salonAddress = string.Join(", ", new[] { appt.Salon.AddressLine, appt.Salon.City }.Where(s => !string.IsNullOrWhiteSpace(s)));
+        var encodedAddress = Uri.EscapeDataString(string.IsNullOrWhiteSpace(salonAddress) ? appt.Salon.Name : salonAddress);
+        var mapLink = $"https://maps.google.com/?q={encodedAddress}";
+
+        if (reminder.ReminderType == "24Hours")
+        {
+            reminderTypeName = "24 hours";
+            reminderNotificationType = "AppointmentReminder24H";
+            inAppSubject = $"Reminder: Upcoming Appointment Tomorrow ({appt.Salon.Name})";
+            inAppMessage = $"Your appointment for {appt.ServiceNameAtBooking} with {appt.Staff.FullName} is tomorrow at {appt.StartAtUtc:yyyy-MM-dd HH:mm} UTC. Address: {salonAddress}";
+            whatsappSmsMessage = $"👋 Hi {appt.Customer.FullName}! Reminder: Your appointment for {appt.ServiceNameAtBooking} with {appt.Staff.FullName} at {appt.Salon.Name} is tomorrow at {appt.StartAtUtc:HH:mm} UTC.\n📍 Address: {salonAddress} (Map: {mapLink})\n✅ Tap to confirm attendance: https://salonbook.local/my-bookings?confirm={appt.Id}";
+        }
+        else if (reminder.ReminderType == "2Hours")
+        {
+            reminderTypeName = "2 hours";
+            reminderNotificationType = "AppointmentReminder2H";
+            inAppSubject = $"Reminder: Appointment in 2 Hours ({appt.Salon.Name})";
+            inAppMessage = $"Your appointment for {appt.ServiceNameAtBooking} with {appt.Staff.FullName} starts in 2 hours at {appt.StartAtUtc:HH:mm} UTC.";
+            whatsappSmsMessage = $"⏳ Quick heads-up {appt.Customer.FullName}! Your appointment for {appt.ServiceNameAtBooking} with {appt.Staff.FullName} at {appt.Salon.Name} starts in 2 hours ({appt.StartAtUtc:HH:mm} UTC).\n📍 Directions: {mapLink}\nSee you soon!";
+        }
+        else // 1HourAfter
+        {
+            reminderTypeName = "post-visit";
+            reminderNotificationType = "PostVisitThankYou";
+            inAppSubject = $"Thank you for visiting {appt.Salon.Name}! ⭐️ Leave a Review";
+            inAppMessage = $"Thank you for choosing {appt.Salon.Name} today for your {appt.ServiceNameAtBooking}! We would love your feedback.";
+            whatsappSmsMessage = $"✨ Thank you for visiting {appt.Salon.Name} today, {appt.Customer.FullName}! We hope you loved your {appt.ServiceNameAtBooking} with {appt.Staff.FullName}.\n⭐️ Tap here to leave a 1-tap review: https://salonbook.local/salons/{appt.Salon.Slug}?review=true\nHave a wonderful day!";
+        }
+
+        // 1. InApp Notification
         _dbContext.Notifications.Add(new Notification
         {
             RecipientUserId = appt.CustomerId,
@@ -470,18 +514,48 @@ public class NotificationService : INotificationService
             AppointmentId = appt.Id,
             Type = reminderNotificationType,
             Channel = "InApp",
-            Subject = $"Reminder: Upcoming Appointment ({reminderTypeName})",
-            Message = $"You have an upcoming appointment for {appt.ServiceNameAtBooking} with {appt.Staff.FullName} at {appt.Salon.Name} on {appt.StartAtUtc:yyyy-MM-dd HH:mm} UTC.",
+            Subject = inAppSubject,
+            Message = inAppMessage,
             Status = "Sent",
             SentAtUtc = DateTime.UtcNow,
             CreatedAtUtc = DateTime.UtcNow
         });
 
-        // Create Customer Reminder Email
+        // 2. Automated WhatsApp Notification
+        _dbContext.Notifications.Add(new Notification
+        {
+            RecipientUserId = appt.CustomerId,
+            SalonId = appt.SalonId,
+            AppointmentId = appt.Id,
+            Type = reminderNotificationType,
+            Channel = "WhatsApp",
+            Subject = inAppSubject,
+            Message = whatsappSmsMessage,
+            Status = "Sent",
+            SentAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        // 3. Automated SMS Notification
+        _dbContext.Notifications.Add(new Notification
+        {
+            RecipientUserId = appt.CustomerId,
+            SalonId = appt.SalonId,
+            AppointmentId = appt.Id,
+            Type = reminderNotificationType,
+            Channel = "SMS",
+            Subject = inAppSubject,
+            Message = whatsappSmsMessage,
+            Status = "Sent",
+            SentAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        // 4. Email Notification
         if (!string.IsNullOrWhiteSpace(appt.Customer.Email))
         {
-            var emailSubject = $"Reminder: Upcoming Appointment in {reminderTypeName} - {appt.ServiceNameAtBooking}";
-            var emailBody = $"<p>Dear {appt.Customer.FullName},</p><p>This is a friendly reminder that you have an upcoming appointment for <strong>{appt.ServiceNameAtBooking}</strong> with {appt.Staff.FullName} at <strong>{appt.Salon.Name}</strong> on <strong>{appt.StartAtUtc:yyyy-MM-dd HH:mm} UTC</strong>.</p><p>We look forward to seeing you!</p>";
+            var emailSubject = $"{inAppSubject} - {appt.ServiceNameAtBooking}";
+            var emailBody = $"<p>Dear {appt.Customer.FullName},</p><p>{inAppMessage}</p><p><strong>Appointment:</strong> #{appt.Id} - {appt.ServiceNameAtBooking}<br/><strong>Salon:</strong> {appt.Salon.Name}<br/><strong>Time:</strong> {appt.StartAtUtc:yyyy-MM-dd HH:mm} UTC</p><p>Thank you for choosing SalonBook!</p>";
 
             var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, emailSubject, emailBody, cancellationToken);
 
