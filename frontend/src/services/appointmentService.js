@@ -19,6 +19,7 @@ export const appointmentService = {
   getAdminAppointment: (id) => fetchApi(`/api/admin/appointments/${id}`, { method: 'GET' }),
   updateAppointmentStatus: (id, status, reason) => fetchApi(`/api/admin/appointments/${id}/status`, { method: 'PATCH', body: { status, reason } }),
   verifyPayment: (id, data) => fetchApi(`/api/admin/appointments/${id}/verify-payment`, { method: 'POST', body: data }),
+  rescheduleAppointment: (id, data) => fetchApi(`/api/admin/appointments/${id}/reschedule`, { method: 'PATCH', body: data }),
   getCalendar: (startUtc, endUtc, staffId) => {
     const params = { startUtc, endUtc };
     if (staffId) params.staffId = staffId;

@@ -60,7 +60,7 @@ public class PublicSalonsController : ControllerBase
         var totalCount = await query.CountAsync(cancellationToken);
 
         var salons = await query
-            .OrderBy(s => s.Name)
+            .OrderByDescending(s => s.CreatedAtUtc)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);

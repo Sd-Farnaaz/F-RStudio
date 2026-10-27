@@ -24,6 +24,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AppointmentReminder> AppointmentReminders => Set<AppointmentReminder>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<ClientConsultationCard> ClientConsultationCards => Set<ClientConsultationCard>();
+    public DbSet<ClientFormulaRecord> ClientFormulaRecords => Set<ClientFormulaRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -103,7 +103,7 @@ public class AdminCustomerIntegrationTests : IClassFixture<CustomWebApplicationF
     public async Task CreateCustomer_AllowsCreatedCustomerToLogin()
     {
         // Arrange
-        var (adminToken, _, _) = await RegisterSalonAndAdminAsync();
+        var (adminToken, adminSalonId, _) = await RegisterSalonAndAdminAsync();
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
 
         var suffix = Guid.NewGuid().ToString("N")[..8];
@@ -134,7 +134,43 @@ public class AdminCustomerIntegrationTests : IClassFixture<CustomWebApplicationF
         Assert.NotNull(authRes);
         Assert.NotEmpty(authRes.AccessToken);
         Assert.Equal(Roles.User, authRes.User.Role);
-        Assert.Null(authRes.User.SalonId); // Global customer
+        Assert.Equal(adminSalonId, authRes.User.SalonId);
+    }
+
+    [Fact]
+    public async Task CreateCustomer_EnforcesTenantIsolation_OtherSalonCannotSeeCustomer()
+    {
+        // Arrange - Salon A creates a customer
+        var (salonAToken, _, _) = await RegisterSalonAndAdminAsync();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", salonAToken);
+
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var req = new CreateCustomerRequest
+        {
+            FullName = $"Salon A Client {suffix}",
+            Email = $"salona_{suffix}@domain.com",
+            Password = "Password123!"
+        };
+
+        var createRes = await _client.PostAsJsonAsync("/api/admin/customers", req);
+        Assert.Equal(HttpStatusCode.Created, createRes.StatusCode);
+        var createdCustomer = await createRes.Content.ReadFromJsonAsync<CustomerResponse>();
+        Assert.NotNull(createdCustomer);
+
+        // Act - Salon B logs in and tries to list and fetch Salon A's customer
+        var (salonBToken, _, _) = await RegisterSalonAndAdminAsync();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", salonBToken);
+
+        // 1. List query: Salon B must NOT see Salon A's customer
+        var listRes = await _client.GetAsync($"/api/admin/customers?search={suffix}");
+        Assert.Equal(HttpStatusCode.OK, listRes.StatusCode);
+        var pagedResult = await listRes.Content.ReadFromJsonAsync<PagedResult<CustomerResponse>>();
+        Assert.NotNull(pagedResult);
+        Assert.DoesNotContain(pagedResult.Items, c => c.Id == createdCustomer.Id);
+
+        // 2. Direct get: Salon B must receive 404 NotFound
+        var getByIdRes = await _client.GetAsync($"/api/admin/customers/{createdCustomer.Id}");
+        Assert.Equal(HttpStatusCode.NotFound, getByIdRes.StatusCode);
     }
 
     [Fact]

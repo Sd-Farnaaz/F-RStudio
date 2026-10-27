@@ -37,6 +37,7 @@ import StaffPage from './pages/dashboard/StaffPage';
 import StaffSchedulePage from './pages/dashboard/StaffSchedulePage';
 import AdminAppointmentsPage from './pages/dashboard/AdminAppointmentsPage';
 import AdminCalendarPage from './pages/dashboard/AdminCalendarPage';
+import AdminPosPage from './pages/dashboard/AdminPosPage';
 import AdminCustomersPage from './pages/dashboard/AdminCustomersPage';
 import AdminReviewsPage from './pages/dashboard/AdminReviewsPage';
 import AdminBillingPage from './pages/dashboard/AdminBillingPage';
@@ -120,6 +121,7 @@ function App() {
           <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
           <Route path="/admin/appointments" element={<ProtectedRoute allowedRoles={['Admin']}><AdminAppointmentsPage /></ProtectedRoute>} />
           <Route path="/admin/calendar" element={<ProtectedRoute allowedRoles={['Admin']}><AdminCalendarPage /></ProtectedRoute>} />
+          <Route path="/admin/pos" element={<ProtectedRoute allowedRoles={['Admin']}><AdminPosPage /></ProtectedRoute>} />
           <Route path="/admin/services" element={<ProtectedRoute allowedRoles={['Admin']}><ServicesPage /></ProtectedRoute>} />
           <Route path="/admin/staff" element={<ProtectedRoute allowedRoles={['Admin']}><StaffPage /></ProtectedRoute>} />
           <Route path="/admin/staff/:id/schedule" element={<ProtectedRoute allowedRoles={['Admin']}><StaffSchedulePage /></ProtectedRoute>} />

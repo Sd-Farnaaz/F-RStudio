@@ -127,13 +127,25 @@ public class AppointmentCalendarItemResponse
 {
     public int Id { get; set; }
 
+    public int CustomerId { get; set; }
+
+    public string CustomerName { get; set; } = string.Empty;
+
+    public string? CustomerEmail { get; set; }
+
+    public string? CustomerPhone { get; set; }
+
     public int StaffId { get; set; }
 
     public string StaffName { get; set; } = string.Empty;
 
-    public string CustomerName { get; set; } = string.Empty;
+    public string? StaffTitle { get; set; }
+
+    public int ServiceId { get; set; }
 
     public string ServiceName { get; set; } = string.Empty;
+
+    public int DurationMinutes { get; set; }
 
     public decimal Price { get; set; }
 
@@ -142,5 +154,19 @@ public class AppointmentCalendarItemResponse
     public DateTime EndAtUtc { get; set; }
 
     public string Status { get; set; } = string.Empty;
+
+    public string PaymentStatus { get; set; } = string.Empty;
+
+    public decimal AmountPaid { get; set; }
 }
 
+public class RescheduleAppointmentRequest
+{
+    [Required(ErrorMessage = "NewStartAtUtc is required.")]
+    public DateTime NewStartAtUtc { get; set; }
+
+    public int? NewStaffId { get; set; }
+
+    [StringLength(500, ErrorMessage = "Reason cannot exceed 500 characters.")]
+    public string? Reason { get; set; }
+}

@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Calendar, Users, Home, Settings, LogOut, Search, Menu, X, CreditCard, Compass, User as UserIcon, Store, ShieldCheck, Star, DollarSign } from 'lucide-react';
+import { Calendar, Users, Home, Settings, LogOut, Search, Menu, X, CreditCard, Compass, User as UserIcon, Store, ShieldCheck, Star, DollarSign, ShoppingBag } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import NotificationBell from './NotificationBell';
@@ -38,6 +38,7 @@ export default function DashboardLayout({ children }) {
       { name: 'Dashboard', href: '/admin/dashboard', icon: Home },
       { name: 'Appointments', href: '/admin/appointments', icon: Calendar },
       { name: 'Calendar', href: '/admin/calendar', icon: Calendar },
+      { name: 'POS & Walk-In', href: '/admin/pos', icon: ShoppingBag },
       { name: 'Services', href: '/admin/services', icon: Settings },
       { name: 'Staff', href: '/admin/staff', icon: Users },
       { name: 'Customers', href: '/admin/customers', icon: Users },
