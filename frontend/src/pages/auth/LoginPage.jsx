@@ -38,7 +38,7 @@ export default function LoginPage() {
     <AuthLayout 
       title="Welcome back" 
       subtitle="Sign in to your client account to manage appointments and browse salons."
-      imageSrc="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1200&q=80"
+      imageSrc="https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&w=1200&q=85"
     >
       {error && (
         <div className="mb-6 p-4 bg-rose-50 text-rose-700 text-xs sm:text-sm rounded-2xl border border-rose-100 flex items-start gap-2.5">

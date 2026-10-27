@@ -59,7 +59,7 @@ export default function AdminRegisterPage() {
     <AuthLayout 
       title="Partner with SalonBook" 
       subtitle="Register your business to begin managing appointments, specialists, and payments."
-      imageSrc="https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?auto=format&fit=crop&w=1200&q=80"
+      imageSrc="https://images.unsplash.com/photo-1633681926022-84c23e8cb2d6?auto=format&fit=crop&w=1200&q=85"
     >
       {error && (
         <div className="mb-6 p-4 bg-rose-50 text-rose-700 text-xs sm:text-sm rounded-2xl border border-rose-100 flex items-start gap-2.5">

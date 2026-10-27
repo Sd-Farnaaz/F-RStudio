@@ -50,7 +50,7 @@ export default function SignupPage() {
     <AuthLayout 
       title="Create your account" 
       subtitle="Join SalonBook to discover exceptional studios and book your beauty visits."
-      imageSrc="https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=1200&q=80"
+      imageSrc="https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&w=1200&q=85"
     >
       {error && (
         <div className="mb-6 p-4 bg-rose-50 text-rose-700 text-xs sm:text-sm rounded-2xl border border-rose-100 flex items-start gap-2.5">

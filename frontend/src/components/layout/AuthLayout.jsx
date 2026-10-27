@@ -53,7 +53,7 @@ export default function AuthLayout({ children, title, subtitle, imageSrc }) {
       <div className="hidden lg:block lg:w-1/2 bg-rose-tint relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-t from-deep-plum/80 via-deep-plum/20 to-transparent z-10" />
         <img 
-          src={imageSrc || "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1200&q=80"} 
+          src={imageSrc || "https://images.unsplash.com/photo-1600948836101-f9ffda59d250?auto=format&fit=crop&w=1200&q=85"} 
           alt="Luxury salon styling studio" 
           className="absolute inset-0 w-full h-full object-cover object-center"
         />

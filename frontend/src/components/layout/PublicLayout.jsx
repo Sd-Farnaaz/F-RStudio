@@ -1,12 +1,41 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
+import { 
+  Menu, 
+  X, 
+  ArrowRight, 
+  ShieldCheck, 
+  Sparkles,
+  Mail,
+  Phone,
+  MapPin,
+  Clock,
+  Calendar,
+  CreditCard,
+  Lock,
+  CheckCircle2,
+  Send,
+  Check,
+  Heart,
+  Store,
+  Scissors
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function PublicLayout({ children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [subscribed, setSubscribed] = useState(false);
   const { user } = useAuth();
   const location = useLocation();
+
+  const handleNewsletterSubmit = (e) => {
+    e.preventDefault();
+    if (!newsletterEmail || !newsletterEmail.includes('@')) return;
+    setSubscribed(true);
+    setNewsletterEmail('');
+    setTimeout(() => setSubscribed(false), 5000);
+  };
 
   const getDashboardLink = () => {
     if (!user) return '/login';
@@ -176,69 +205,348 @@ export default function PublicLayout({ children }) {
         {children}
       </main>
 
-      {/* Polished Footer */}
-      <footer className="bg-deep-plum text-soft-blush pt-16 pb-12 px-6 sm:px-8 border-t border-[#3A2B2D]">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-12 pb-14 border-b border-white/10">
-            
-            {/* Brand Column */}
-            <div className="sm:col-span-2 lg:col-span-2 space-y-4">
-              <span className="font-serif text-2xl font-bold tracking-tight text-white block">
-                Salon<span className="text-dusty-rose">Book</span>
+      {/* ========================================================================= */}
+      {/* CURATED SALON AESTHETICS PHOTO RIBBON                                      */}
+      {/* ========================================================================= */}
+      <section className="bg-ivory border-t border-border-color overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary-rose" />
+              <span className="text-xs font-semibold uppercase tracking-widest text-deep-plum">
+                Curated by SalonBook
               </span>
-              <p className="text-sm text-dusty-rose/90 max-w-sm leading-relaxed">
-                The premier appointment scheduling and salon management platform crafted for modern beauty professionals and discerning clients.
-              </p>
-              <div className="flex items-center gap-2 pt-2 text-xs text-dusty-rose/80">
-                <ShieldCheck className="w-4 h-4 text-dusty-rose shrink-0" />
-                <span>Verified Salon Double-Booking Protection</span>
+              <span className="text-xs text-muted">• Modern Aesthetics & Luxury Studios</span>
+            </div>
+            <Link 
+              to="/salons" 
+              className="text-xs font-semibold text-primary-rose hover:text-deep-plum transition-colors flex items-center gap-1 group self-start sm:self-auto"
+            >
+              <span>Explore All Verified Studios</span>
+              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+            {/* Gallery Image 1 */}
+            <div className="group relative aspect-square rounded-2xl overflow-hidden border border-border-color bg-soft-blush shadow-2xs">
+              <img
+                src="https://images.unsplash.com/photo-1600948836101-f9ffda59d250?auto=format&fit=crop&w=600&q=80"
+                alt="Luxury salon styling stations with arched mirrors"
+                className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-deep-plum/75 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                <span className="text-[11px] font-medium text-white">Studio Interior</span>
               </div>
             </div>
 
-            {/* Navigation Column: For Clients */}
+            {/* Gallery Image 2 */}
+            <div className="group relative aspect-square rounded-2xl overflow-hidden border border-border-color bg-soft-blush shadow-2xs">
+              <img
+                src="https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&w=600&q=80"
+                alt="Hair stylist balayage coloring"
+                className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-deep-plum/75 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                <span className="text-[11px] font-medium text-white">Signature Balayage</span>
+              </div>
+            </div>
+
+            {/* Gallery Image 3 */}
+            <div className="group relative aspect-square rounded-2xl overflow-hidden border border-border-color bg-soft-blush shadow-2xs">
+              <img
+                src="https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=600&q=80"
+                alt="Botanical spa and facial wellness"
+                className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-deep-plum/75 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                <span className="text-[11px] font-medium text-white">Spa & Wellness</span>
+              </div>
+            </div>
+
+            {/* Gallery Image 4 */}
+            <div className="group relative aspect-square rounded-2xl overflow-hidden border border-border-color bg-soft-blush shadow-2xs">
+              <img
+                src="https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?auto=format&fit=crop&w=600&q=80"
+                alt="Organic skincare cosmetic brushes and serums"
+                className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-deep-plum/75 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                <span className="text-[11px] font-medium text-white">Clinical Formulations</span>
+              </div>
+            </div>
+
+            {/* Gallery Image 5 */}
+            <div className="group relative aspect-square rounded-2xl overflow-hidden border border-border-color bg-soft-blush shadow-2xs">
+              <img
+                src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80"
+                alt="Hair stylist tools and shears"
+                className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-deep-plum/75 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                <span className="text-[11px] font-medium text-white">Artisan Styling</span>
+              </div>
+            </div>
+
+            {/* Gallery Image 6 */}
+            <div className="group relative aspect-square rounded-2xl overflow-hidden border border-border-color bg-soft-blush shadow-2xs">
+              <img
+                src="https://images.unsplash.com/photo-1633681926022-84c23e8cb2d6?auto=format&fit=crop&w=600&q=80"
+                alt="Contemporary salon styling chairs"
+                className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-deep-plum/75 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                <span className="text-[11px] font-medium text-white">Boutique Studios</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* ENHANCED LUXURY FOOTER                                                    */}
+      {/* ========================================================================= */}
+      <footer className="bg-deep-plum text-soft-blush pt-16 pb-12 px-6 sm:px-8 border-t border-[#3A2B2D] relative">
+        <div className="max-w-7xl mx-auto space-y-14">
+
+          {/* 1. Trust & Quality Guarantees Ribbon */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-12 border-b border-white/10 text-xs">
+            <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
+              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-dusty-rose shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="font-semibold text-white block">100% Verified</span>
+                <span className="text-[11px] text-dusty-rose/80">Vetted beauty salons & spas</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
+              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-dusty-rose shrink-0">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="font-semibold text-white block">Real-Time Sync</span>
+                <span className="text-[11px] text-dusty-rose/80">Zero double-booking guarantee</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
+              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-dusty-rose shrink-0">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="font-semibold text-white block">Escrow Security</span>
+                <span className="text-[11px] text-dusty-rose/80">Protected deposit releases</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
+              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-dusty-rose shrink-0">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="font-semibold text-white block">Client Dossiers</span>
+                <span className="text-[11px] text-dusty-rose/80">Skin & formula safety records</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Editorial Newsletter & VIP Club */}
+          <div className="bg-gradient-to-r from-white/[0.06] to-white/[0.02] rounded-3xl p-6 sm:p-8 border border-white/10 flex flex-col lg:flex-row items-center justify-between gap-6">
+            <div className="space-y-1.5 max-w-xl text-center lg:text-left">
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-dusty-rose block">
+                The SalonBook Editorial
+              </span>
+              <h3 className="font-serif text-2xl font-medium text-white">
+                Stay Ahead of Modern Beauty Trends
+              </h3>
+              <p className="text-xs sm:text-sm text-dusty-rose/80 leading-relaxed">
+                Join 15,000+ salon tastemakers and beauty enthusiasts. Receive our seasonal hair & skincare trend forecasts, studio opening previews, and platform updates.
+              </p>
+            </div>
+
+            <form onSubmit={handleNewsletterSubmit} className="w-full lg:w-auto flex flex-col sm:flex-row gap-2 max-w-md">
+              <div className="relative flex-1">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-dusty-rose/60" />
+                <input
+                  type="email"
+                  required
+                  value={newsletterEmail}
+                  onChange={(e) => setNewsletterEmail(e.target.value)}
+                  placeholder="Enter your email address..."
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/10 border border-white/15 text-xs text-white placeholder:text-dusty-rose/50 focus:outline-none focus:ring-2 focus:ring-dusty-rose/40"
+                />
+              </div>
+              <button
+                type="submit"
+                className="px-6 py-3 bg-primary-rose text-white text-xs font-semibold rounded-xl hover:bg-primary-rose/90 shadow-xs transition-all flex items-center justify-center gap-1.5 whitespace-nowrap"
+              >
+                {subscribed ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Subscribed!</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Subscribe</span>
+                    <Send className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          {/* 3. Multi-Column Link Navigation */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8 pb-12 border-b border-white/10">
+            
+            {/* Brand & Concierge */}
+            <div className="sm:col-span-2 lg:col-span-2 space-y-4">
+              <Link to="/" className="inline-block">
+                <span className="font-serif text-2xl font-bold tracking-tight text-white block">
+                  Salon<span className="text-dusty-rose">Book</span>
+                </span>
+              </Link>
+              <p className="text-sm text-dusty-rose/90 max-w-sm leading-relaxed">
+                The premier appointment scheduling and salon management platform crafted for modern beauty professionals and discerning clients.
+              </p>
+              
+              {/* Concierge Desk */}
+              <div className="pt-2 space-y-2 text-xs text-dusty-rose/80">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-dusty-rose shrink-0" />
+                  <span>concierge@salonbook.com</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-dusty-rose shrink-0" />
+                  <span>+91 98765 43210 (Mon–Sun 8 AM – 10 PM IST)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-dusty-rose shrink-0" />
+                  <span>Flagship Hubs: Mumbai • Bengaluru • Delhi NCR</span>
+                </div>
+              </div>
+
+              {/* Social Channels */}
+              <div className="flex items-center gap-2.5 pt-2">
+                <a href="#instagram" aria-label="Instagram" className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-dusty-rose hover:text-white hover:bg-white/10 transition-colors">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+                </a>
+                <a href="#twitter" aria-label="X (Twitter)" className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-dusty-rose hover:text-white hover:bg-white/10 transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                </a>
+                <a href="#linkedin" aria-label="LinkedIn" className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-dusty-rose hover:text-white hover:bg-white/10 transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                </a>
+                <a href="#youtube" aria-label="YouTube" className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-dusty-rose hover:text-white hover:bg-white/10 transition-colors">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                </a>
+              </div>
+            </div>
+
+            {/* Discover Services */}
             <div className="space-y-4">
               <h4 className="font-medium text-white uppercase tracking-wider text-xs font-sans">
-                Discover
+                Curated Treatments
               </h4>
               <ul className="text-sm text-dusty-rose space-y-2.5">
-                <li><Link to="/salons" className="hover:text-white transition-colors">Browse Salons</Link></li>
-                <li><Link to="/features" className="hover:text-white transition-colors">Platform Features</Link></li>
-                <li><Link to="/pricing" className="hover:text-white transition-colors">Pricing Plans</Link></li>
+                <li><Link to="/salons" className="hover:text-white transition-colors">Hair Styling & Balayage</Link></li>
+                <li><Link to="/salons" className="hover:text-white transition-colors">Luxury Spa & Massages</Link></li>
+                <li><Link to="/salons" className="hover:text-white transition-colors">Medi-Facials & Skincare</Link></li>
+                <li><Link to="/salons" className="hover:text-white transition-colors">Bridal & Makeover</Link></li>
+                <li><Link to="/salons" className="hover:text-white transition-colors">Nail Bar & Extensions</Link></li>
+                <li><Link to="/salons" className="hover:text-white transition-colors">Men's Barbering</Link></li>
               </ul>
             </div>
 
-            {/* Navigation Column: For Salon Owners */}
+            {/* Platform & Salon Features */}
             <div className="space-y-4">
               <h4 className="font-medium text-white uppercase tracking-wider text-xs font-sans">
-                For Salons
+                Platform Suite
+              </h4>
+              <ul className="text-sm text-dusty-rose space-y-2.5">
+                <li><Link to="/features" className="hover:text-white transition-colors">Calendar & Shift Scheduling</Link></li>
+                <li><Link to="/pricing" className="hover:text-white transition-colors">SaaS Subscription Plans</Link></li>
+                <li><Link to="/features" className="hover:text-white transition-colors">Client Intake Dossiers</Link></li>
+                <li><Link to="/features" className="hover:text-white transition-colors">Point of Sale (POS) & Invoicing</Link></li>
+                <li><Link to="/features" className="hover:text-white transition-colors">Verified Customer Reviews</Link></li>
+                <li><Link to="/pricing" className="hover:text-white transition-colors">Vendor Escrow Settlements</Link></li>
+              </ul>
+            </div>
+
+            {/* Portals & Legal */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-white uppercase tracking-wider text-xs font-sans">
+                Portals & Company
               </h4>
               <ul className="text-sm text-dusty-rose space-y-2.5">
                 <li><Link to="/admin/register" className="hover:text-white transition-colors">Register Your Salon</Link></li>
-                <li><Link to="/admin/login" className="hover:text-white transition-colors">Salon Admin Sign In</Link></li>
-                <li><Link to="/join" className="hover:text-white transition-colors">Join as Professional</Link></li>
-              </ul>
-            </div>
-
-            {/* Navigation Column: Company */}
-            <div className="space-y-4">
-              <h4 className="font-medium text-white uppercase tracking-wider text-xs font-sans">
-                Company
-              </h4>
-              <ul className="text-sm text-dusty-rose space-y-2.5">
+                <li><Link to="/admin/login" className="hover:text-white transition-colors">Salon Admin Portal</Link></li>
+                <li><Link to="/login" className="hover:text-white transition-colors">Client Booking Account</Link></li>
+                <li><Link to="/superadmin/login" className="hover:text-white transition-colors">SuperAdmin Gateway</Link></li>
                 <li><Link to="/contact" className="hover:text-white transition-colors">Contact Support</Link></li>
-                <li><Link to="/login" className="hover:text-white transition-colors">Client Login</Link></li>
               </ul>
             </div>
 
           </div>
 
-          {/* Copyright Subfooter */}
-          <div className="pt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-dusty-rose/70">
-            <p>© {new Date().getFullYear()} SalonBook SaaS. All rights reserved.</p>
-            <p className="text-center sm:text-right">
-              Crafted with elegance for salons, spas, and wellness studios.
-            </p>
+          {/* 4. Operating City Network Strip */}
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-dusty-rose/70 pt-2">
+            <span className="font-medium text-dusty-rose">Available Across India:</span>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-dusty-rose/60">
+              <span>Mumbai</span>
+              <span>•</span>
+              <span>Delhi NCR</span>
+              <span>•</span>
+              <span>Bengaluru</span>
+              <span>•</span>
+              <span>Hyderabad</span>
+              <span>•</span>
+              <span>Pune</span>
+              <span>•</span>
+              <span>Kolkata</span>
+              <span>•</span>
+              <span>Chennai</span>
+              <span>•</span>
+              <span>Jaipur</span>
+              <span>•</span>
+              <span>Goa</span>
+              <span>•</span>
+              <span>Chandigarh</span>
+            </div>
           </div>
+
+          {/* 5. Copyright, Accepted Payments & Social Bar */}
+          <div className="pt-6 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-6 text-xs text-dusty-rose/70">
+            <div className="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
+              <p>© {new Date().getFullYear()} SalonBook SaaS Technologies Inc. All rights reserved.</p>
+              <span className="hidden sm:inline text-white/20">|</span>
+              <p className="flex items-center gap-1.5 text-dusty-rose/60">
+                <span>Crafted with</span>
+                <Heart className="w-3.5 h-3.5 text-primary-rose fill-primary-rose inline" />
+                <span>for modern beauty studios</span>
+              </p>
+            </div>
+
+            {/* Accepted Payments & Security Indicator */}
+            <div className="flex flex-wrap items-center gap-2 text-[10px] text-dusty-rose/80 font-mono">
+              <span className="px-2 py-0.5 rounded bg-white/10 border border-white/10">UPI</span>
+              <span className="px-2 py-0.5 rounded bg-white/10 border border-white/10">RuPay</span>
+              <span className="px-2 py-0.5 rounded bg-white/10 border border-white/10">Visa</span>
+              <span className="px-2 py-0.5 rounded bg-white/10 border border-white/10">Mastercard</span>
+              <span className="px-2 py-0.5 rounded bg-white/10 border border-white/10 flex items-center gap-1">
+                <Lock className="w-2.5 h-2.5 text-emerald-400" />
+                256-Bit SSL
+              </span>
+            </div>
+          </div>
+
         </div>
       </footer>
     </div>

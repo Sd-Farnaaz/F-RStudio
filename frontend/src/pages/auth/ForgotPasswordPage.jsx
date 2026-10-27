@@ -30,7 +30,7 @@ export default function ForgotPasswordPage() {
     <AuthLayout 
       title="Reset your password" 
       subtitle="Enter your registered email address and we will dispatch password recovery instructions."
-      imageSrc="https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?auto=format&fit=crop&w=1200&q=80"
+      imageSrc="https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=1200&q=85"
     >
       {serverMessage ? (
         <div className="space-y-6 text-center py-2 animate-in fade-in">

@@ -120,8 +120,8 @@ export default function LandingPage() {
                 {/* Main Dominant Salon Interior Photo */}
                 <div className="relative aspect-[4/5] rounded-3xl overflow-hidden border-2 border-white shadow-xl bg-soft-blush">
                   <img 
-                    src="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1000&q=80" 
-                    alt="Luxury salon interior styling stations" 
+                    src="https://images.unsplash.com/photo-1600948836101-f9ffda59d250?auto=format&fit=crop&w=1200&q=85" 
+                    alt="Luxury salon interior styling stations with arched mirrors" 
                     className="w-full h-full object-cover object-center"
                     loading="eager"
                   />
@@ -132,8 +132,8 @@ export default function LandingPage() {
                 {/* Overlapping Secondary Accent Image */}
                 <div className="hidden sm:block absolute -bottom-6 -left-8 w-44 h-44 rounded-2xl overflow-hidden border-4 border-white shadow-lg bg-soft-blush">
                   <img 
-                    src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80" 
-                    alt="Beauty specialist styling details" 
+                    src="https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&w=800&q=85" 
+                    alt="Master hairstylist balayage styling" 
                     className="w-full h-full object-cover"
                     loading="lazy"
                   />
@@ -379,66 +379,138 @@ export default function LandingPage() {
           {/* Steps Display */}
           {activeJourney === 'clients' ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4">
-              <div className="p-7 rounded-3xl bg-ivory border border-border-color relative">
-                <span className="text-4xl font-serif font-bold text-dusty-rose/40 block mb-3">01</span>
-                <h3 className="font-serif text-lg font-medium text-deep-plum mb-2">
-                  Discover Curated Salons
-                </h3>
-                <p className="text-xs sm:text-sm text-muted leading-relaxed">
-                  Browse verified hair, nail, spa, and beauty studios with transparent service menus, pricing, and locations.
-                </p>
+              <div className="rounded-3xl bg-ivory border border-border-color overflow-hidden flex flex-col justify-between shadow-2xs hover:shadow-sm transition-shadow">
+                <div className="aspect-[16/9] w-full overflow-hidden bg-soft-blush relative">
+                  <img
+                    src="https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=600&q=80"
+                    alt="Discover luxury salons"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-xs px-2.5 py-0.5 rounded-full text-xs font-serif font-bold text-deep-plum border border-border-color shadow-2xs">
+                    01
+                  </div>
+                </div>
+                <div className="p-7">
+                  <h3 className="font-serif text-lg font-medium text-deep-plum mb-2">
+                    Discover Curated Salons
+                  </h3>
+                  <p className="text-xs sm:text-sm text-muted leading-relaxed">
+                    Browse verified hair, nail, spa, and beauty studios with transparent service menus, pricing, and locations.
+                  </p>
+                </div>
               </div>
 
-              <div className="p-7 rounded-3xl bg-ivory border border-border-color relative">
-                <span className="text-4xl font-serif font-bold text-dusty-rose/40 block mb-3">02</span>
-                <h3 className="font-serif text-lg font-medium text-deep-plum mb-2">
-                  Pick Treatment & Slot
-                </h3>
-                <p className="text-xs sm:text-sm text-muted leading-relaxed">
-                  Select your treatment, pick your favorite stylist, and choose an available live calendar slot instantly.
-                </p>
+              <div className="rounded-3xl bg-ivory border border-border-color overflow-hidden flex flex-col justify-between shadow-2xs hover:shadow-sm transition-shadow">
+                <div className="aspect-[16/9] w-full overflow-hidden bg-soft-blush relative">
+                  <img
+                    src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80"
+                    alt="Stylist picking treatment"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-xs px-2.5 py-0.5 rounded-full text-xs font-serif font-bold text-deep-plum border border-border-color shadow-2xs">
+                    02
+                  </div>
+                </div>
+                <div className="p-7">
+                  <h3 className="font-serif text-lg font-medium text-deep-plum mb-2">
+                    Pick Treatment & Slot
+                  </h3>
+                  <p className="text-xs sm:text-sm text-muted leading-relaxed">
+                    Select your treatment, pick your favorite stylist, and choose an available live calendar slot instantly.
+                  </p>
+                </div>
               </div>
 
-              <div className="p-7 rounded-3xl bg-ivory border border-border-color relative">
-                <span className="text-4xl font-serif font-bold text-dusty-rose/40 block mb-3">03</span>
-                <h3 className="font-serif text-lg font-medium text-deep-plum mb-2">
-                  Enjoy Confirmed Visits
-                </h3>
-                <p className="text-xs sm:text-sm text-muted leading-relaxed">
-                  Submit required advance deposit references seamlessly, receive automated reminders, and arrive with confidence.
-                </p>
+              <div className="rounded-3xl bg-ivory border border-border-color overflow-hidden flex flex-col justify-between shadow-2xs hover:shadow-sm transition-shadow">
+                <div className="aspect-[16/9] w-full overflow-hidden bg-soft-blush relative">
+                  <img
+                    src="https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=600&q=80"
+                    alt="Relaxed confirmed salon visit"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-xs px-2.5 py-0.5 rounded-full text-xs font-serif font-bold text-deep-plum border border-border-color shadow-2xs">
+                    03
+                  </div>
+                </div>
+                <div className="p-7">
+                  <h3 className="font-serif text-lg font-medium text-deep-plum mb-2">
+                    Enjoy Confirmed Visits
+                  </h3>
+                  <p className="text-xs sm:text-sm text-muted leading-relaxed">
+                    Submit required advance deposit references seamlessly, receive automated reminders, and arrive with confidence.
+                  </p>
+                </div>
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4">
-              <div className="p-7 rounded-3xl bg-ivory border border-border-color relative">
-                <span className="text-4xl font-serif font-bold text-dusty-rose/40 block mb-3">01</span>
-                <h3 className="font-serif text-lg font-medium text-deep-plum mb-2">
-                  Register Your Business
-                </h3>
-                <p className="text-xs sm:text-sm text-muted leading-relaxed">
-                  Create your salon workspace, upload your logo, configure currency and contact details, and publish your service menu.
-                </p>
+              <div className="rounded-3xl bg-ivory border border-border-color overflow-hidden flex flex-col justify-between shadow-2xs hover:shadow-sm transition-shadow">
+                <div className="aspect-[16/9] w-full overflow-hidden bg-soft-blush relative">
+                  <img
+                    src="https://images.unsplash.com/photo-1633681926022-84c23e8cb2d6?auto=format&fit=crop&w=600&q=80"
+                    alt="Register your salon studio"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-xs px-2.5 py-0.5 rounded-full text-xs font-serif font-bold text-deep-plum border border-border-color shadow-2xs">
+                    01
+                  </div>
+                </div>
+                <div className="p-7">
+                  <h3 className="font-serif text-lg font-medium text-deep-plum mb-2">
+                    Register Your Business
+                  </h3>
+                  <p className="text-xs sm:text-sm text-muted leading-relaxed">
+                    Create your salon workspace, upload your logo, configure currency and contact details, and publish your service menu.
+                  </p>
+                </div>
               </div>
 
-              <div className="p-7 rounded-3xl bg-ivory border border-border-color relative">
-                <span className="text-4xl font-serif font-bold text-dusty-rose/40 block mb-3">02</span>
-                <h3 className="font-serif text-lg font-medium text-deep-plum mb-2">
-                  Coordinate Staff & Shifts
-                </h3>
-                <p className="text-xs sm:text-sm text-muted leading-relaxed">
-                  Add team specialists, designate weekly working hours, and assign treatments to prevent overlapping schedules.
-                </p>
+              <div className="rounded-3xl bg-ivory border border-border-color overflow-hidden flex flex-col justify-between shadow-2xs hover:shadow-sm transition-shadow">
+                <div className="aspect-[16/9] w-full overflow-hidden bg-soft-blush relative">
+                  <img
+                    src="https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&w=600&q=80"
+                    alt="Coordinate team shifts"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-xs px-2.5 py-0.5 rounded-full text-xs font-serif font-bold text-deep-plum border border-border-color shadow-2xs">
+                    02
+                  </div>
+                </div>
+                <div className="p-7">
+                  <h3 className="font-serif text-lg font-medium text-deep-plum mb-2">
+                    Coordinate Staff & Shifts
+                  </h3>
+                  <p className="text-xs sm:text-sm text-muted leading-relaxed">
+                    Add team specialists, designate weekly working hours, and assign treatments to prevent overlapping schedules.
+                  </p>
+                </div>
               </div>
 
-              <div className="p-7 rounded-3xl bg-ivory border border-border-color relative">
-                <span className="text-4xl font-serif font-bold text-dusty-rose/40 block mb-3">03</span>
-                <h3 className="font-serif text-lg font-medium text-deep-plum mb-2">
-                  Verify Deposits & Grow
-                </h3>
-                <p className="text-xs sm:text-sm text-muted leading-relaxed">
-                  Review booking requests, verify UPI advance proofs, track client histories, and keep your chairs filled.
-                </p>
+              <div className="rounded-3xl bg-ivory border border-border-color overflow-hidden flex flex-col justify-between shadow-2xs hover:shadow-sm transition-shadow">
+                <div className="aspect-[16/9] w-full overflow-hidden bg-soft-blush relative">
+                  <img
+                    src="https://images.unsplash.com/photo-1600948836101-f9ffda59d250?auto=format&fit=crop&w=600&q=80"
+                    alt="Verify advance deposits"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-xs px-2.5 py-0.5 rounded-full text-xs font-serif font-bold text-deep-plum border border-border-color shadow-2xs">
+                    03
+                  </div>
+                </div>
+                <div className="p-7">
+                  <h3 className="font-serif text-lg font-medium text-deep-plum mb-2">
+                    Verify Deposits & Grow
+                  </h3>
+                  <p className="text-xs sm:text-sm text-muted leading-relaxed">
+                    Review booking requests, verify UPI advance proofs, track client histories, and keep your chairs filled.
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -449,37 +521,49 @@ export default function LandingPage() {
       {/* ========================================================================= */}
       {/* 5. CLOSING CALL TO ACTION                                                 */}
       {/* ========================================================================= */}
-      <section className="py-20 sm:py-24 bg-gradient-to-br from-soft-blush via-rose-tint/30 to-ivory">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-dusty-rose/40 text-primary-rose text-xs font-semibold uppercase tracking-wider shadow-2xs">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Join SalonBook Today</span>
-          </span>
+      <section className="py-20 sm:py-28 bg-ivory">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="relative rounded-[2.5rem] overflow-hidden bg-deep-plum text-white p-8 sm:p-14 lg:p-20 shadow-2xl border border-border-color/20">
+            {/* Background luxury photo overlay */}
+            <img
+              src="https://images.unsplash.com/photo-1600948836101-f9ffda59d250?auto=format&fit=crop&w=1600&q=85"
+              alt="Luxury aesthetic salon interior"
+              className="absolute inset-0 w-full h-full object-cover object-center opacity-20 mix-blend-luminosity scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-deep-plum via-deep-plum/90 to-deep-plum/60" />
 
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-medium text-deep-plum leading-tight max-w-2xl mx-auto">
-            Ready to elevate your salon booking experience?
-          </h2>
+            <div className="relative z-10 max-w-2xl space-y-6">
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-dusty-rose text-xs font-semibold uppercase tracking-wider shadow-2xs">
+                <Sparkles className="w-3.5 h-3.5 text-dusty-rose" />
+                <span>Join SalonBook Today</span>
+              </span>
 
-          <p className="text-base sm:text-lg text-muted max-w-xl mx-auto leading-relaxed">
-            Whether you are a beauty professional scaling your business or a client looking for a seamless appointment, SalonBook is made for you.
-          </p>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-medium leading-[1.15] text-white">
+                Ready to elevate your salon booking experience?
+              </h2>
 
-          <div className="flex flex-col sm:flex-row gap-3.5 justify-center pt-4">
-            <Link 
-              to="/join" 
-              className="inline-flex items-center justify-center px-8 py-4 bg-primary-rose text-white text-sm sm:text-base font-semibold rounded-2xl hover:bg-primary-rose/90 shadow-sm hover:shadow-md active:scale-[0.99] transition-all gap-2"
-            >
-              <span>Get Started Now</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+              <p className="text-base sm:text-lg text-soft-blush/90 leading-relaxed font-normal">
+                Whether you are a beauty professional scaling your business or a client looking for a seamless, confirmed appointment, SalonBook delivers luxury at every touchpoint.
+              </p>
 
-            <Link 
-              to="/salons" 
-              className="inline-flex items-center justify-center px-8 py-4 bg-white text-deep-plum border border-border-color text-sm sm:text-base font-medium rounded-2xl hover:bg-soft-blush hover:border-dusty-rose shadow-2xs transition-all gap-2"
-            >
-              <Store className="w-4 h-4 text-primary-rose" />
-              <span>Browse Salons</span>
-            </Link>
+              <div className="flex flex-col sm:flex-row gap-3.5 pt-4">
+                <Link 
+                  to="/join" 
+                  className="inline-flex items-center justify-center px-8 py-4 bg-primary-rose text-white text-sm sm:text-base font-semibold rounded-2xl hover:bg-primary-rose/90 shadow-md hover:shadow-lg active:scale-[0.99] transition-all gap-2"
+                >
+                  <span>Get Started Now</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+
+                <Link 
+                  to="/salons" 
+                  className="inline-flex items-center justify-center px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 text-sm sm:text-base font-medium rounded-2xl shadow-xs transition-all gap-2"
+                >
+                  <Store className="w-4 h-4 text-dusty-rose" />
+                  <span>Browse Salons</span>
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </section>
