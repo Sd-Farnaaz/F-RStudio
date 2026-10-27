@@ -406,6 +406,90 @@ namespace SalonBook.Api.Data.Migrations
                     b.ToTable("RefreshTokens", (string)null);
                 });
 
+            modelBuilder.Entity("SalonBook.Api.Models.Review", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AppointmentId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CleanlinessRating")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Comment")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsVerifiedVisit")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("OwnerRepliedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("OwnerReply")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("PhotoUrlsJson")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SalonId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("StaffId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("StaffRating")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ValueRating")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Reviews_AppointmentId");
+
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("IX_Reviews_CustomerId");
+
+                    b.HasIndex("SalonId")
+                        .HasDatabaseName("IX_Reviews_SalonId");
+
+                    b.HasIndex("StaffId")
+                        .HasDatabaseName("IX_Reviews_StaffId");
+
+                    b.HasIndex("SalonId", "Rating")
+                        .HasDatabaseName("IX_Reviews_SalonId_Rating");
+
+                    b.ToTable("Reviews", (string)null);
+                });
+
             modelBuilder.Entity("SalonBook.Api.Models.Salon", b =>
                 {
                     b.Property<int>("Id")
@@ -1046,6 +1130,44 @@ namespace SalonBook.Api.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("SalonBook.Api.Models.Review", b =>
+                {
+                    b.HasOne("SalonBook.Api.Models.Appointment", "Appointment")
+                        .WithOne("Review")
+                        .HasForeignKey("SalonBook.Api.Models.Review", "AppointmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Reviews_Appointments_AppointmentId");
+
+                    b.HasOne("SalonBook.Api.Models.User", "Customer")
+                        .WithMany("Reviews")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Reviews_Users_CustomerId");
+
+                    b.HasOne("SalonBook.Api.Models.Salon", "Salon")
+                        .WithMany("Reviews")
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Reviews_Salons_SalonId");
+
+                    b.HasOne("SalonBook.Api.Models.Staff", "Staff")
+                        .WithMany("Reviews")
+                        .HasForeignKey("StaffId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("FK_Reviews_Staff_StaffId");
+
+                    b.Navigation("Appointment");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Salon");
+
+                    b.Navigation("Staff");
+                });
+
             modelBuilder.Entity("SalonBook.Api.Models.Service", b =>
                 {
                     b.HasOne("SalonBook.Api.Models.Salon", "Salon")
@@ -1134,6 +1256,8 @@ namespace SalonBook.Api.Data.Migrations
                     b.Navigation("Notifications");
 
                     b.Navigation("Reminders");
+
+                    b.Navigation("Review");
                 });
 
             modelBuilder.Entity("SalonBook.Api.Models.Salon", b =>
@@ -1145,6 +1269,8 @@ namespace SalonBook.Api.Data.Migrations
                     b.Navigation("Notifications");
 
                     b.Navigation("Payouts");
+
+                    b.Navigation("Reviews");
 
                     b.Navigation("Services");
 
@@ -1161,6 +1287,8 @@ namespace SalonBook.Api.Data.Migrations
             modelBuilder.Entity("SalonBook.Api.Models.Staff", b =>
                 {
                     b.Navigation("Appointments");
+
+                    b.Navigation("Reviews");
 
                     b.Navigation("Schedules");
                 });
@@ -1179,6 +1307,8 @@ namespace SalonBook.Api.Data.Migrations
                     b.Navigation("PasswordResetTokens");
 
                     b.Navigation("RefreshTokens");
+
+                    b.Navigation("Reviews");
                 });
 #pragma warning restore 612, 618
         }
