@@ -153,6 +153,111 @@ public class VendorPayoutsController : ControllerBase
         return Ok(response);
     }
 
+    /// <summary>
+    /// Request settlement and bank transfer for all accumulated escrow holdings.
+    /// </summary>
+    [HttpPost("payouts/request-settlement")]
+    [ProducesResponseType(typeof(RequestSettlementResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> RequestSettlement(CancellationToken cancellationToken = default)
+    {
+        var salonId = _currentUserService.SalonId;
+        if (!salonId.HasValue) return Forbid();
+
+        var pendingPayouts = await _dbContext.VendorPayouts
+            .Where(p => p.SalonId == salonId.Value && p.Status == "Pending")
+            .ToListAsync(cancellationToken);
+
+        if (pendingPayouts.Count == 0)
+        {
+            return BadRequest(new { message = "You have no pending escrow funds available for payout settlement." });
+        }
+
+        var totalAmount = pendingPayouts.Sum(p => p.NetAmount);
+        var now = DateTime.UtcNow;
+
+        foreach (var p in pendingPayouts)
+        {
+            p.Status = "Processed";
+            p.UpdatedAtUtc = now;
+            p.Notes = $"{p.Notes} | Settlement batched on {now:yyyy-MM-dd}";
+        }
+
+        // Create In-App Notification
+        if (_currentUserService.UserId.HasValue)
+        {
+            _dbContext.Notifications.Add(new Notification
+            {
+                RecipientUserId = _currentUserService.UserId.Value,
+                SalonId = salonId.Value,
+                Type = "SettlementRequested",
+                Channel = "InApp",
+                Subject = "Payout Settlement Requested",
+                Message = $"Your settlement request for ₹{totalAmount:F2} across {pendingPayouts.Count} bookings has been queued for bank disbursement.",
+                Status = "Sent",
+                SentAtUtc = now,
+                CreatedAtUtc = now
+            });
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new RequestSettlementResponse
+        {
+            Success = true,
+            Message = $"Successfully submitted settlement request for ₹{totalAmount:F2}.",
+            BatchedPayoutCount = pendingPayouts.Count,
+            TotalSettlementAmount = totalAmount,
+            RequestedAtUtc = now
+        });
+    }
+
+    /// <summary>
+    /// Disburse a processed payout with bank transaction reference / UTR number.
+    /// </summary>
+    [HttpPost("payouts/{id:int}/disburse")]
+    [Authorize(Policy = "SalonAdminOnly")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DisbursePayout(
+        int id,
+        [FromBody] DisbursePayoutRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var salonId = _currentUserService.SalonId;
+        if (!salonId.HasValue) return Forbid();
+
+        var payout = await _dbContext.VendorPayouts
+            .FirstOrDefaultAsync(p => p.Id == id && p.SalonId == salonId.Value, cancellationToken);
+
+        if (payout == null)
+        {
+            return NotFound(new { message = $"Payout #{id} not found." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.UtrNumber))
+        {
+            return BadRequest(new { message = "Valid Bank UTR / Reference number is required for disbursement." });
+        }
+
+        payout.Status = "Disbursed";
+        payout.UtrNumber = request.UtrNumber.Trim();
+        payout.DisbursedAtUtc = DateTime.UtcNow;
+        payout.BankReleaseAtUtc = DateTime.UtcNow;
+        if (!string.IsNullOrWhiteSpace(request.Notes))
+        {
+            payout.Notes = $"{payout.Notes} | Disbursed: {request.Notes.Trim()}";
+        }
+        payout.UpdatedAtUtc = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new { message = $"Payout #{id} marked as Disbursed with UTR: {request.UtrNumber}.", payout = MapToPayoutResponse(payout) });
+    }
+
     private static VendorPayoutResponse MapToPayoutResponse(VendorPayout p)
     {
         return new VendorPayoutResponse

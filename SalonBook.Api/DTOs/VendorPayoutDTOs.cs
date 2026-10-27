@@ -42,3 +42,19 @@ public class EscrowLedgerResponse
     public PagedResult<VendorPayoutResponse> Transactions { get; set; } = new();
 }
 
+public class RequestSettlementResponse
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public int BatchedPayoutCount { get; set; }
+    public decimal TotalSettlementAmount { get; set; }
+    public DateTime RequestedAtUtc { get; set; }
+}
+
+public class DisbursePayoutRequest
+{
+    public string UtrNumber { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+}
+
+

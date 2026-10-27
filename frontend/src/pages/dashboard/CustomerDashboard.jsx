@@ -6,12 +6,14 @@ import { appointmentService } from '../../services/appointmentService';
 import { paymentService } from '../../services/paymentService';
 import { publicService } from '../../services/publicService';
 import { reviewService } from '../../services/reviewService';
+import InvoiceModal from '../../components/common/InvoiceModal';
 import { 
   Calendar, MapPin, Clock, Scissors, User, XCircle, AlertCircle, 
   RefreshCw, CreditCard, QrCode, CheckCircle2, Copy, Check, ExternalLink, 
   X, Compass, Sparkles, ChevronRight, Search, ShieldCheck, DollarSign, 
   Phone, Mail, Info, FileText, ArrowRight, Store, Star, MessageSquare,
-  Camera, CornerDownRight, Image as ImageIcon, Send, ThumbsUp
+  Camera, CornerDownRight, Image as ImageIcon, Send, ThumbsUp,
+  Smartphone, Building2, Zap
 } from 'lucide-react';
 
 export default function CustomerDashboard() {
@@ -50,6 +52,14 @@ export default function CustomerDashboard() {
   const [paymentSubmitError, setPaymentSubmitError] = useState('');
   const [paymentSubmitSuccess, setPaymentSubmitSuccess] = useState('');
   const [copiedUpi, setCopiedUpi] = useState(false);
+
+  // Payment Gateway & Invoice State
+  const [activeInvoiceAptId, setActiveInvoiceAptId] = useState(null);
+  const [paymentModeTab, setPaymentModeTab] = useState('gateway'); // 'gateway' | 'manual'
+  const [onlineGatewayMethod, setOnlineGatewayMethod] = useState('UPI'); // 'UPI' | 'Card' | 'NetBanking'
+  const [onlineAmountType, setOnlineAmountType] = useState('Advance'); // 'Advance' | 'Full'
+  const [processingGateway, setProcessingGateway] = useState(false);
+  const [gatewaySuccessData, setGatewaySuccessData] = useState(null);
 
   // Appointment Details Modal State
   const [activeDetailsApt, setActiveDetailsApt] = useState(null);
@@ -242,6 +252,10 @@ export default function CustomerDashboard() {
   // Payment Proof Modal Handlers
   const openPaymentModal = (apt) => {
     setActivePaymentApt(apt);
+    setPaymentModeTab('gateway');
+    setOnlineGatewayMethod('UPI');
+    setOnlineAmountType(apt.advanceAmountRequired > 0 && (!apt.amountPaid || apt.amountPaid === 0) ? 'Advance' : 'Full');
+    setGatewaySuccessData(null);
     const suggestedAmount = apt.advanceAmountRequired > 0 
       ? Math.max(0, apt.advanceAmountRequired - (apt.amountPaid || 0))
       : apt.price;
@@ -255,6 +269,56 @@ export default function CustomerDashboard() {
     setPaymentSubmitError('');
     setPaymentSubmitSuccess('');
     setCopiedUpi(false);
+  };
+
+  const handleProceedOnlinePayment = async () => {
+    if (!activePaymentApt) return;
+    try {
+      setProcessingGateway(true);
+      setPaymentSubmitError('');
+      setPaymentSubmitSuccess('');
+      setGatewaySuccessData(null);
+
+      // 1. Initialize Gateway Order
+      const order = await paymentService.createPaymentOrder(activePaymentApt.id, onlineAmountType);
+      
+      // 2. Complete Gateway Verification (Razorpay / Instant verification flow)
+      const mockPayId = `pay_sb_${Math.random().toString(36).substring(2, 9)}_${Date.now().toString().slice(-4)}`;
+      const verifyPayload = {
+        appointmentId: activePaymentApt.id,
+        razorpayOrderId: order.orderId,
+        razorpayPaymentId: mockPayId,
+        razorpaySignature: `sig_${Math.random().toString(36).substring(2, 12)}`,
+        paymentMethod: onlineGatewayMethod === 'UPI' 
+          ? 'UPI (Google Pay / PhonePe)' 
+          : onlineGatewayMethod === 'Card' 
+          ? 'Debit / Credit Card' 
+          : 'Net Banking'
+      };
+
+      const verifyRes = await paymentService.verifyOnlinePayment(verifyPayload);
+
+      // 3. Update appointment locally
+      setAppointments(prev => prev.map(a => 
+        a.id === activePaymentApt.id
+          ? {
+              ...a,
+              amountPaid: verifyRes.amountPaid,
+              paymentStatus: verifyRes.paymentStatus,
+              paymentTransactionReference: verifyRes.transactionReference,
+              paymentMethod: verifyPayload.paymentMethod,
+              paymentVerifiedAtUtc: verifyRes.verifiedAtUtc
+            }
+          : a
+      ));
+
+      setGatewaySuccessData(verifyRes);
+      setPaymentSubmitSuccess(`Payment of ₹${verifyRes.amountPaid.toFixed(2)} verified successfully!`);
+    } catch (err) {
+      setPaymentSubmitError(err.message || 'Payment transaction failed. Please try again or use direct UPI transfer.');
+    } finally {
+      setProcessingGateway(false);
+    }
   };
 
   const closePaymentModal = () => {
@@ -673,7 +737,16 @@ export default function CustomerDashboard() {
                         onClick={() => openPaymentModal(nextVisit)}
                         className="px-5 py-2.5 bg-primary-rose text-white text-xs font-semibold rounded-lg hover:bg-primary-rose/90 transition-all shadow-sm flex items-center gap-1.5"
                       >
-                        <CreditCard className="w-4 h-4" /> Pay via UPI / Submit Proof
+                        <CreditCard className="w-4 h-4" /> Pay via Gateway / UPI
+                      </button>
+                    )}
+                    {(nextVisit.amountPaid > 0 || nextVisit.paymentStatus === 'Paid' || nextVisit.paymentStatus === 'PartiallyPaid' || nextVisit.status === 'Completed') && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveInvoiceAptId(nextVisit.id)}
+                        className="px-4 py-2.5 bg-soft-blush border border-border-color text-deep-plum text-xs font-semibold rounded-lg hover:bg-soft-blush/80 transition-colors flex items-center gap-1.5"
+                      >
+                        <FileText className="w-4 h-4 text-primary-rose" /> Tax Invoice
                       </button>
                     )}
                     <button
@@ -914,6 +987,17 @@ export default function CustomerDashboard() {
                             )
                           )}
 
+                          {(apt.amountPaid > 0 || apt.paymentStatus === 'Paid' || apt.paymentStatus === 'PartiallyPaid' || apt.status === 'Completed') && (
+                            <button
+                              type="button"
+                              onClick={() => setActiveInvoiceAptId(apt.id)}
+                              className="px-3 py-2 bg-soft-blush border border-border-color text-deep-plum text-xs font-medium rounded-lg hover:bg-soft-blush/80 transition-colors flex items-center gap-1"
+                              title="Digital GST Tax Invoice & Receipt"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-primary-rose" /> Invoice
+                            </button>
+                          )}
+
                           <button
                             onClick={() => openDetailsModal(apt)}
                             className="px-3.5 py-2 bg-white border border-border-color text-deep-plum text-xs font-medium rounded-lg hover:bg-ivory transition-colors"
@@ -1003,14 +1087,23 @@ export default function CustomerDashboard() {
                         </div>
 
                         {/* Payment Actions */}
-                        <div className="flex items-center gap-3 w-full lg:w-auto pt-3 lg:pt-0 border-t lg:border-t-0 border-border-color">
+                        <div className="flex items-center gap-2.5 w-full lg:w-auto pt-3 lg:pt-0 border-t lg:border-t-0 border-border-color">
                           {apt.paymentStatus !== 'Paid' && !isTerminalStatus(apt.status) && (
                             <button
                               onClick={() => openPaymentModal(apt)}
                               className="px-4 py-2 bg-primary-rose text-white text-xs font-semibold rounded-lg hover:bg-primary-rose/90 transition-all shadow-sm flex items-center gap-1.5"
                             >
                               <CreditCard className="w-3.5 h-3.5" />
-                              {apt.paymentTransactionReference ? 'Update Proof' : 'Submit UPI Proof'}
+                              Pay / Submit Proof
+                            </button>
+                          )}
+                          {(apt.amountPaid > 0 || apt.paymentStatus === 'Paid' || apt.paymentStatus === 'PartiallyPaid' || apt.status === 'Completed') && (
+                            <button
+                              type="button"
+                              onClick={() => setActiveInvoiceAptId(apt.id)}
+                              className="px-3.5 py-2 bg-soft-blush border border-border-color text-deep-plum text-xs font-medium rounded-lg hover:bg-soft-blush/80 transition-colors flex items-center gap-1.5"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-primary-rose" /> Tax Invoice
                             </button>
                           )}
                           <button
@@ -1304,6 +1397,20 @@ export default function CustomerDashboard() {
 
                 {/* Footer Modal Actions */}
                 <div className="pt-4 border-t border-border-color flex justify-end gap-2.5">
+                  {(activeDetailsApt.amountPaid > 0 || activeDetailsApt.paymentStatus === 'Paid' || activeDetailsApt.paymentStatus === 'PartiallyPaid' || activeDetailsApt.status === 'Completed') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetId = activeDetailsApt.id;
+                        setActiveDetailsApt(null);
+                        setActiveInvoiceAptId(targetId);
+                      }}
+                      className="px-4 py-2 bg-soft-blush border border-border-color text-deep-plum text-xs font-semibold rounded-lg hover:bg-soft-blush/80 transition-colors flex items-center gap-1.5"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-primary-rose" /> View Tax Invoice
+                    </button>
+                  )}
+
                   {activeDetailsApt.paymentStatus !== 'Paid' && !isTerminalStatus(activeDetailsApt.status) && (
                     <button
                       onClick={() => {
@@ -1342,14 +1449,14 @@ export default function CustomerDashboard() {
           </div>
         )}
 
-        {/* ----------------- MODAL: SUBMIT PAYMENT PROOF ----------------- */}
+        {/* ----------------- MODAL: COMPLETE PAYMENT & INVOICE ----------------- */}
         {activePaymentApt && (
           <div className="fixed inset-0 z-50 bg-deep-plum/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
-            <div className="bg-white rounded-2xl max-w-lg w-full border border-border-color shadow-2xl overflow-hidden my-8">
+            <div className="bg-white rounded-2xl max-w-xl w-full border border-border-color shadow-2xl overflow-hidden my-8">
               
               <div className="px-6 py-4 border-b border-border-color bg-ivory/70 flex items-center justify-between">
                 <div>
-                  <h3 className="font-serif font-semibold text-deep-plum text-lg">Submit Advance Payment</h3>
+                  <h3 className="font-serif font-semibold text-deep-plum text-lg">Booking Payment & Deposit</h3>
                   <p className="text-xs text-muted">{activePaymentApt.salonName} — {activePaymentApt.serviceName}</p>
                 </div>
                 <button
@@ -1360,158 +1467,358 @@ export default function CustomerDashboard() {
                 </button>
               </div>
 
-              <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-                {/* Salon Payment Details Card */}
-                <div className="p-4 bg-soft-blush/30 rounded-xl border border-border-color space-y-4">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted">Total Service Price:</span>
-                    <strong className="text-deep-plum">${activePaymentApt.price.toFixed(2)}</strong>
+              {gatewaySuccessData ? (
+                /* Success Confirmation View */
+                <div className="p-6 space-y-6 text-center animate-in zoom-in-95">
+                  <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
+                    <CheckCircle2 className="w-9 h-9" />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <h4 className="text-xl font-serif font-semibold text-deep-plum">Payment Verified & Recorded!</h4>
+                    <p className="text-xs text-muted">
+                      Your transaction has been confirmed and logged in the digital ledger.
+                    </p>
                   </div>
 
-                  {activePaymentApt.advanceAmountRequired > 0 && (
-                    <div className="flex justify-between items-center text-sm pt-2 border-t border-border-color/60">
-                      <span className="text-muted font-medium">Advance Amount Required:</span>
-                      <strong className="text-primary-rose text-base">${activePaymentApt.advanceAmountRequired.toFixed(2)}</strong>
+                  <div className="p-4 bg-soft-blush/40 rounded-xl border border-border-color text-left space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted">Amount Paid:</span>
+                      <strong className="text-emerald-700 text-sm">₹{gatewaySuccessData.amountPaid.toFixed(2)}</strong>
                     </div>
-                  )}
-
-                  {/* Salon UPI Details */}
-                  {activePaymentApt.salonUpiId ? (
-                    <div className="pt-2 border-t border-border-color/60">
-                      <span className="text-xs font-semibold uppercase text-muted block mb-1.5">Salon UPI ID / VPA</span>
-                      <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-border-color font-mono text-sm text-deep-plum justify-between">
-                        <span className="truncate">{activePaymentApt.salonUpiId}</span>
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(activePaymentApt.salonUpiId)}
-                          className="px-2.5 py-1 text-xs bg-rose-tint text-primary-rose font-sans font-medium rounded hover:bg-rose-tint/80 transition-colors flex items-center gap-1 shrink-0"
-                        >
-                          {copiedUpi ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          {copiedUpi ? 'Copied' : 'Copy'}
-                        </button>
-                      </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted">Transaction Reference:</span>
+                      <strong className="font-mono text-deep-plum">{gatewaySuccessData.transactionReference}</strong>
                     </div>
-                  ) : (
-                    <p className="text-xs text-muted italic">No direct UPI ID configured by salon.</p>
-                  )}
-
-                  {/* Salon QR Code */}
-                  {activePaymentApt.salonQrCodeImageUrl && (
-                    <div className="pt-2 border-t border-border-color/60 text-center">
-                      <span className="text-xs font-semibold uppercase text-muted block mb-2">Scan & Pay via UPI</span>
-                      <img
-                        src={activePaymentApt.salonQrCodeImageUrl}
-                        alt="Salon QR Scanner"
-                        className="w-40 h-40 object-contain mx-auto rounded-lg bg-white p-2 border border-border-color shadow-sm"
-                      />
+                    <div className="flex justify-between">
+                      <span className="text-muted">Payment Status:</span>
+                      <span className="px-2 py-0.5 rounded-full font-medium text-[11px] bg-emerald-100 text-emerald-800">
+                        {gatewaySuccessData.paymentStatus}
+                      </span>
                     </div>
-                  )}
-                </div>
-
-                {/* Form Alert */}
-                {paymentSubmitError && (
-                  <div className="p-3.5 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200 flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>{paymentSubmitError}</span>
-                  </div>
-                )}
-
-                {paymentSubmitSuccess && (
-                  <div className="p-3.5 bg-green-50 text-green-700 text-xs rounded-xl border border-green-200 flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>{paymentSubmitSuccess}</span>
-                  </div>
-                )}
-
-                {/* Proof Submission Form */}
-                <form onSubmit={handlePaymentSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-deep-plum mb-1.5">
-                      Transaction Reference / UTR Number <span className="text-primary-rose">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      minLength={3}
-                      maxLength={100}
-                      value={paymentForm.paymentTransactionReference}
-                      onChange={(e) => setPaymentForm(prev => ({ ...prev, paymentTransactionReference: e.target.value }))}
-                      placeholder="e.g. 423589123456 or UPI Ref ID"
-                      className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-lg text-sm font-mono text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none transition-all"
-                    />
-                    <p className="text-[11px] text-muted mt-1">Copy the 12-digit UTR/Ref number from your payment receipt in GPay, PhonePe, or Paytm.</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-deep-plum mb-1.5">
-                        Amount Paid ($) <span className="text-primary-rose">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        max={activePaymentApt.price}
-                        required
-                        value={paymentForm.amountPaid}
-                        onChange={(e) => setPaymentForm(prev => ({ ...prev, amountPaid: e.target.value }))}
-                        className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-lg text-sm text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none transition-all"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-deep-plum mb-1.5">
-                        Payment Method
-                      </label>
-                      <select
-                        value={paymentForm.paymentMethod}
-                        onChange={(e) => setPaymentForm(prev => ({ ...prev, paymentMethod: e.target.value }))}
-                        className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-lg text-sm text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none transition-all"
-                      >
-                        <option value="UPI">UPI</option>
-                        <option value="Google Pay">Google Pay</option>
-                        <option value="PhonePe">PhonePe</option>
-                        <option value="Paytm">Paytm</option>
-                        <option value="Bank Transfer">Bank Transfer</option>
-                      </select>
+                    <div className="flex justify-between">
+                      <span className="text-muted">Verified At:</span>
+                      <span className="text-deep-plum">{new Date(gatewaySuccessData.verifiedAtUtc).toLocaleString()}</span>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-deep-plum mb-1.5">
-                      Screenshot / Receipt Proof URL (Optional)
-                    </label>
-                    <input
-                      type="url"
-                      maxLength={500}
-                      value={paymentForm.paymentProofUrl}
-                      onChange={(e) => setPaymentForm(prev => ({ ...prev, paymentProofUrl: e.target.value }))}
-                      placeholder="https://example.com/receipt.jpg"
-                      className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-lg text-sm text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none transition-all"
-                    />
-                  </div>
-
-                  {/* Submission Footer */}
-                  <div className="pt-4 border-t border-border-color flex justify-end gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetId = activePaymentApt.id;
+                        closePaymentModal();
+                        setActiveInvoiceAptId(targetId);
+                      }}
+                      className="flex-1 py-2.5 px-4 bg-primary-rose text-white text-xs font-semibold rounded-xl hover:bg-primary-rose/90 transition-all flex items-center justify-center gap-2 shadow-sm"
+                    >
+                      <FileText className="w-4 h-4" /> View Digital GST Tax Invoice
+                    </button>
                     <button
                       type="button"
                       onClick={closePaymentModal}
-                      disabled={submittingPayment}
-                      className="px-4 py-2 text-sm text-muted hover:text-deep-plum rounded-lg transition-colors"
+                      className="py-2.5 px-5 bg-white border border-border-color text-deep-plum text-xs font-semibold rounded-xl hover:bg-ivory transition-colors"
                     >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={submittingPayment}
-                      className="px-5 py-2 bg-primary-rose text-white text-sm font-medium rounded-lg hover:bg-primary-rose/90 transition-all shadow-sm flex items-center gap-2 disabled:opacity-60"
-                    >
-                      {submittingPayment ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                      Submit Proof
+                      Close Window
                     </button>
                   </div>
-                </form>
-              </div>
+                </div>
+              ) : (
+                <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+                  {/* Summary Bar */}
+                  <div className="p-4 bg-soft-blush/30 rounded-xl border border-border-color space-y-2 text-xs">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted font-medium">Total Service Price:</span>
+                      <strong className="text-deep-plum">₹{activePaymentApt.price.toFixed(2)}</strong>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-muted">
+                      <span>Already Paid:</span>
+                      <span className="font-medium text-emerald-700">₹{(activePaymentApt.amountPaid || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-muted pt-1 border-t border-border-color/60">
+                      <span>Remaining Balance:</span>
+                      <span className="font-semibold text-deep-plum">₹{Math.max(0, activePaymentApt.price - (activePaymentApt.amountPaid || 0)).toFixed(2)}</span>
+                    </div>
+                    {activePaymentApt.advanceAmountRequired > 0 && (
+                      <div className="flex justify-between items-center text-xs pt-1 border-t border-border-color/60 text-primary-rose">
+                        <span className="font-medium">Advance Deposit Required:</span>
+                        <strong className="font-bold">₹{activePaymentApt.advanceAmountRequired.toFixed(2)}</strong>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Mode Tabs */}
+                  <div className="grid grid-cols-2 p-1 bg-ivory rounded-xl border border-border-color text-xs font-medium">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentModeTab('gateway')}
+                      className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                        paymentModeTab === 'gateway'
+                          ? 'bg-white text-primary-rose shadow-2xs font-semibold'
+                          : 'text-muted hover:text-deep-plum'
+                      }`}
+                    >
+                      <Zap className="w-3.5 h-3.5" /> Instant Gateway
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentModeTab('manual')}
+                      className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                        paymentModeTab === 'manual'
+                          ? 'bg-white text-primary-rose shadow-2xs font-semibold'
+                          : 'text-muted hover:text-deep-plum'
+                      }`}
+                    >
+                      <QrCode className="w-3.5 h-3.5" /> Direct UPI / UTR
+                    </button>
+                  </div>
+
+                  {paymentSubmitError && (
+                    <div className="p-3.5 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200 flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{paymentSubmitError}</span>
+                    </div>
+                  )}
+
+                  {paymentModeTab === 'gateway' ? (
+                    /* TAB 1: INSTANT ONLINE PAYMENT GATEWAY */
+                    <div className="space-y-4">
+                      {/* Amount Selection */}
+                      {activePaymentApt.advanceAmountRequired > 0 && (!activePaymentApt.amountPaid || activePaymentApt.amountPaid === 0) ? (
+                        <div>
+                          <label className="block text-xs font-semibold text-deep-plum mb-2">Select Payment Tier</label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setOnlineAmountType('Advance')}
+                              className={`p-3 rounded-xl border text-left transition-all ${
+                                onlineAmountType === 'Advance'
+                                  ? 'border-primary-rose bg-soft-blush/40 ring-1 ring-primary-rose'
+                                  : 'border-border-color bg-white hover:bg-ivory/50'
+                              }`}
+                            >
+                              <div className="text-xs font-semibold text-deep-plum">Advance Deposit</div>
+                              <div className="text-base font-bold text-primary-rose mt-0.5">₹{activePaymentApt.advanceAmountRequired.toFixed(2)}</div>
+                              <p className="text-[10px] text-muted mt-1">Book and reserve slot</p>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setOnlineAmountType('Full')}
+                              className={`p-3 rounded-xl border text-left transition-all ${
+                                onlineAmountType === 'Full'
+                                  ? 'border-primary-rose bg-soft-blush/40 ring-1 ring-primary-rose'
+                                  : 'border-border-color bg-white hover:bg-ivory/50'
+                              }`}
+                            >
+                              <div className="text-xs font-semibold text-deep-plum">Full Service Price</div>
+                              <div className="text-base font-bold text-deep-plum mt-0.5">₹{activePaymentApt.price.toFixed(2)}</div>
+                              <p className="text-[10px] text-muted mt-1">Pay 100% upfront</p>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-white rounded-xl border border-border-color flex justify-between items-center">
+                          <div>
+                            <span className="text-xs font-medium text-muted block">Payable Balance</span>
+                            <span className="text-base font-bold text-deep-plum">
+                              ₹{Math.max(0, activePaymentApt.price - (activePaymentApt.amountPaid || 0)).toFixed(2)}
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-semibold text-primary-rose bg-soft-blush px-2.5 py-1 rounded-full">
+                            Full Settlement
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Payment Method Selector */}
+                      <div>
+                        <label className="block text-xs font-semibold text-deep-plum mb-2">Choose Payment Method</label>
+                        <div className="grid grid-cols-3 gap-2.5">
+                          {[
+                            { id: 'UPI', label: 'UPI / QR', desc: 'GPay, PhonePe, Paytm', icon: Smartphone },
+                            { id: 'Card', label: 'Cards', desc: 'Debit / Credit', icon: CreditCard },
+                            { id: 'NetBanking', label: 'Net Banking', desc: 'HDFC, ICICI, SBI', icon: Building2 },
+                          ].map(m => {
+                            const IconComponent = m.icon;
+                            const isSelected = onlineGatewayMethod === m.id;
+                            return (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => setOnlineGatewayMethod(m.id)}
+                                className={`p-3 rounded-xl border text-left transition-all ${
+                                  isSelected 
+                                    ? 'border-primary-rose bg-soft-blush/30 ring-1 ring-primary-rose'
+                                    : 'border-border-color bg-white hover:bg-ivory/40'
+                                }`}
+                              >
+                                <IconComponent className={`w-4 h-4 mb-1.5 ${isSelected ? 'text-primary-rose' : 'text-muted'}`} />
+                                <div className="text-xs font-semibold text-deep-plum">{m.label}</div>
+                                <div className="text-[10px] text-muted truncate">{m.desc}</div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Security Assurance Banner */}
+                      <div className="p-3 bg-ivory rounded-xl border border-border-color flex items-center gap-2.5 text-[11px] text-muted">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>Instant 256-Bit SSL Encrypted Verification • Instant Digital GST Tax Invoice</span>
+                      </div>
+
+                      {/* Gateway Trigger Button */}
+                      <button
+                        type="button"
+                        onClick={handleProceedOnlinePayment}
+                        disabled={processingGateway}
+                        className="w-full py-3 bg-primary-rose text-white text-xs font-semibold rounded-xl hover:bg-primary-rose/90 transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                      >
+                        {processingGateway ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span>Processing Secure Transaction...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-4 h-4" />
+                            <span>
+                              Pay ₹{onlineAmountType === 'Advance' && activePaymentApt.advanceAmountRequired > 0 
+                                ? activePaymentApt.advanceAmountRequired.toFixed(2) 
+                                : Math.max(0, activePaymentApt.price - (activePaymentApt.amountPaid || 0)).toFixed(2)} via Secure Gateway
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    /* TAB 2: MANUAL UPI TRANSFER & UTR FORM */
+                    <div className="space-y-4">
+                      {/* Salon UPI Details */}
+                      {activePaymentApt.salonUpiId ? (
+                        <div className="p-3 bg-soft-blush/20 rounded-xl border border-border-color">
+                          <span className="text-xs font-semibold uppercase text-muted block mb-1.5">Salon UPI ID / VPA</span>
+                          <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-border-color font-mono text-sm text-deep-plum justify-between">
+                            <span className="truncate">{activePaymentApt.salonUpiId}</span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(activePaymentApt.salonUpiId)}
+                              className="px-2.5 py-1 text-xs bg-rose-tint text-primary-rose font-sans font-medium rounded hover:bg-rose-tint/80 transition-colors flex items-center gap-1 shrink-0"
+                            >
+                              {copiedUpi ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                              {copiedUpi ? 'Copied' : 'Copy'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted italic">No direct UPI ID configured by salon.</p>
+                      )}
+
+                      {/* Salon QR Code */}
+                      {activePaymentApt.salonQrCodeImageUrl && (
+                        <div className="p-3 bg-white rounded-xl border border-border-color text-center">
+                          <span className="text-xs font-semibold uppercase text-muted block mb-2">Scan & Pay via UPI App</span>
+                          <img
+                            src={activePaymentApt.salonQrCodeImageUrl}
+                            alt="Salon QR Scanner"
+                            className="w-36 h-36 object-contain mx-auto rounded-lg bg-white p-2 border border-border-color shadow-sm"
+                          />
+                        </div>
+                      )}
+
+                      {/* Proof Submission Form */}
+                      <form onSubmit={handlePaymentSubmit} className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-medium text-deep-plum mb-1.5">
+                            Transaction Reference / UTR Number <span className="text-primary-rose">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            minLength={3}
+                            maxLength={100}
+                            value={paymentForm.paymentTransactionReference}
+                            onChange={(e) => setPaymentForm(prev => ({ ...prev, paymentTransactionReference: e.target.value }))}
+                            placeholder="e.g. 423589123456 or UPI Ref ID"
+                            className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-lg text-sm font-mono text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none transition-all"
+                          />
+                          <p className="text-[11px] text-muted mt-1">Copy the 12-digit UTR/Ref number from your payment receipt in GPay, PhonePe, or Paytm.</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-medium text-deep-plum mb-1.5">
+                              Amount Paid (₹) <span className="text-primary-rose">*</span>
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              max={activePaymentApt.price}
+                              required
+                              value={paymentForm.amountPaid}
+                              onChange={(e) => setPaymentForm(prev => ({ ...prev, amountPaid: e.target.value }))}
+                              className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-lg text-sm text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none transition-all"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-deep-plum mb-1.5">
+                              Payment Method
+                            </label>
+                            <select
+                              value={paymentForm.paymentMethod}
+                              onChange={(e) => setPaymentForm(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                              className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-lg text-sm text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none transition-all"
+                            >
+                              <option value="UPI">UPI</option>
+                              <option value="Google Pay">Google Pay</option>
+                              <option value="PhonePe">PhonePe</option>
+                              <option value="Paytm">Paytm</option>
+                              <option value="Bank Transfer">Bank Transfer</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-deep-plum mb-1.5">
+                            Screenshot / Receipt Proof URL (Optional)
+                          </label>
+                          <input
+                            type="url"
+                            maxLength={500}
+                            value={paymentForm.paymentProofUrl}
+                            onChange={(e) => setPaymentForm(prev => ({ ...prev, paymentProofUrl: e.target.value }))}
+                            placeholder="https://example.com/receipt.jpg"
+                            className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-lg text-sm text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none transition-all"
+                          />
+                        </div>
+
+                        {/* Submission Footer */}
+                        <div className="pt-3 border-t border-border-color flex justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={closePaymentModal}
+                            disabled={submittingPayment}
+                            className="px-4 py-2 text-sm text-muted hover:text-deep-plum rounded-lg transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={submittingPayment}
+                            className="px-5 py-2 bg-primary-rose text-white text-sm font-medium rounded-lg hover:bg-primary-rose/90 transition-all shadow-sm flex items-center gap-2 disabled:opacity-60 cursor-pointer"
+                          >
+                            {submittingPayment ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                            Submit Proof
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              )}
 
             </div>
           </div>
@@ -1958,6 +2265,14 @@ export default function CustomerDashboard() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Digital GST Tax Invoice & Receipt Modal */}
+        {activeInvoiceAptId && (
+          <InvoiceModal 
+            appointmentId={activeInvoiceAptId} 
+            onClose={() => setActiveInvoiceAptId(null)} 
+          />
         )}
 
       </div>

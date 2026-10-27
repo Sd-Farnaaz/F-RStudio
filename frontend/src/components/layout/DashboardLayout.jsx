@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Calendar, Users, Home, Settings, LogOut, Search, Menu, X, CreditCard, Compass, User as UserIcon, Store, ShieldCheck, Star } from 'lucide-react';
+import { Calendar, Users, Home, Settings, LogOut, Search, Menu, X, CreditCard, Compass, User as UserIcon, Store, ShieldCheck, Star, DollarSign } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import NotificationBell from './NotificationBell';
@@ -42,6 +42,8 @@ export default function DashboardLayout({ children }) {
       { name: 'Staff', href: '/admin/staff', icon: Users },
       { name: 'Customers', href: '/admin/customers', icon: Users },
       { name: 'Reviews', href: '/admin/reviews', icon: Star },
+      { name: 'Plan & Billing', href: '/admin/billing', icon: CreditCard },
+      { name: 'Payouts & Escrow', href: '/admin/payouts', icon: DollarSign },
       { name: 'Salon Profile', href: '/admin/settings/salon', icon: Settings },
     ];
   } else {

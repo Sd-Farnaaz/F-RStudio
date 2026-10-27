@@ -47,6 +47,24 @@ public class AdminServicesController : ControllerBase
             return Forbid();
         }
 
+        // Subscription Tier Gating: Starter (5 services max), Growth / LuxuryPro (unlimited)
+        var salon = await _dbContext.Salons.AsNoTracking().FirstOrDefaultAsync(s => s.Id == salonId.Value, cancellationToken);
+        var tier = salon?.SubscriptionTier ?? "Starter";
+        if (tier.Equals("Starter", StringComparison.OrdinalIgnoreCase))
+        {
+            var activeServicesCount = await _dbContext.Services.AsNoTracking().CountAsync(s => s.SalonId == salonId.Value && s.IsActive, cancellationToken);
+            if (activeServicesCount >= 5)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    message = "Your Starter plan allows a maximum of 5 active services. Please upgrade your salon subscription to Growth or Luxury Pro to offer unlimited services.",
+                    upgradeRequired = true,
+                    currentTier = tier,
+                    servicesLimit = 5
+                });
+            }
+        }
+
         var service = new Service
         {
             SalonId = salonId.Value, // Hardcoded to authenticated admin's salon
