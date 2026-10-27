@@ -68,5 +68,7 @@ public class Appointment
     public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 
     public ICollection<AppointmentReminder> Reminders { get; set; } = new List<AppointmentReminder>();
+
+    public Review? Review { get; set; }
 }
 

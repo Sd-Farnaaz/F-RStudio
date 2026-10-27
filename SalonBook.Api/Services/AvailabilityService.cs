@@ -14,6 +14,13 @@ public interface IAvailabilityService
         string dateString,
         int? staffId = null,
         CancellationToken cancellationToken = default);
+
+    Task<SalonAvailabilityResponse> GetAvailabilityAsync(
+        string salonSlug,
+        IEnumerable<int> serviceIds,
+        string dateString,
+        int? staffId = null,
+        CancellationToken cancellationToken = default);
 }
 
 public class AvailabilityService : IAvailabilityService
@@ -29,9 +36,19 @@ public class AvailabilityService : IAvailabilityService
         _logger = logger;
     }
 
-    public async Task<SalonAvailabilityResponse> GetAvailabilityAsync(
+    public Task<SalonAvailabilityResponse> GetAvailabilityAsync(
         string salonSlug,
         int serviceId,
+        string dateString,
+        int? staffId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return GetAvailabilityAsync(salonSlug, new[] { serviceId }, dateString, staffId, cancellationToken);
+    }
+
+    public async Task<SalonAvailabilityResponse> GetAvailabilityAsync(
+        string salonSlug,
+        IEnumerable<int> serviceIds,
         string dateString,
         int? staffId = null,
         CancellationToken cancellationToken = default)
@@ -39,6 +56,12 @@ public class AvailabilityService : IAvailabilityService
         if (string.IsNullOrWhiteSpace(salonSlug))
         {
             throw new ArgumentException("Salon slug is required.");
+        }
+
+        var idList = serviceIds?.Where(id => id > 0).Distinct().ToList() ?? new List<int>();
+        if (idList.Count == 0)
+        {
+            throw new ArgumentException("At least one valid service ID is required.");
         }
 
         if (!DateOnly.TryParseExact(dateString, "yyyy-MM-dd", out var targetDate))
@@ -57,14 +80,19 @@ public class AvailabilityService : IAvailabilityService
             throw new KeyNotFoundException($"Salon '{salonSlug}' was not found or is inactive.");
         }
 
-        var service = await _dbContext.Services
+        var services = await _dbContext.Services
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == serviceId && s.SalonId == salon.Id && s.IsActive, cancellationToken);
+            .Where(s => idList.Contains(s.Id) && s.SalonId == salon.Id && s.IsActive)
+            .ToListAsync(cancellationToken);
 
-        if (service == null)
+        if (services.Count == 0)
         {
-            throw new KeyNotFoundException($"Active service with ID {serviceId} was not found for salon '{salonSlug}'.");
+            throw new KeyNotFoundException($"No active services found for ID(s): {string.Join(", ", idList)} for salon '{salonSlug}'.");
         }
+
+        var primaryService = services.First();
+        var totalMinutes = services.Sum(s => s.DurationMinutes);
+        var combinedName = string.Join(" + ", services.Select(s => s.Name));
 
         var salonTz = GetTimeZoneInfo(salon.TimeZone);
         var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, salonTz);
@@ -76,7 +104,7 @@ public class AvailabilityService : IAvailabilityService
         }
 
         var targetDayOfWeek = targetDate.DayOfWeek;
-        var duration = TimeSpan.FromMinutes(service.DurationMinutes);
+        var duration = TimeSpan.FromMinutes(totalMinutes);
 
         // Fetch staff and their schedules for that day
         var staffQuery = _dbContext.Staff
@@ -172,9 +200,9 @@ public class AvailabilityService : IAvailabilityService
             Date = targetDate.ToString("yyyy-MM-dd"),
             DayOfWeek = targetDayOfWeek.ToString(),
             TimeZone = salon.TimeZone,
-            ServiceId = service.Id,
-            ServiceName = service.Name,
-            DurationMinutes = service.DurationMinutes,
+            ServiceId = primaryService.Id,
+            ServiceName = combinedName,
+            DurationMinutes = totalMinutes,
             Slots = availableSlots
         };
     }

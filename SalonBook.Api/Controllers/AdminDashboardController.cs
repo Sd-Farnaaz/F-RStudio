@@ -74,11 +74,11 @@ public class AdminDashboardController : ControllerBase
                              a.Status != "Cancelled", cancellationToken);
 
         // 2. Total distinct customers relevant to this salon
-        var totalCustomers = await _dbContext.Appointments
+        var totalCustomers = await _dbContext.Users
             .AsNoTracking()
-            .Where(a => a.SalonId == salonId.Value)
-            .Select(a => a.CustomerId)
-            .Distinct()
+            .Where(u => u.Role == Roles.User &&
+                        (u.SalonId == salonId.Value ||
+                         u.Appointments.Any(a => a.SalonId == salonId.Value)))
             .CountAsync(cancellationToken);
 
         // 3. Appointments within selected date range

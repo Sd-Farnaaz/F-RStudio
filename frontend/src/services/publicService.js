@@ -23,4 +23,5 @@ export const publicService = {
     const query = new URLSearchParams(cleanParams).toString();
     return fetchApi(`/api/salons/${encodeURIComponent(slug)}/services${query ? `?${query}` : ''}`, { method: 'GET', skipAuth: true });
   },
+  getSalonStaff: (slug) => fetchApi(`/api/salons/${encodeURIComponent(slug)}/staff`, { method: 'GET', skipAuth: true }),
 };

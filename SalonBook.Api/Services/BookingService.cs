@@ -62,19 +62,30 @@ public class BookingService : IBookingService
             throw new ArgumentException("Cannot book appointments in the past.");
         }
 
-        // 3. Verify Service is active and belongs to Salon
-        var service = await _dbContext.Services
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == request.ServiceId && s.SalonId == salon.Id && s.IsActive, cancellationToken);
+        // 3. Verify Services are active and belong to Salon
+        var allServiceIds = new List<int> { request.ServiceId };
+        if (request.AdditionalServiceIds != null && request.AdditionalServiceIds.Count > 0)
+        {
+            allServiceIds.AddRange(request.AdditionalServiceIds.Where(id => id > 0 && id != request.ServiceId));
+        }
 
-        if (service == null)
+        var allServices = await _dbContext.Services
+            .AsNoTracking()
+            .Where(s => allServiceIds.Contains(s.Id) && s.SalonId == salon.Id && s.IsActive)
+            .ToListAsync(cancellationToken);
+
+        var primaryService = allServices.FirstOrDefault(s => s.Id == request.ServiceId);
+        if (primaryService == null)
         {
             throw new KeyNotFoundException($"Active service with ID {request.ServiceId} was not found for salon '{salon.Name}'.");
         }
 
-        var durationMinutes = service.DurationMinutes;
-        var endAtUtc = request.StartAtUtc.AddMinutes(durationMinutes);
-        var localEnd = localStart.AddMinutes(durationMinutes);
+        var totalPrice = allServices.Sum(s => s.Price);
+        var totalDurationMinutes = allServices.Sum(s => s.DurationMinutes);
+        var combinedServiceName = string.Join(" + ", allServices.Select(s => s.Name));
+
+        var endAtUtc = request.StartAtUtc.AddMinutes(totalDurationMinutes);
+        var localEnd = localStart.AddMinutes(totalDurationMinutes);
         var dayOfWeek = localStart.DayOfWeek;
 
         // 4. Resolve Staff member
@@ -176,14 +187,14 @@ public class BookingService : IBookingService
             {
                 if (string.Equals(salon.AdvancePaymentType, AdvancePaymentTypes.Percentage, StringComparison.OrdinalIgnoreCase))
                 {
-                    advanceAmountRequired = Math.Round(service.Price * (salon.AdvancePaymentValue.Value / 100m), 2);
+                    advanceAmountRequired = Math.Round(totalPrice * (salon.AdvancePaymentValue.Value / 100m), 2);
                 }
                 else
                 {
                     advanceAmountRequired = salon.AdvancePaymentValue.Value;
                 }
 
-                advanceAmountRequired = Math.Min(service.Price, Math.Max(0m, advanceAmountRequired));
+                advanceAmountRequired = Math.Min(totalPrice, Math.Max(0m, advanceAmountRequired));
                 paymentStatus = PaymentStatuses.Pending;
             }
 
@@ -192,13 +203,13 @@ public class BookingService : IBookingService
                 SalonId = salon.Id,
                 CustomerId = customerId,
                 StaffId = resolvedStaffId,
-                ServiceId = service.Id,
+                ServiceId = primaryService.Id,
                 StartAtUtc = request.StartAtUtc,
                 EndAtUtc = endAtUtc,
                 Status = AppointmentStatuses.Confirmed,
-                PriceAtBooking = service.Price,
-                ServiceNameAtBooking = service.Name,
-                DurationMinutesAtBooking = service.DurationMinutes,
+                PriceAtBooking = totalPrice,
+                ServiceNameAtBooking = combinedServiceName,
+                DurationMinutesAtBooking = totalDurationMinutes,
                 CustomerNotes = request.CustomerNotes?.Trim(),
                 AdvanceAmountRequired = advanceAmountRequired,
                 AmountPaid = 0.00m,
