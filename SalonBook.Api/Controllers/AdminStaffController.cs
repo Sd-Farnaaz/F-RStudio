@@ -43,6 +43,28 @@ public class AdminStaffController : ControllerBase
             return Forbid();
         }
 
+        // Subscription Tier Gating: Starter (1 staff), Growth (10 staff), LuxuryPro (unlimited)
+        var salon = await _dbContext.Salons.AsNoTracking().FirstOrDefaultAsync(s => s.Id == salonId.Value, cancellationToken);
+        var tier = salon?.SubscriptionTier ?? "Starter";
+        int? staffLimit = tier.Equals("Starter", StringComparison.OrdinalIgnoreCase) ? 1 
+                        : tier.Equals("Growth", StringComparison.OrdinalIgnoreCase) ? 10 
+                        : null;
+
+        if (staffLimit.HasValue)
+        {
+            var activeStaffCount = await _dbContext.Staff.AsNoTracking().CountAsync(s => s.SalonId == salonId.Value && s.IsActive, cancellationToken);
+            if (activeStaffCount >= staffLimit.Value)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    message = $"Your {tier} plan allows a maximum of {staffLimit.Value} active specialist{(staffLimit.Value > 1 ? "s" : "")}. Please upgrade your salon subscription to Growth or Luxury Pro to add more specialists.",
+                    upgradeRequired = true,
+                    currentTier = tier,
+                    staffLimit = staffLimit.Value
+                });
+            }
+        }
+
         var staff = new Staff
         {
             SalonId = salonId.Value,

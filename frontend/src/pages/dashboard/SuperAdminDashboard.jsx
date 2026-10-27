@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import SuperAdminLayout from '../../components/layout/SuperAdminLayout';
 import { superAdminService } from '../../services/superAdminService';
+import { subscriptionService } from '../../services/subscriptionService';
 import { 
   Building2, 
   Users, 
@@ -16,20 +17,37 @@ import {
   XCircle, 
   Store,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  CreditCard,
+  TrendingUp,
+  Zap,
+  Edit3,
+  X
 } from 'lucide-react';
 
 export default function SuperAdminDashboard() {
   const [data, setData] = useState(null);
+  const [subData, setSubData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Tier Assignment Modal State
+  const [editingSalonTier, setEditingSalonTier] = useState(null);
+  const [selectedTier, setSelectedTier] = useState('Growth');
+  const [selectedCycle, setSelectedCycle] = useState('Monthly');
+  const [assigningTier, setAssigningTier] = useState(false);
+  const [assignError, setAssignError] = useState('');
 
   const fetchOverview = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
-      const overview = await superAdminService.getOverview();
+      const [overview, subs] = await Promise.all([
+        superAdminService.getOverview(),
+        subscriptionService.getSuperAdminSubscriptions().catch(() => null)
+      ]);
       setData(overview);
+      setSubData(subs);
     } catch (err) {
       setError(err.message || 'Failed to load platform overview metrics.');
     } finally {
@@ -56,6 +74,32 @@ export default function SuperAdminDashboard() {
       month: 'short',
       year: 'numeric'
     }).format(new Date(dateString));
+  };
+
+  const handleOpenAssignTier = (salon) => {
+    setEditingSalonTier(salon);
+    setSelectedTier(salon.tier || 'Growth');
+    setSelectedCycle(salon.billingCycle || 'Monthly');
+    setAssignError('');
+  };
+
+  const handleConfirmAssignTier = async (e) => {
+    e.preventDefault();
+    if (!editingSalonTier) return;
+    try {
+      setAssigningTier(true);
+      setAssignError('');
+      await subscriptionService.adminAssignTier(editingSalonTier.salonId, {
+        tier: selectedTier,
+        billingCycle: selectedCycle
+      });
+      setEditingSalonTier(null);
+      await fetchOverview();
+    } catch (err) {
+      setAssignError(err.message || 'Failed to assign subscription tier');
+    } finally {
+      setAssigningTier(false);
+    }
   };
 
   const getKycBadge = (status, isVerified) => {
@@ -282,7 +326,125 @@ export default function SuperAdminDashboard() {
             </div>
 
             {/* ========================================================================= */}
-            {/* 3. RECENT SALONS DIRECTORY LIST                                           */}
+            {/* 3. SAAS SUBSCRIPTION REVENUE & BILLING ENGINE                             */}
+            {/* ========================================================================= */}
+            {subData && (
+              <div className="bg-white rounded-3xl p-6 sm:p-7 border border-border-color shadow-xs space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-soft-blush border border-dusty-rose/40 text-primary-rose text-xs font-semibold uppercase tracking-wider mb-2">
+                      <CreditCard className="w-3.5 h-3.5" />
+                      <span>SaaS Subscription Engine</span>
+                    </div>
+                    <h3 className="font-serif text-xl sm:text-2xl font-bold text-deep-plum">
+                      Platform Subscription Revenue & Tiers
+                    </h3>
+                    <p className="text-xs text-muted mt-0.5">
+                      Recurring software revenues, tier allocations, and vendor plan assignments.
+                    </p>
+                  </div>
+
+                  {/* Tiers Breakdown Badges */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-ivory border border-border-color text-deep-plum">
+                      Starter: <strong>{subData.starterCount}</strong>
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-rose-tint border border-primary-rose/30 text-primary-rose">
+                      Growth: <strong>{subData.growthCount}</strong>
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-deep-plum text-white flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-amber-300" /> Luxury Pro: <strong>{subData.luxuryProCount}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* SaaS Metrics 2-Card Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div className="p-5 bg-gradient-to-br from-soft-blush/30 to-ivory rounded-2xl border border-border-color flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted">Monthly Recurring Revenue (MRR)</span>
+                      <div className="text-3xl font-serif font-bold text-deep-plum mt-1">
+                        ₹{subData.monthlyRecurringRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </div>
+                      <p className="text-[11px] text-muted mt-1">Normalized active monthly software subscriptions</p>
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-white border border-border-color flex items-center justify-center text-primary-rose shadow-2xs">
+                      <TrendingUp className="w-6 h-6" />
+                    </div>
+                  </div>
+
+                  <div className="p-5 bg-gradient-to-br from-soft-blush/30 to-ivory rounded-2xl border border-border-color flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted">Annual Run Rate (ARR)</span>
+                      <div className="text-3xl font-serif font-bold text-emerald-800 mt-1">
+                        ₹{subData.annualRunRate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </div>
+                      <p className="text-[11px] text-muted mt-1">Projected 12-month platform software run-rate</p>
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-white border border-border-color flex items-center justify-center text-emerald-700 shadow-2xs">
+                      <Zap className="w-6 h-6" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Salons Subscription Table */}
+                <div className="border border-border-color rounded-2xl overflow-hidden">
+                  <div className="px-5 py-3 bg-ivory/60 border-b border-border-color flex justify-between items-center text-xs font-semibold text-deep-plum">
+                    <span>Active Salon Plans ({subData.salons.length})</span>
+                    <span className="text-muted font-normal">Click 'Change Tier' to reassign plan privileges</span>
+                  </div>
+
+                  <div className="overflow-x-auto max-h-72 overflow-y-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-ivory/30 text-muted uppercase font-semibold border-b border-border-color sticky top-0">
+                        <tr>
+                          <th className="px-5 py-3">Salon</th>
+                          <th className="px-5 py-3">Location</th>
+                          <th className="px-5 py-3">Active Tier</th>
+                          <th className="px-5 py-3">Cycle</th>
+                          <th className="px-5 py-3">Team / Catalog</th>
+                          <th className="px-5 py-3 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border-color">
+                        {subData.salons.map((s) => (
+                          <tr key={s.salonId} className="hover:bg-soft-blush/20 transition-colors">
+                            <td className="px-5 py-3 font-semibold text-deep-plum">{s.salonName}</td>
+                            <td className="px-5 py-3 text-muted">{s.city}</td>
+                            <td className="px-5 py-3">
+                              <span className={`px-2.5 py-0.5 rounded-full font-semibold text-[11px] ${
+                                s.tier.toLowerCase() === 'luxurypro' ? 'bg-deep-plum text-white' :
+                                s.tier.toLowerCase() === 'growth' ? 'bg-rose-tint text-primary-rose border border-primary-rose/30' :
+                                'bg-ivory text-deep-plum border border-border-color'
+                              }`}>
+                                {s.tier === 'LuxuryPro' ? 'Luxury Pro' : s.tier}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 text-muted">{s.billingCycle}</td>
+                            <td className="px-5 py-3 text-muted">
+                              {s.staffCount} staff • {s.servicesCount} services
+                            </td>
+                            <td className="px-5 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenAssignTier(s)}
+                                className="px-2.5 py-1 bg-white border border-border-color hover:border-primary-rose text-deep-plum rounded-lg text-xs font-medium transition-colors shadow-2xs inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <Edit3 className="w-3 h-3 text-primary-rose" />
+                                <span>Change Tier</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* 4. RECENT SALONS DIRECTORY LIST                                           */}
             {/* ========================================================================= */}
             <div className="bg-white rounded-3xl border border-border-color shadow-xs overflow-hidden">
               <div className="p-6 border-b border-border-color flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -387,6 +549,77 @@ export default function SuperAdminDashboard() {
               )}
             </div>
           </>
+        )}
+
+        {/* ----------------- SUPERADMIN TIER ASSIGNMENT MODAL ----------------- */}
+        {editingSalonTier && (
+          <div className="fixed inset-0 z-50 bg-deep-plum/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+            <div className="bg-white rounded-2xl max-w-md w-full border border-border-color shadow-2xl overflow-hidden my-8">
+              <div className="px-6 py-4 border-b border-border-color bg-ivory/70 flex items-center justify-between">
+                <div>
+                  <h3 className="font-serif font-semibold text-deep-plum text-lg">Assign Subscription Tier</h3>
+                  <p className="text-xs text-muted">{editingSalonTier.salonName}</p>
+                </div>
+                <button
+                  onClick={() => setEditingSalonTier(null)}
+                  className="p-1 rounded-md text-muted hover:text-deep-plum hover:bg-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleConfirmAssignTier} className="p-6 space-y-4">
+                {assignError && (
+                  <div className="p-3 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200">
+                    {assignError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-deep-plum mb-1.5">Select Tier</label>
+                  <select
+                    value={selectedTier}
+                    onChange={(e) => setSelectedTier(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-lg text-sm text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none"
+                  >
+                    <option value="Starter">Starter Solo (1 Staff, 5 Services, 5% fee)</option>
+                    <option value="Growth">Growth Studio (10 Staff, Unlimited Services, 2.5% fee)</option>
+                    <option value="LuxuryPro">Luxury Pro (Unlimited Staff & Services, 0% fee)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-deep-plum mb-1.5">Billing Cadence</label>
+                  <select
+                    value={selectedCycle}
+                    onChange={(e) => setSelectedCycle(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-border-color rounded-lg text-sm text-deep-plum focus:ring-2 focus:ring-primary-rose/30 outline-none"
+                  >
+                    <option value="Monthly">Monthly</option>
+                    <option value="Annual">Annual (Prepaid)</option>
+                  </select>
+                </div>
+
+                <div className="pt-3 border-t border-border-color flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditingSalonTier(null)}
+                    disabled={assigningTier}
+                    className="px-4 py-2 text-xs text-muted hover:text-deep-plum transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={assigningTier}
+                    className="px-5 py-2.5 bg-primary-rose text-white text-xs font-semibold rounded-xl hover:bg-primary-rose/90 transition-all shadow-sm flex items-center gap-2 disabled:opacity-60 cursor-pointer"
+                  >
+                    {assigningTier ? 'Saving...' : 'Confirm Tier Assignment'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
 
       </div>

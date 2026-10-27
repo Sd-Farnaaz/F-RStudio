@@ -48,5 +48,17 @@ export const superAdminService = {
     fetchApi(`/api/superadmin/users/${id}/status`, {
       method: 'PATCH',
       body: { isActive }
+    }),
+
+  // 4. Vendor Settlements & Escrow Management (Phase 3)
+  getSettlements: (params = {}) => {
+    const query = toQueryString(params);
+    return fetchApi(`/api/superadmin/settlements${query}`, { method: 'GET' });
+  },
+
+  disburseSettlement: (id, { utrNumber, notes }) =>
+    fetchApi(`/api/superadmin/settlements/${id}/disburse`, {
+      method: 'POST',
+      body: { utrNumber, notes }
     })
 };

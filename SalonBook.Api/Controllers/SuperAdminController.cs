@@ -51,6 +51,25 @@ public class SuperAdminController : ControllerBase
             .Where(a => a.Status != "Cancelled")
             .SumAsync(a => (decimal?)a.PriceAtBooking, cancellationToken) ?? 0m;
 
+        // Cross-Phase Platform Insights (Reviews, Client Dossiers, Escrow Holdings, SaaS MRR)
+        var totalVerifiedReviews = await _dbContext.Reviews.CountAsync(cancellationToken);
+        var totalConsultationCards = await _dbContext.ClientConsultationCards.CountAsync(cancellationToken);
+        var totalPendingEscrow = await _dbContext.VendorPayouts
+            .Where(p => p.Status == "Pending" || p.Status == "Processed")
+            .SumAsync(p => (decimal?)p.NetAmount, cancellationToken) ?? 0m;
+
+        var activeSalonsList = await _dbContext.Salons
+            .AsNoTracking()
+            .Where(s => s.IsActive && s.SubscriptionStatus == "Active")
+            .Select(s => new { s.SubscriptionBillingCycle, s.SubscriptionPrice })
+            .ToListAsync(cancellationToken);
+
+        decimal mrr = 0m;
+        foreach (var s in activeSalonsList)
+        {
+            mrr += s.SubscriptionBillingCycle == "Annual" ? s.SubscriptionPrice / 12m : s.SubscriptionPrice;
+        }
+
         var recentSalons = await _dbContext.Salons
             .AsNoTracking()
             .OrderByDescending(s => s.CreatedAtUtc)
@@ -65,6 +84,7 @@ public class SuperAdminController : ControllerBase
                 IsActive = s.IsActive,
                 IsVerified = s.IsVerified,
                 KycStatus = s.KycStatus,
+                SubscriptionTier = s.SubscriptionTier ?? "Starter",
                 CreatedAtUtc = s.CreatedAtUtc
             })
             .ToListAsync(cancellationToken);
@@ -80,6 +100,10 @@ public class SuperAdminController : ControllerBase
             TotalAppointments = totalAppointments,
             TotalGrossRevenue = totalGrossRevenue,
             PlatformHealth = "Healthy",
+            TotalVerifiedReviews = totalVerifiedReviews,
+            TotalConsultationCards = totalConsultationCards,
+            TotalPendingEscrow = Math.Round(totalPendingEscrow, 2),
+            MonthlyRecurringRevenue = Math.Round(mrr, 2),
             RecentSalons = recentSalons
         };
 
@@ -98,6 +122,7 @@ public class SuperAdminController : ControllerBase
         [FromQuery] bool? isActive,
         [FromQuery] bool? isVerified,
         [FromQuery] string? kycStatus,
+        [FromQuery] string? subscriptionTier,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
@@ -117,10 +142,16 @@ public class SuperAdminController : ControllerBase
             query = query.Where(s => s.IsVerified == isVerified.Value);
         }
 
-        if (!string.IsNullOrWhiteSpace(kycStatus))
+        if (!string.IsNullOrWhiteSpace(kycStatus) && !kycStatus.Equals("all", StringComparison.OrdinalIgnoreCase))
         {
             var normalizedKyc = kycStatus.Trim().ToLower();
             query = query.Where(s => s.KycStatus.ToLower() == normalizedKyc);
+        }
+
+        if (!string.IsNullOrWhiteSpace(subscriptionTier) && !subscriptionTier.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            var tierTerm = subscriptionTier.Trim().ToLower();
+            query = query.Where(s => (s.SubscriptionTier ?? "Starter").ToLower() == tierTerm);
         }
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -157,7 +188,14 @@ public class SuperAdminController : ControllerBase
                 TotalStaff = s.StaffMembers.Count,
                 TotalServices = s.Services.Count,
                 TotalAppointments = s.Appointments.Count,
-                CreatedAtUtc = s.CreatedAtUtc
+                CreatedAtUtc = s.CreatedAtUtc,
+
+                // Cross-Phase Data
+                SubscriptionTier = s.SubscriptionTier ?? "Starter",
+                AverageRating = s.Reviews.Any() ? Math.Round(s.Reviews.Average(r => r.Rating), 1) : 0,
+                TotalReviews = s.Reviews.Count,
+                TotalConsultationCards = _dbContext.ClientConsultationCards.Count(c => c.SalonId == s.Id),
+                TotalPendingEscrow = s.Payouts.Where(p => p.Status == "Pending" || p.Status == "Processed").Sum(p => p.NetAmount)
             })
             .ToListAsync(cancellationToken);
 
@@ -186,6 +224,8 @@ public class SuperAdminController : ControllerBase
             .Include(s => s.StaffMembers)
             .Include(s => s.Services)
             .Include(s => s.Appointments)
+            .Include(s => s.Reviews)
+            .Include(s => s.Payouts)
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
 
         if (salon == null)
@@ -197,6 +237,12 @@ public class SuperAdminController : ControllerBase
         var totalRevenue = salon.Appointments
             .Where(a => a.Status != "Cancelled")
             .Sum(a => a.PriceAtBooking);
+
+        var totalConsultationCards = await _dbContext.ClientConsultationCards.CountAsync(c => c.SalonId == id, cancellationToken);
+        var totalFormulas = await _dbContext.ClientFormulaRecords.CountAsync(f => f.SalonId == id, cancellationToken);
+        var avgRating = salon.Reviews.Any() ? Math.Round(salon.Reviews.Average(r => r.Rating), 1) : 0;
+        var pendingEscrow = salon.Payouts.Where(p => p.Status == "Pending" || p.Status == "Processed").Sum(p => p.NetAmount);
+        var disbursedEscrow = salon.Payouts.Where(p => p.Status == "Disbursed").Sum(p => p.NetAmount);
 
         var response = new SuperAdminSalonDetailResponse
         {
@@ -225,7 +271,25 @@ public class SuperAdminController : ControllerBase
             TotalServices = salon.Services.Count,
             TotalAppointments = salon.Appointments.Count,
             TotalRevenue = totalRevenue,
-            CreatedAtUtc = salon.CreatedAtUtc
+            CreatedAtUtc = salon.CreatedAtUtc,
+
+            // Phase 1, Phase 2, Phase 3 Enhancements
+            SubscriptionTier = salon.SubscriptionTier ?? "Starter",
+            SubscriptionBillingCycle = salon.SubscriptionBillingCycle ?? "Monthly",
+            SubscriptionStatus = salon.SubscriptionStatus ?? "Active",
+            SubscriptionPrice = salon.SubscriptionPrice,
+            SubscriptionRenewsAtUtc = salon.SubscriptionRenewsAtUtc,
+            GstNumber = salon.GstNumber,
+            UpiId = salon.UpiId,
+            IsAdvancePaymentRequired = salon.IsAdvancePaymentRequired,
+            AdvancePaymentType = salon.AdvancePaymentType,
+            AdvancePaymentValue = salon.AdvancePaymentValue,
+            AverageRating = avgRating,
+            TotalReviews = salon.Reviews.Count,
+            TotalConsultationCards = totalConsultationCards,
+            TotalFormulaRecords = totalFormulas,
+            TotalPendingEscrow = pendingEscrow,
+            TotalDisbursedEscrow = disbursedEscrow
         };
 
         return Ok(response);
@@ -417,6 +481,160 @@ public class SuperAdminController : ControllerBase
             message = $"User status updated to {(user.IsActive ? "active" : "inactive")}.",
             userId = user.Id,
             isActive = user.IsActive
+        });
+    }
+
+    /// <summary>
+    /// Platform-wide settlements and escrow ledger for SuperAdmin with status filtering.
+    /// </summary>
+    [HttpGet("settlements")]
+    [ProducesResponseType(typeof(SuperAdminSettlementsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetSettlements(
+        [FromQuery] string? status,
+        [FromQuery] int? salonId,
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var totalPending = await _dbContext.VendorPayouts
+            .Where(p => p.Status == "Pending")
+            .SumAsync(p => (decimal?)p.NetAmount, cancellationToken) ?? 0m;
+
+        var totalProcessed = await _dbContext.VendorPayouts
+            .Where(p => p.Status == "Processed")
+            .SumAsync(p => (decimal?)p.NetAmount, cancellationToken) ?? 0m;
+
+        var totalDisbursed = await _dbContext.VendorPayouts
+            .Where(p => p.Status == "Disbursed")
+            .SumAsync(p => (decimal?)p.NetAmount, cancellationToken) ?? 0m;
+
+        var query = _dbContext.VendorPayouts
+            .AsNoTracking()
+            .Include(p => p.Salon)
+            .AsQueryable();
+
+        if (salonId.HasValue)
+        {
+            query = query.Where(p => p.SalonId == salonId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(status) && !status.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            var normalizedStatus = status.Trim().ToLower();
+            query = query.Where(p => p.Status.ToLower() == normalizedStatus);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(p => (p.Salon != null && p.Salon.Name.ToLower().Contains(term)) ||
+                                     p.EscrowTransactionId.ToLower().Contains(term) ||
+                                     (p.UtrNumber != null && p.UtrNumber.ToLower().Contains(term)));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderByDescending(p => p.CreatedAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(p => new SuperAdminSettlementItem
+            {
+                Id = p.Id,
+                SalonId = p.SalonId,
+                SalonName = p.Salon != null ? p.Salon.Name : "Unknown Salon",
+                SalonCity = p.Salon != null && p.Salon.City != null ? p.Salon.City : "—",
+                EscrowTransactionId = p.EscrowTransactionId,
+                Amount = p.Amount,
+                CommissionAmount = p.CommissionAmount,
+                NetAmount = p.NetAmount,
+                CurrencyCode = p.CurrencyCode,
+                Status = p.Status,
+                UtrNumber = p.UtrNumber,
+                DisbursedAtUtc = p.DisbursedAtUtc,
+                Notes = p.Notes,
+                CreatedAtUtc = p.CreatedAtUtc
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(new SuperAdminSettlementsResponse
+        {
+            TotalPendingEscrow = Math.Round(totalPending, 2),
+            TotalProcessedSettlement = Math.Round(totalProcessed, 2),
+            TotalDisbursed = Math.Round(totalDisbursed, 2),
+            Settlements = new PagedResult<SuperAdminSettlementItem>
+            {
+                Items = items,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            }
+        });
+    }
+
+    /// <summary>
+    /// Disburse a settlement payout and record bank UTR reference.
+    /// </summary>
+    [HttpPost("settlements/{id:int}/disburse")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DisburseSettlement(
+        int id,
+        [FromBody] DisburseSettlementRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.UtrNumber))
+        {
+            return BadRequest(new { message = "Bank UTR or transfer reference is required." });
+        }
+
+        var payout = await _dbContext.VendorPayouts
+            .Include(p => p.Salon)
+            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+
+        if (payout == null)
+        {
+            return NotFound(new { message = "Settlement record not found." });
+        }
+
+        if (payout.Status == "Disbursed")
+        {
+            return BadRequest(new { message = "This settlement has already been disbursed." });
+        }
+
+        payout.Status = "Disbursed";
+        payout.UtrNumber = request.UtrNumber.Trim();
+        payout.DisbursedAtUtc = DateTime.UtcNow;
+        payout.UpdatedAtUtc = DateTime.UtcNow;
+        if (!string.IsNullOrWhiteSpace(request.Notes))
+        {
+            payout.Notes = string.IsNullOrWhiteSpace(payout.Notes)
+                ? request.Notes.Trim()
+                : $"{payout.Notes}; {request.Notes.Trim()}";
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("SuperAdmin {AdminEmail} marked payout ID {PayoutId} (Salon {SalonId}) as Disbursed with UTR {UtrNumber}",
+            _currentUserService.Email, payout.Id, payout.SalonId, payout.UtrNumber);
+
+        return Ok(new
+        {
+            message = "Settlement marked as Disbursed successfully.",
+            payoutId = payout.Id,
+            salonId = payout.SalonId,
+            status = payout.Status,
+            utrNumber = payout.UtrNumber,
+            disbursedAtUtc = payout.DisbursedAtUtc
         });
     }
 }

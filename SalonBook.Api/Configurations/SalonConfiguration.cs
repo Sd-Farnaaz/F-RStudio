@@ -101,6 +101,32 @@ public class SalonConfiguration : IEntityTypeConfiguration<Salon>
         builder.Property(s => s.LogoUrl)
             .HasMaxLength(500);
 
+        builder.Property(s => s.SubscriptionTier)
+            .IsRequired()
+            .HasMaxLength(50)
+            .HasDefaultValue("Starter");
+
+        builder.Property(s => s.SubscriptionBillingCycle)
+            .IsRequired()
+            .HasMaxLength(20)
+            .HasDefaultValue("Monthly");
+
+        builder.Property(s => s.SubscriptionStatus)
+            .IsRequired()
+            .HasMaxLength(30)
+            .HasDefaultValue("Active");
+
+        builder.Property(s => s.SubscriptionPrice)
+            .IsRequired()
+            .HasPrecision(18, 2)
+            .HasDefaultValue(0.00m);
+
+        builder.Property(s => s.SubscriptionStartedAtUtc)
+            .IsRequired(false);
+
+        builder.Property(s => s.SubscriptionRenewsAtUtc)
+            .IsRequired(false);
+
         builder.Property(s => s.IsAdvancePaymentRequired)
             .IsRequired()
             .HasDefaultValue(false);

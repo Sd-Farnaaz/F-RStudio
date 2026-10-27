@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { adminService } from '../../services/adminService';
+import TierUpgradePromptModal from '../../components/common/TierUpgradePromptModal';
 import { Plus, Edit2, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function ServicesPage() {
@@ -13,6 +14,7 @@ export default function ServicesPage() {
   const [currentService, setCurrentService] = useState(null);
   const [formData, setFormData] = useState({ name: '', category: '', description: '', price: '', durationMinutes: 30, isActive: true });
   const [saving, setSaving] = useState(false);
+  const [upgradePrompt, setUpgradePrompt] = useState(null);
 
   useEffect(() => {
     fetchServices();
@@ -75,7 +77,11 @@ export default function ServicesPage() {
       await fetchServices();
       handleCloseModal();
     } catch (err) {
-      setError(err.message || 'Failed to save service');
+      if (err.message && (err.message.includes('plan allows') || err.message.includes('upgrade your salon subscription'))) {
+        setUpgradePrompt(err.message);
+      } else {
+        setError(err.message || 'Failed to save service');
+      }
     } finally {
       setSaving(false);
     }
@@ -266,6 +272,14 @@ export default function ServicesPage() {
           </div>
         </div>
       )}
+
+      {/* Tier Quota Upgrade Modal */}
+      <TierUpgradePromptModal
+        isOpen={!!upgradePrompt}
+        onClose={() => setUpgradePrompt(null)}
+        title="Services Catalog Quota Reached"
+        message={upgradePrompt}
+      />
     </DashboardLayout>
   );
 }

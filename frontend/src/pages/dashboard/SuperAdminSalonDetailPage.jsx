@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import SuperAdminLayout from '../../components/layout/SuperAdminLayout';
 import { superAdminService } from '../../services/superAdminService';
+import { subscriptionService } from '../../services/subscriptionService';
 import { 
   ArrowLeft, 
   Clock, 
@@ -14,7 +15,20 @@ import {
   AlertCircle, 
   Power, 
   RotateCcw,
-  Globe
+  Globe,
+  Sparkles,
+  TrendingUp,
+  Zap,
+  Star,
+  FileText,
+  CreditCard,
+  Edit3,
+  X,
+  ExternalLink,
+  DollarSign,
+  Receipt,
+  Layers,
+  ChevronRight
 } from 'lucide-react';
 
 export default function SuperAdminSalonDetailPage() {
@@ -34,6 +48,15 @@ export default function SuperAdminSalonDetailPage() {
     notes: '', 
     isSubmitting: false, 
     message: '', 
+    error: '' 
+  });
+
+  // SaaS Subscription Plan Tier Modal (Phase 3)
+  const [tierModal, setTierModal] = useState({ 
+    isOpen: false, 
+    tier: 'Growth', 
+    billingCycle: 'Monthly', 
+    isSubmitting: false, 
     error: '' 
   });
 
@@ -114,6 +137,33 @@ export default function SuperAdminSalonDetailPage() {
     }
   };
 
+  const openTierModal = () => {
+    if (!salon) return;
+    setTierModal({
+      isOpen: true,
+      tier: salon.subscriptionTier || 'Growth',
+      billingCycle: salon.subscriptionBillingCycle || 'Monthly',
+      isSubmitting: false,
+      error: ''
+    });
+  };
+
+  const handleTierSubmit = async (e) => {
+    e.preventDefault();
+    if (!salon) return;
+    try {
+      setTierModal(prev => ({ ...prev, isSubmitting: true, error: '' }));
+      await subscriptionService.adminAssignTier(salon.id, {
+        tier: tierModal.tier,
+        billingCycle: tierModal.billingCycle
+      });
+      setTierModal(prev => ({ ...prev, isOpen: false, isSubmitting: false }));
+      await fetchSalonDetail();
+    } catch (err) {
+      setTierModal(prev => ({ ...prev, isSubmitting: false, error: err.message || 'Failed to reassign subscription plan' }));
+    }
+  };
+
   const formatCurrency = (amount, currencyCode = 'INR') => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -131,6 +181,32 @@ export default function SuperAdminSalonDetailPage() {
       hour: '2-digit',
       minute: '2-digit'
     }).format(new Date(dateString));
+  };
+
+  const getTierBadge = (tier) => {
+    const t = (tier || 'Starter').toLowerCase();
+    if (t.includes('luxury')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+          Luxury Pro Tier
+        </span>
+      );
+    }
+    if (t.includes('growth')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+          <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
+          Growth Studio Tier
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-stone-100 text-stone-700 border border-stone-200">
+        <Zap className="w-3.5 h-3.5 text-stone-500" />
+        Starter Solo Tier
+      </span>
+    );
   };
 
   return (
@@ -222,6 +298,9 @@ export default function SuperAdminSalonDetailPage() {
                       {salon.businessType}
                     </span>
 
+                    {/* Phase 3 SaaS Subscription Tier Badge */}
+                    {getTierBadge(salon.subscriptionTier)}
+
                     {salon.isActive ? (
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -245,6 +324,12 @@ export default function SuperAdminSalonDetailPage() {
                         {salon.kycStatus || 'Pending KYC'}
                       </span>
                     )}
+
+                    {/* Phase 1 Rating Badge */}
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                      {salon.averageRating > 0 ? salon.averageRating.toFixed(1) : 'New'} ({salon.totalReviews} reviews)
+                    </span>
                   </div>
 
                   <h2 className="font-serif text-2xl sm:text-3xl font-medium text-deep-plum">
@@ -256,19 +341,31 @@ export default function SuperAdminSalonDetailPage() {
                 </div>
               </div>
 
-              {/* Status Action Switch */}
+              {/* Status Action Switch & Tier Reassign */}
               <div className="flex flex-col sm:items-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleStatusToggle}
-                  disabled={statusForm.isSubmitting}
-                  className={`px-5 py-2.5 rounded-xl text-xs font-semibold text-white shadow-xs transition-all flex items-center gap-2 disabled:opacity-50 ${
-                    salon.isActive ? 'bg-rose-700 hover:bg-rose-800' : 'bg-emerald-600 hover:bg-emerald-700'
-                  }`}
-                >
-                  <Power className="w-4 h-4" />
-                  <span>{statusForm.isSubmitting ? 'Updating...' : salon.isActive ? 'Suspend Salon' : 'Activate Salon'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={openTierModal}
+                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-deep-plum bg-ivory border border-border-color hover:bg-soft-blush hover:border-dusty-rose shadow-xs transition-all flex items-center gap-1.5"
+                  >
+                    <CreditCard className="w-4 h-4 text-primary-rose" />
+                    <span>Change Plan Tier</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleStatusToggle}
+                    disabled={statusForm.isSubmitting}
+                    className={`px-5 py-2.5 rounded-xl text-xs font-semibold text-white shadow-xs transition-all flex items-center gap-2 disabled:opacity-50 ${
+                      salon.isActive ? 'bg-rose-700 hover:bg-rose-800' : 'bg-emerald-600 hover:bg-emerald-700'
+                    }`}
+                  >
+                    <Power className="w-4 h-4" />
+                    <span>{statusForm.isSubmitting ? 'Updating...' : salon.isActive ? 'Suspend Salon' : 'Activate Salon'}</span>
+                  </button>
+                </div>
+
                 {statusForm.message && (
                   <span className="text-xs text-emerald-700 font-medium">{statusForm.message}</span>
                 )}
@@ -278,7 +375,7 @@ export default function SuperAdminSalonDetailPage() {
               </div>
             </div>
 
-            {/* Metrics Ribbon */}
+            {/* Core Scale Metrics Ribbon */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="bg-white rounded-2xl p-4 border border-border-color shadow-2xs">
                 <span className="text-xs font-semibold text-muted uppercase tracking-wider block mb-1">Total Staff</span>
@@ -315,10 +412,77 @@ export default function SuperAdminSalonDetailPage() {
               </div>
             </div>
 
+            {/* Cross-Phase Operational & Financial Summary Ribbon */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Phase 1: Rating */}
+              <div className="bg-white rounded-2xl p-4 border border-border-color shadow-2xs flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0">
+                  <Star className="w-5 h-5 fill-amber-400 text-amber-500" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-semibold text-muted uppercase tracking-wider block">Phase 1 • Reputation</span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-serif text-xl font-bold text-deep-plum">
+                      {salon.averageRating > 0 ? salon.averageRating.toFixed(1) : 'New'}
+                    </span>
+                    <span className="text-xs text-muted">/ 5.0 ({salon.totalReviews} reviews)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Phase 2: Client Dossiers */}
+              <div className="bg-white rounded-2xl p-4 border border-border-color shadow-2xs flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-semibold text-muted uppercase tracking-wider block">Phase 2 • Client Care</span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-serif text-xl font-bold text-deep-plum">
+                      {salon.totalConsultationCards}
+                    </span>
+                    <span className="text-xs text-muted">dossiers ({salon.totalFormulaRecords} formulas)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Phase 3: SaaS Subscription */}
+              <div className="bg-white rounded-2xl p-4 border border-border-color shadow-2xs flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-200 text-purple-600 flex items-center justify-center shrink-0">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-semibold text-muted uppercase tracking-wider block">Phase 3 • SaaS Plan</span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-serif text-lg font-bold text-deep-plum">
+                      {salon.subscriptionTier || 'Starter'}
+                    </span>
+                    <span className="text-xs text-muted">({formatCurrency(salon.subscriptionPrice)}/{salon.subscriptionBillingCycle === 'Annual' ? 'yr' : 'mo'})</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Phase 3: Escrow Holding */}
+              <div className="bg-white rounded-2xl p-4 border border-border-color shadow-2xs flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center shrink-0">
+                  <DollarSign className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-semibold text-muted uppercase tracking-wider block">Phase 3 • Escrow Balance</span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-serif text-lg font-bold text-deep-plum">
+                      {formatCurrency(salon.totalPendingEscrow)}
+                    </span>
+                    <span className="text-xs text-amber-700 font-medium">in hold</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Two-Column Detail Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
-              {/* Left Column (2 spans): Contact & Profile Information */}
+              {/* Left Column (2 spans): Details, Subscription & Dossiers */}
               <div className="lg:col-span-2 space-y-6">
                 
                 {/* Profile Information Card */}
@@ -371,6 +535,91 @@ export default function SuperAdminSalonDetailPage() {
                   </div>
                 </div>
 
+                {/* Phase 3 SaaS Subscription & Online Deposit Policy Card */}
+                <div className="bg-white rounded-3xl p-6 border border-border-color shadow-xs space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-border-color">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-5 h-5 text-purple-600" />
+                      <h3 className="font-serif text-lg font-medium text-deep-plum">
+                        SaaS Subscription & Billing Settings
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={openTierModal}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary-rose bg-soft-blush border border-dusty-rose/40 rounded-xl hover:bg-soft-blush/70 transition-colors"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Reassign Tier</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div className="p-3.5 rounded-2xl bg-ivory border border-border-color space-y-1">
+                      <span className="text-muted font-medium block">Subscription Tier</span>
+                      <div className="flex items-center gap-2">
+                        {getTierBadge(salon.subscriptionTier)}
+                        <span className="text-deep-plum font-semibold">({salon.subscriptionStatus || 'Active'})</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-ivory border border-border-color space-y-1">
+                      <span className="text-muted font-medium block">Billing Cycle & Price</span>
+                      <p className="text-deep-plum font-semibold">
+                        {formatCurrency(salon.subscriptionPrice)} / {salon.subscriptionBillingCycle || 'Monthly'}
+                      </p>
+                      {salon.subscriptionRenewsAtUtc && (
+                        <p className="text-[11px] text-muted">
+                          Renews: {formatDate(salon.subscriptionRenewsAtUtc)}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-ivory border border-border-color space-y-1">
+                      <span className="text-muted font-medium block">Advance Booking Deposit Policy</span>
+                      <p className="text-deep-plum font-semibold">
+                        {salon.isAdvancePaymentRequired 
+                          ? `${salon.advancePaymentValue}${salon.advancePaymentType === 'Percentage' ? '%' : ' INR'} Required Deposit`
+                          : 'No Advance Deposit Required (Pay at Salon)'}
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-ivory border border-border-color space-y-1">
+                      <span className="text-muted font-medium block">Vendor Bank & Tax Identity</span>
+                      <p className="text-deep-plum font-mono">
+                        GSTIN: <span className="font-semibold">{salon.gstNumber || 'Not submitted'}</span>
+                      </p>
+                      <p className="text-deep-plum font-mono">
+                        Payout UPI: <span className="font-semibold">{salon.upiId || 'Not submitted'}</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Phase 2 Clinical Consultation & Formula Records Card */}
+                <div className="bg-white rounded-3xl p-6 border border-border-color shadow-xs space-y-4">
+                  <div className="flex items-center gap-2 pb-3 border-b border-border-color">
+                    <FileText className="w-5 h-5 text-emerald-600" />
+                    <h3 className="font-serif text-lg font-medium text-deep-plum">
+                      Client Consultation Cards & Clinical Formulas
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div className="p-4 rounded-2xl bg-ivory border border-border-color space-y-1">
+                      <span className="text-muted font-medium block">Consultation Dossiers</span>
+                      <span className="font-serif text-2xl font-bold text-deep-plum">{salon.totalConsultationCards}</span>
+                      <p className="text-[11px] text-muted">Active client intake cards with skin/scalp conditions & patch tests</p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-ivory border border-border-color space-y-1">
+                      <span className="text-muted font-medium block">Technical Formulas</span>
+                      <span className="font-serif text-2xl font-bold text-deep-plum">{salon.totalFormulaRecords}</span>
+                      <p className="text-[11px] text-muted">Chemical hair color, toner & peel mixing records on file</p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Primary Administrator Account Card */}
                 <div className="bg-white rounded-3xl p-6 border border-border-color shadow-xs space-y-4">
                   <h3 className="font-serif text-lg font-medium text-deep-plum pb-3 border-b border-border-color">
@@ -393,9 +642,40 @@ export default function SuperAdminSalonDetailPage() {
 
               </div>
 
-              {/* Right Column (1 span): Compliance & KYC Review Actions */}
+              {/* Right Column (1 span): Escrow Ledger & Compliance KYC */}
               <div className="space-y-6">
                 
+                {/* Phase 3 Escrow & Settlements Overview Card */}
+                <div className="bg-white rounded-3xl p-6 border border-border-color shadow-xs space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-border-color">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-5 h-5 text-blue-600" />
+                      <h3 className="font-serif text-lg font-medium text-deep-plum">
+                        Vendor Escrow Balance
+                      </h3>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-ivory border border-border-color text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted">Pending Escrow Hold:</span>
+                      <span className="font-semibold text-deep-plum">{formatCurrency(salon.totalPendingEscrow)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted">Total Disbursed:</span>
+                      <span className="font-semibold text-emerald-700">{formatCurrency(salon.totalDisbursedEscrow)}</span>
+                    </div>
+                  </div>
+
+                  <Link
+                    to={`/superadmin/settlements?salonId=${salon.id}`}
+                    className="w-full py-2.5 bg-ivory border border-border-color hover:bg-soft-blush text-deep-plum hover:text-primary-rose text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <span>View Salon Settlements Ledger</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+
                 {/* KYC Decision Card */}
                 <div className="bg-white rounded-3xl p-6 border border-border-color shadow-xs space-y-4">
                   <div className="flex items-center gap-2 pb-3 border-b border-border-color">
@@ -496,6 +776,87 @@ export default function SuperAdminSalonDetailPage() {
 
             </div>
           </>
+        )}
+
+        {/* ========================================================================= */}
+        {/* MODAL: ASSIGN SUBSCRIPTION PLAN TIER (PHASE 3)                            */}
+        {/* ========================================================================= */}
+        {tierModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-deep-plum/50 backdrop-blur-xs">
+            <div className="bg-white rounded-3xl max-w-md w-full border border-border-color shadow-xl overflow-hidden p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-serif text-xl font-medium text-deep-plum">
+                    Reassign Subscription Tier
+                  </h3>
+                  <p className="text-xs text-muted mt-0.5">
+                    Update SaaS plan entitlements for <strong>{salon?.name}</strong>.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTierModal({ isOpen: false, tier: 'Growth', billingCycle: 'Monthly', isSubmitting: false, error: '' })}
+                  className="text-muted hover:text-deep-plum p-1 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {tierModal.error && (
+                <div className="p-3 bg-rose-50 text-rose-700 text-xs rounded-xl border border-rose-200">
+                  {tierModal.error}
+                </div>
+              )}
+
+              <form onSubmit={handleTierSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-deep-plum mb-1.5">
+                    Select Plan Tier
+                  </label>
+                  <select
+                    value={tierModal.tier}
+                    onChange={(e) => setTierModal(prev => ({ ...prev, tier: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 bg-ivory text-xs border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-rose/40 text-deep-plum font-medium"
+                  >
+                    <option value="Starter">Starter Solo (₹999/mo - 1 Staff, Core POS)</option>
+                    <option value="Growth">Growth Studio (₹2,499/mo - Up to 5 Staff, Dossiers & Formulas)</option>
+                    <option value="LuxuryPro">Luxury Pro (₹4,999/mo - Unlimited Staff, Escrow & Priority)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-deep-plum mb-1.5">
+                    Billing Cycle
+                  </label>
+                  <select
+                    value={tierModal.billingCycle}
+                    onChange={(e) => setTierModal(prev => ({ ...prev, billingCycle: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 bg-ivory text-xs border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-rose/40 text-deep-plum font-medium"
+                  >
+                    <option value="Monthly">Monthly Cycle</option>
+                    <option value="Annual">Annual Cycle (20% Savings)</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setTierModal({ isOpen: false, tier: 'Growth', billingCycle: 'Monthly', isSubmitting: false, error: '' })}
+                    className="px-4 py-2 border border-border-color text-muted hover:text-deep-plum text-xs font-semibold rounded-xl hover:bg-ivory transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={tierModal.isSubmitting}
+                    className="px-4 py-2 bg-primary-rose text-white text-xs font-semibold rounded-xl hover:bg-primary-rose/90 shadow-2xs transition-all disabled:opacity-50"
+                  >
+                    {tierModal.isSubmitting ? 'Updating...' : 'Save Plan Tier'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
 
       </div>

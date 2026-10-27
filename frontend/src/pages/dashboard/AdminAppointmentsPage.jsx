@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { appointmentService } from '../../services/appointmentService';
 import { paymentService } from '../../services/paymentService';
+import InvoiceModal from '../../components/common/InvoiceModal';
 import { 
   Calendar, Clock, User, CheckCircle, XCircle, AlertCircle, RefreshCw, 
-  Scissors, CreditCard, CheckCircle2, Search, ExternalLink, X, ShieldCheck, DollarSign
+  Scissors, CreditCard, CheckCircle2, Search, ExternalLink, X, ShieldCheck, DollarSign,
+  FileText
 } from 'lucide-react';
 
 export default function AdminAppointmentsPage() {
@@ -19,6 +21,7 @@ export default function AdminAppointmentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [updatingId, setUpdatingId] = useState(null);
+  const [activeInvoiceAptId, setActiveInvoiceAptId] = useState(null);
 
   // Verification Modal State
   const [verifyingApt, setVerifyingApt] = useState(null);
@@ -348,6 +351,19 @@ export default function AdminAppointmentsPage() {
                         {/* Actions */}
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {/* View / Print Digital GST Tax Invoice */}
+                            {(apt.amountPaid > 0 || apt.paymentStatus === 'Paid' || apt.paymentStatus === 'PartiallyPaid' || apt.status === 'Completed') && (
+                              <button
+                                type="button"
+                                onClick={() => setActiveInvoiceAptId(apt.id)}
+                                className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-border-color bg-soft-blush/50 text-deep-plum hover:bg-soft-blush transition-colors flex items-center gap-1"
+                                title="Digital GST Tax Invoice & Receipt"
+                              >
+                                <FileText className="w-3.5 h-3.5 text-primary-rose" />
+                                <span className="hidden sm:inline">Invoice</span>
+                              </button>
+                            )}
+
                             {/* Verify Payment Button */}
                             <button
                               onClick={() => openVerifyModal(apt)}
@@ -546,6 +562,14 @@ export default function AdminAppointmentsPage() {
 
             </div>
           </div>
+        )}
+
+        {/* Digital GST Tax Invoice & Receipt Modal */}
+        {activeInvoiceAptId && (
+          <InvoiceModal 
+            appointmentId={activeInvoiceAptId} 
+            onClose={() => setActiveInvoiceAptId(null)} 
+          />
         )}
 
       </div>

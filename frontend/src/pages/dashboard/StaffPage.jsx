@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { staffService } from '../../services/staffService';
+import TierUpgradePromptModal from '../../components/common/TierUpgradePromptModal';
 import { Plus, Edit2, Trash2, Calendar as CalendarIcon, AlertCircle, Search } from 'lucide-react';
 
 export default function StaffPage() {
@@ -15,6 +16,7 @@ export default function StaffPage() {
   const [currentStaff, setCurrentStaff] = useState(null);
   const [formData, setFormData] = useState({ fullName: '', email: '', phoneNumber: '', title: '', isActive: true });
   const [saving, setSaving] = useState(false);
+  const [upgradePrompt, setUpgradePrompt] = useState(null);
 
   useEffect(() => {
     fetchStaff();
@@ -71,7 +73,11 @@ export default function StaffPage() {
       await fetchStaff();
       handleCloseModal();
     } catch (err) {
-      setError(err.message || 'Failed to save staff member');
+      if (err.message && (err.message.includes('plan allows') || err.message.includes('upgrade your salon subscription'))) {
+        setUpgradePrompt(err.message);
+      } else {
+        setError(err.message || 'Failed to save staff member');
+      }
     } finally {
       setSaving(false);
     }
@@ -287,6 +293,14 @@ export default function StaffPage() {
           </div>
         </div>
       )}
+
+      {/* Tier Quota Upgrade Modal */}
+      <TierUpgradePromptModal
+        isOpen={!!upgradePrompt}
+        onClose={() => setUpgradePrompt(null)}
+        title="Specialist Quota Reached"
+        message={upgradePrompt}
+      />
     </DashboardLayout>
   );
 }
