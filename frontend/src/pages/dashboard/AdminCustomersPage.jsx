@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import ClientDossierDrawer from '../../components/dossier/ClientDossierDrawer';
 import { customerService } from '../../services/customerService';
 import { 
   Users, Search, UserPlus, Mail, Calendar, CheckCircle2, XCircle, 
-  AlertCircle, RefreshCw, Eye, EyeOff, X, ChevronLeft, ChevronRight, ShieldCheck, Info
+  AlertCircle, RefreshCw, Eye, EyeOff, X, ChevronLeft, ChevronRight, ShieldCheck, Info, FileText
 } from 'lucide-react';
 
 export default function AdminCustomersPage() {
@@ -14,6 +15,10 @@ export default function AdminCustomersPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Client Consultation Dossier Drawer State
+  const [dossierCustomerId, setDossierCustomerId] = useState(null);
+  const [dossierOpen, setDossierOpen] = useState(false);
 
   // Add Customer Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -250,12 +255,22 @@ export default function AdminCustomersPage() {
 
                       {/* Actions */}
                       <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => setViewCustomer(c)}
-                          className="px-3 py-1.5 text-xs font-semibold text-primary-rose hover:bg-rose-tint rounded-lg transition-colors"
-                        >
-                          View Details
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => { setDossierCustomerId(c.id); setDossierOpen(true); }}
+                            className="px-2.5 py-1.5 text-xs font-semibold bg-rose-tint text-primary-rose hover:bg-primary-rose hover:text-white rounded-lg transition-colors inline-flex items-center gap-1"
+                            title="Open Consultation Dossier"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            Dossier
+                          </button>
+                          <button
+                            onClick={() => setViewCustomer(c)}
+                            className="px-2.5 py-1.5 text-xs font-semibold text-muted hover:text-deep-plum hover:bg-gray-100 rounded-lg transition-colors"
+                          >
+                            Details
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -471,6 +486,13 @@ export default function AdminCustomersPage() {
             </div>
           </div>
         )}
+
+        {/* Client Consultation Dossier Drawer */}
+        <ClientDossierDrawer
+          customerId={dossierCustomerId}
+          isOpen={dossierOpen}
+          onClose={() => setDossierOpen(false)}
+        />
 
       </div>
     </DashboardLayout>

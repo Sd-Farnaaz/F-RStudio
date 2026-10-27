@@ -274,18 +274,125 @@ public class AdminAppointmentsController : ControllerBase
             .Select(a => new AppointmentCalendarItemResponse
             {
                 Id = a.Id,
+                CustomerId = a.CustomerId,
+                CustomerName = a.Customer.FullName,
+                CustomerEmail = a.Customer.Email,
+                CustomerPhone = null,
                 StaffId = a.StaffId,
                 StaffName = a.Staff.FullName,
-                CustomerName = a.Customer.FullName,
+                StaffTitle = a.Staff.Title,
+                ServiceId = a.ServiceId,
                 ServiceName = a.ServiceNameAtBooking,
+                DurationMinutes = a.DurationMinutesAtBooking,
                 Price = a.PriceAtBooking,
                 StartAtUtc = a.StartAtUtc,
                 EndAtUtc = a.EndAtUtc,
-                Status = a.Status
+                Status = a.Status,
+                PaymentStatus = a.PaymentStatus,
+                AmountPaid = a.AmountPaid
             })
             .ToListAsync(cancellationToken);
 
         return Ok(calendarItems);
+    }
+
+    /// <summary>
+    /// Drag-and-drop reschedule an appointment to a new time slot and/or reassign to a new staff member.
+    /// </summary>
+    [HttpPatch("{id:int}/reschedule")]
+    [ProducesResponseType(typeof(AppointmentResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RescheduleAppointment(
+        int id,
+        [FromBody] RescheduleAppointmentRequest request,
+        CancellationToken cancellationToken)
+    {
+        var salonId = _currentUserService.SalonId;
+        if (!salonId.HasValue)
+        {
+            return Forbid();
+        }
+
+        var appointment = await _dbContext.Appointments
+            .Include(a => a.Salon)
+            .Include(a => a.Customer)
+            .Include(a => a.Staff)
+            .Include(a => a.Service)
+            .FirstOrDefaultAsync(a => a.Id == id && a.SalonId == salonId.Value, cancellationToken);
+
+        if (appointment == null)
+        {
+            return NotFound(new { message = "Appointment not found in your salon." });
+        }
+
+        if (appointment.Status == AppointmentStatuses.Cancelled)
+        {
+            return BadRequest(new { message = "Cannot reschedule a cancelled appointment." });
+        }
+
+        var targetStaffId = request.NewStaffId ?? appointment.StaffId;
+
+        // Validate target staff belongs to this salon and is active
+        if (targetStaffId != appointment.StaffId)
+        {
+            var staffExists = await _dbContext.Staff
+                .AnyAsync(s => s.Id == targetStaffId && s.SalonId == salonId.Value && s.IsActive, cancellationToken);
+            if (!staffExists)
+            {
+                return BadRequest(new { message = "The selected staff member was not found or is inactive in this salon." });
+            }
+            appointment.StaffId = targetStaffId;
+        }
+
+        var duration = TimeSpan.FromMinutes(appointment.DurationMinutesAtBooking);
+        var newStartUtc = request.NewStartAtUtc;
+        var newEndUtc = newStartUtc.Add(duration);
+
+        // Check for overlapping non-cancelled appointment on target staff schedule
+        var hasConflict = await _dbContext.Appointments
+            .AnyAsync(a => a.SalonId == salonId.Value &&
+                           a.StaffId == targetStaffId &&
+                           a.Id != appointment.Id &&
+                           a.Status != AppointmentStatuses.Cancelled &&
+                           a.StartAtUtc < newEndUtc &&
+                           newStartUtc < a.EndAtUtc, cancellationToken);
+
+        if (hasConflict)
+        {
+            return Conflict(new { message = "The selected staff member already has an appointment during this time slot." });
+        }
+
+        var oldStart = appointment.StartAtUtc;
+        appointment.StartAtUtc = newStartUtc;
+        appointment.EndAtUtc = newEndUtc;
+        appointment.UpdatedAtUtc = DateTime.UtcNow;
+
+        if (!string.IsNullOrWhiteSpace(request.Reason))
+        {
+            appointment.CustomerNotes = string.IsNullOrWhiteSpace(appointment.CustomerNotes)
+                ? $"[Rescheduled: {request.Reason.Trim()}]"
+                : $"{appointment.CustomerNotes} [Rescheduled: {request.Reason.Trim()}]";
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Appointment ID {AppointmentId} rescheduled from {OldStart} to {NewStart} (StaffId: {StaffId}) by Admin {Email}.",
+            appointment.Id, oldStart, newStartUtc, targetStaffId, _currentUserService.Email);
+
+        try
+        {
+            await _notificationService.DispatchAppointmentEventAsync(appointment, "AppointmentRescheduled", cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to dispatch notification for rescheduled appointment {AppointmentId}.", appointment.Id);
+        }
+
+        return Ok(MapToResponse(appointment));
     }
 
     /// <summary>
