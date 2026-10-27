@@ -5,6 +5,7 @@ export const staffService = {
     const query = new URLSearchParams(params).toString();
     return fetchApi(`/api/admin/staff${query ? `?${query}` : ''}`, { method: 'GET' });
   },
+  getStaff: (params) => staffService.getStaffList(params),
   
   getStaffById: (id) => fetchApi(`/api/admin/staff/${id}`, { method: 'GET' }),
   

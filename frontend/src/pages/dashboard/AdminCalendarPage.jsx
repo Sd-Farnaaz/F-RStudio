@@ -47,7 +47,7 @@ export default function AdminCalendarPage() {
 
   const loadStaff = async () => {
     try {
-      const res = await staffService.getStaff();
+      const res = await staffService.getStaffList();
       const list = res.items || res || [];
       setStaffList(list.filter(s => s.isActive));
     } catch (err) {

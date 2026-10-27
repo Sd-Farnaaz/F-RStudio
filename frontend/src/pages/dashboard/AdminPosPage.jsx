@@ -51,7 +51,7 @@ export default function AdminPosPage() {
       setLoading(true);
       const [servicesRes, staffRes] = await Promise.all([
         adminService.getServices(),
-        staffService.getStaff()
+        staffService.getStaffList()
       ]);
 
       const activeServices = (servicesRes.items || servicesRes || []).filter(s => s.isActive);
