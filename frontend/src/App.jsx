@@ -41,6 +41,7 @@ import AdminCalendarPage from './pages/dashboard/AdminCalendarPage';
 import AdminPosPage from './pages/dashboard/AdminPosPage';
 import AdminCustomersPage from './pages/dashboard/AdminCustomersPage';
 import AdminReviewsPage from './pages/dashboard/AdminReviewsPage';
+import AdminAutomationPage from './pages/dashboard/AdminAutomationPage';
 import AdminBillingPage from './pages/dashboard/AdminBillingPage';
 import AdminPayoutsPage from './pages/dashboard/AdminPayoutsPage';
 
@@ -129,6 +130,7 @@ function App() {
           <Route path="/admin/staff/:id/schedule" element={<ProtectedRoute allowedRoles={['Admin']}><StaffSchedulePage /></ProtectedRoute>} />
           <Route path="/admin/customers" element={<ProtectedRoute allowedRoles={['Admin']}><AdminCustomersPage /></ProtectedRoute>} />
           <Route path="/admin/reviews" element={<ProtectedRoute allowedRoles={['Admin']}><AdminReviewsPage /></ProtectedRoute>} />
+          <Route path="/admin/automation" element={<ProtectedRoute allowedRoles={['Admin']}><AdminAutomationPage /></ProtectedRoute>} />
           <Route path="/admin/billing" element={<ProtectedRoute allowedRoles={['Admin']}><AdminBillingPage /></ProtectedRoute>} />
           <Route path="/admin/payouts" element={<ProtectedRoute allowedRoles={['Admin']}><AdminPayoutsPage /></ProtectedRoute>} />
           <Route path="/admin/settings/salon" element={<ProtectedRoute allowedRoles={['Admin']}><SalonProfilePage /></ProtectedRoute>} />

@@ -88,6 +88,21 @@ public class BookingService : IBookingService
         var localEnd = localStart.AddMinutes(totalDurationMinutes);
         var dayOfWeek = localStart.DayOfWeek;
 
+        // Check active Off-Peak Dynamic Discount rules
+        var activeOffPeakRule = await _dbContext.SalonOffPeakRules
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.SalonId == salon.Id && r.IsActive &&
+                                      r.DaysOfWeek.Contains(dayOfWeek.ToString()), cancellationToken);
+
+        if (activeOffPeakRule != null &&
+            TimeSpan.TryParse(activeOffPeakRule.StartTime, out var rStart) &&
+            TimeSpan.TryParse(activeOffPeakRule.EndTime, out var rEnd) &&
+            localStart.TimeOfDay >= rStart && localStart.TimeOfDay < rEnd)
+        {
+            var discount = Math.Round(totalPrice * (activeOffPeakRule.DiscountPercentage / 100m), 2);
+            totalPrice = Math.Max(0m, totalPrice - discount);
+        }
+
         // 4. Resolve Staff member
         int resolvedStaffId;
         if (request.StaffId.HasValue)

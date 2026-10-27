@@ -59,6 +59,7 @@ builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
+builder.Services.AddScoped<IAiStylistService, AiStylistService>();
 builder.Services.AddHostedService<AppointmentReminderWorker>();
 
 // 5. Authentication with JWT Bearer

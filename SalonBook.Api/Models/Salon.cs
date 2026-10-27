@@ -94,4 +94,6 @@ public class Salon
     public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 
     public ICollection<Review> Reviews { get; set; } = new List<Review>();
+
+    public ICollection<SalonOffPeakRule> OffPeakRules { get; set; } = new List<SalonOffPeakRule>();
 }

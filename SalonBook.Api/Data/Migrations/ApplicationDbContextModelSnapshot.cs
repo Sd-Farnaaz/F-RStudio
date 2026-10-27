@@ -797,6 +797,64 @@ namespace SalonBook.Api.Data.Migrations
                     b.ToTable("Salons", (string)null);
                 });
 
+            modelBuilder.Entity("SalonBook.Api.Models.SalonOffPeakRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<string>("DaysOfWeek")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<decimal>("DiscountPercentage")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("EndTime")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("SalonId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StartTime")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalonId")
+                        .HasDatabaseName("IX_SalonOffPeakRules_SalonId");
+
+                    b.HasIndex("SalonId", "IsActive")
+                        .HasDatabaseName("IX_SalonOffPeakRules_SalonId_IsActive");
+
+                    b.ToTable("SalonOffPeakRules", (string)null);
+                });
+
             modelBuilder.Entity("SalonBook.Api.Models.Service", b =>
                 {
                     b.Property<int>("Id")
@@ -1375,6 +1433,17 @@ namespace SalonBook.Api.Data.Migrations
                     b.Navigation("Staff");
                 });
 
+            modelBuilder.Entity("SalonBook.Api.Models.SalonOffPeakRule", b =>
+                {
+                    b.HasOne("SalonBook.Api.Models.Salon", "Salon")
+                        .WithMany("OffPeakRules")
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Salon");
+                });
+
             modelBuilder.Entity("SalonBook.Api.Models.Service", b =>
                 {
                     b.HasOne("SalonBook.Api.Models.Salon", "Salon")
@@ -1474,6 +1543,8 @@ namespace SalonBook.Api.Data.Migrations
                     b.Navigation("ComplianceLogs");
 
                     b.Navigation("Notifications");
+
+                    b.Navigation("OffPeakRules");
 
                     b.Navigation("Payouts");
 

@@ -394,20 +394,40 @@ export default function SalonsListPage() {
 
                     {/* Page Numbers Indicator */}
                     <div className="hidden sm:flex items-center gap-1 px-2">
-                      {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(p => (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => setCurrentPage(p)}
-                          className={`w-8 h-8 rounded-xl text-xs font-medium transition-colors ${
-                            p === pagination.page
-                              ? 'bg-deep-plum text-white shadow-2xs'
-                              : 'bg-white text-muted hover:text-deep-plum border border-border-color hover:border-dusty-rose'
-                          }`}
-                        >
-                          {p}
-                        </button>
-                      ))}
+                      {(() => {
+                        const total = pagination.totalPages;
+                        const current = pagination.page;
+                        let pages = [];
+                        if (total <= 7) {
+                          pages = Array.from({ length: total }, (_, i) => i + 1);
+                        } else if (current <= 4) {
+                          pages = [1, 2, 3, 4, 5, '...', total];
+                        } else if (current >= total - 3) {
+                          pages = [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+                        } else {
+                          pages = [1, '...', current - 1, current, current + 1, '...', total];
+                        }
+
+                        return pages.map((p, idx) => {
+                          if (p === '...') {
+                            return <span key={`ellipsis-${idx}`} className="w-8 text-center text-xs text-muted">...</span>;
+                          }
+                          return (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => setCurrentPage(p)}
+                              className={`w-8 h-8 rounded-xl text-xs font-medium transition-colors ${
+                                p === current
+                                  ? 'bg-deep-plum text-white shadow-2xs'
+                                  : 'bg-white text-muted hover:text-deep-plum border border-border-color hover:border-dusty-rose'
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          );
+                        });
+                      })()}
                     </div>
 
                     <button
