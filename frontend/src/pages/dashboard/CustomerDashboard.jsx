@@ -6,6 +6,8 @@ import { appointmentService } from '../../services/appointmentService';
 import { paymentService } from '../../services/paymentService';
 import { publicService } from '../../services/publicService';
 import { reviewService } from '../../services/reviewService';
+import { customerDossierService } from '../../services/customerDossierService';
+import AiStylistModal from '../../components/ai/AiStylistModal';
 import InvoiceModal from '../../components/common/InvoiceModal';
 import { 
   Calendar, MapPin, Clock, Scissors, User, XCircle, AlertCircle, 
@@ -13,7 +15,7 @@ import {
   X, Compass, Sparkles, ChevronRight, Search, ShieldCheck, DollarSign, 
   Phone, Mail, Info, FileText, ArrowRight, Store, Star, MessageSquare,
   Camera, CornerDownRight, Image as ImageIcon, Send, ThumbsUp,
-  Smartphone, Building2, Zap
+  Smartphone, Building2, Zap, Palette
 } from 'lucide-react';
 
 export default function CustomerDashboard() {
@@ -64,6 +66,32 @@ export default function CustomerDashboard() {
   // Appointment Details Modal State
   const [activeDetailsApt, setActiveDetailsApt] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+
+  // Beauty Dossier & Care Reminders State (Phase 2 & Phase 4)
+  const [dossier, setDossier] = useState(null);
+  const [dossierLoading, setDossierLoading] = useState(false);
+  const [dossierError, setDossierError] = useState('');
+  const [dossierSuccess, setDossierSuccess] = useState('');
+  const [isEditingDossier, setIsEditingDossier] = useState(false);
+  const [savingDossier, setSavingDossier] = useState(false);
+  const [careReminders, setCareReminders] = useState([]);
+  const [dossierForm, setDossierForm] = useState({
+    allergies: '',
+    skinOrHairNotes: '',
+    emergencyContactName: '',
+    emergencyContactPhone: ''
+  });
+
+  // AI Stylist Assistant Modal & Saved Recommendations (Phase 4)
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [savedAiConsultation, setSavedAiConsultation] = useState(() => {
+    try {
+      const stored = localStorage.getItem('salonbook_ai_style_profile');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
 
   // Verified Reviews Modal State
   const [reviewingApt, setReviewingApt] = useState(null);
@@ -171,7 +199,60 @@ export default function CustomerDashboard() {
     if (activeTab === 'salons' || activeTab === 'overview') {
       fetchSalons();
     }
+    if (activeTab === 'dossier' || activeTab === 'overview') {
+      fetchDossier();
+    }
   }, [activeTab]);
+
+  const fetchDossier = async () => {
+    try {
+      setDossierLoading(true);
+      setDossierError('');
+      const data = await customerDossierService.getDossier();
+      setDossier(data);
+      setDossierForm({
+        allergies: data.allergies || '',
+        skinOrHairNotes: data.skinOrHairNotes || '',
+        emergencyContactName: data.emergencyContactName || '',
+        emergencyContactPhone: data.emergencyContactPhone || ''
+      });
+      if (data.careReminders) {
+        setCareReminders(data.careReminders);
+      }
+    } catch (err) {
+      console.warn('Failed to load customer dossier:', err);
+      setDossierError(err.message || 'Failed to load beauty dossier');
+    } finally {
+      setDossierLoading(false);
+    }
+  };
+
+  const handleSaveDossier = async (e) => {
+    e.preventDefault();
+    try {
+      setSavingDossier(true);
+      setDossierError('');
+      setDossierSuccess('');
+      const updated = await customerDossierService.updateDossier(dossierForm);
+      setDossier(updated);
+      setDossierSuccess('Beauty dossier & health preferences updated across all salons!');
+      setIsEditingDossier(false);
+      setTimeout(() => setDossierSuccess(''), 4000);
+    } catch (err) {
+      setDossierError(err.message || 'Failed to update beauty dossier.');
+    } finally {
+      setSavingDossier(false);
+    }
+  };
+
+  const handleAiConsultationSuccess = (recommendation) => {
+    setSavedAiConsultation(recommendation);
+    try {
+      localStorage.setItem('salonbook_ai_style_profile', JSON.stringify(recommendation));
+    } catch (e) {
+      console.warn('Failed to persist AI recommendation to localStorage', e);
+    }
+  };
 
   const fetchAppointments = async () => {
     try {
@@ -543,6 +624,35 @@ export default function CustomerDashboard() {
 
           <button
             type="button"
+            onClick={() => handleTabChange('dossier')}
+            className={`pb-3.5 px-1 text-sm font-medium border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'dossier'
+                ? 'border-primary-rose text-primary-rose font-semibold'
+                : 'border-transparent text-muted hover:text-deep-plum'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" /> Beauty Dossier
+            {dossier?.allergies && (
+              <span className="ml-1 px-1.5 py-0.5 text-[9px] bg-amber-100 text-amber-800 font-bold rounded-md uppercase">
+                Allergies
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabChange('ai-stylist')}
+            className={`pb-3.5 px-1 text-sm font-medium border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'ai-stylist'
+                ? 'border-primary-rose text-primary-rose font-semibold'
+                : 'border-transparent text-muted hover:text-deep-plum'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-primary-rose" /> AI Stylist
+          </button>
+
+          <button
+            type="button"
             onClick={() => handleTabChange('payments')}
             className={`pb-3.5 px-1 text-sm font-medium border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'payments'
@@ -550,7 +660,7 @@ export default function CustomerDashboard() {
                 : 'border-transparent text-muted hover:text-deep-plum'
             }`}
           >
-            <CreditCard className="w-4 h-4" /> Payments & Advance
+            <CreditCard className="w-4 h-4" /> Payments & Escrow
           </button>
 
           <button
@@ -655,7 +765,7 @@ export default function CustomerDashboard() {
                 </div>
                 <div className="mt-4">
                   <span className="text-2xl font-serif font-bold text-deep-plum">
-                    {loading ? '—' : `$${totalPaidSum.toFixed(2)}`}
+                    {loading ? '—' : `₹${totalPaidSum.toFixed(2)}`}
                   </span>
                   <p className="text-[11px] text-muted mt-1 flex items-center">
                     <span>Verified transfers</span> <ChevronRight className="w-3 h-3 ml-0.5" />
@@ -711,20 +821,25 @@ export default function CustomerDashboard() {
                       </span>
                       <span className="flex items-center">
                         <User className="w-4 h-4 mr-1.5 text-primary-rose/70" />
-                        Stylist: {nextVisit.staffName}
+                        Specialist: {nextVisit.staffName} {nextVisit.staffTitle ? `(${nextVisit.staffTitle})` : ''}
                       </span>
                       <span className="flex items-center font-medium text-deep-plum">
-                        Total: ${nextVisit.price.toFixed(2)}
+                        Total: ₹{nextVisit.price.toFixed(2)}
                       </span>
                     </div>
 
                     {/* Payment Status Bar */}
-                    <div className="flex items-center gap-3 pt-1">
+                    <div className="flex flex-wrap items-center gap-3 pt-1">
                       <span className="text-xs text-muted">Payment:</span>
                       {getPaymentBadge(nextVisit.paymentStatus)}
                       {nextVisit.advanceAmountRequired > 0 && (
                         <span className="text-xs text-amber-800 font-medium">
-                          (Advance Required: ${nextVisit.advanceAmountRequired.toFixed(2)})
+                          (Advance Required: ₹{nextVisit.advanceAmountRequired.toFixed(2)})
+                        </span>
+                      )}
+                      {nextVisit.amountPaid > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Escrow Protected (₹{nextVisit.amountPaid.toFixed(2)})
                         </span>
                       )}
                     </div>
@@ -852,6 +967,132 @@ export default function CustomerDashboard() {
                 )}
               </div>
             </div>
+
+            {/* Phase 4: Routine Care & Retention Reminders */}
+            {careReminders && careReminders.length > 0 && (
+              <div className="bg-white rounded-3xl border border-border-color shadow-sm p-6 sm:p-7 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border-color">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-soft-blush flex items-center justify-center text-primary-rose">
+                      <Zap className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-serif font-semibold text-deep-plum text-base">
+                        Personalized Care & Maintenance Cadence
+                      </h4>
+                      <p className="text-xs text-muted">
+                        Smart retention recommendations based on your service history & renewal cycles
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleTabChange('dossier')}
+                    className="text-xs font-semibold text-primary-rose hover:underline self-start sm:self-auto cursor-pointer"
+                  >
+                    View Beauty Dossier →
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {careReminders.map((rem, idx) => (
+                    <div
+                      key={idx}
+                      className="p-4 rounded-2xl bg-ivory/60 border border-border-color flex flex-col justify-between gap-3 hover:border-primary-rose/40 transition-colors"
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            rem.dueStatus === 'Overdue' 
+                              ? 'bg-rose-100 text-rose-800 border border-rose-200' 
+                              : rem.dueStatus === 'Due Soon'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          }`}>
+                            {rem.dueStatus}
+                          </span>
+                          {rem.activeOffPeakDiscount && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 flex items-center gap-1">
+                              <Zap className="w-2.5 h-2.5" />
+                              {rem.activeOffPeakDiscount}% Off-Peak Deal
+                            </span>
+                          )}
+                        </div>
+
+                        <h5 className="font-serif font-semibold text-deep-plum text-sm pt-0.5">
+                          {rem.reminderType}
+                        </h5>
+                        <p className="text-xs text-muted leading-relaxed">
+                          {rem.recommendationMessage}
+                        </p>
+                      </div>
+
+                      <div className="pt-2 border-t border-border-color/60 flex items-center justify-between text-xs">
+                        <span className="text-muted font-medium">at {rem.salonName}</span>
+                        <Link
+                          to={`/salons/${rem.salonSlug}`}
+                          className="px-3.5 py-1.5 bg-primary-rose text-white text-[11px] font-semibold rounded-lg hover:bg-primary-rose/90 transition-all shadow-xs flex items-center gap-1"
+                        >
+                          Book Refresh →
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* AI Stylist Assistant Banner & Escrow Guarantee (Phase 1, 3, 4) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* AI Beauty Stylist Spotlight */}
+              <div className="bg-gradient-to-br from-soft-blush/60 via-white to-rose-tint/30 rounded-3xl border border-dusty-rose/30 p-6 flex flex-col justify-between space-y-4">
+                <div className="space-y-2">
+                  <div className="w-10 h-10 rounded-xl bg-white shadow-2xs flex items-center justify-center text-primary-rose">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <h4 className="font-serif font-bold text-deep-plum text-lg">
+                    AI Virtual Beauty Stylist
+                  </h4>
+                  <p className="text-xs text-muted leading-relaxed">
+                    Unsure which haircut, balayage tone, or spa treatment matches your facial structure? Receive intelligent consultation in 30 seconds.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAiModal(true)}
+                    className="px-4 py-2 bg-primary-rose text-white text-xs font-semibold rounded-xl hover:bg-primary-rose/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> Launch Consultation
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange('ai-stylist')}
+                    className="text-xs font-semibold text-deep-plum hover:text-primary-rose transition-colors cursor-pointer"
+                  >
+                    View Saved Advice →
+                  </button>
+                </div>
+              </div>
+
+              {/* Escrow Trust & Client Safety Guarantee */}
+              <div className="bg-gradient-to-br from-emerald-50/50 via-white to-emerald-50/20 rounded-3xl border border-emerald-200/60 p-6 flex flex-col justify-between space-y-4">
+                <div className="space-y-2">
+                  <div className="w-10 h-10 rounded-xl bg-white shadow-2xs flex items-center justify-center text-emerald-600">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <h4 className="font-serif font-bold text-deep-plum text-lg">
+                    100% Escrow Protection Guarantee
+                  </h4>
+                  <p className="text-xs text-muted leading-relaxed">
+                    Your advance booking deposit is securely escrowed. Salon owners receive funds only after treatment completion. Free full cancellation within policy window.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 pt-2 text-xs text-emerald-800 font-semibold">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Escrow-Backed • Zero Risk Reservation</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -933,15 +1174,23 @@ export default function CustomerDashboard() {
                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
                               <span className="flex items-center"><Clock className="w-4 h-4 mr-1 text-primary-rose/70" /> {new Date(apt.startAtUtc).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'})}</span>
                               <span className="flex items-center"><Scissors className="w-4 h-4 mr-1 text-primary-rose/70" /> {apt.serviceName} ({apt.durationMinutes} min)</span>
-                              <span className="flex items-center"><User className="w-4 h-4 mr-1 text-primary-rose/70" /> {apt.staffName}</span>
+                              <span className="flex items-center">
+                                <User className="w-4 h-4 mr-1 text-primary-rose/70" />
+                                Specialist: {apt.staffName} {apt.staffTitle ? `(${apt.staffTitle})` : ''}
+                              </span>
                             </div>
 
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted pt-1">
-                              <span>Total: <strong className="text-deep-plum">${apt.price.toFixed(2)}</strong></span>
+                              <span>Total: <strong className="text-deep-plum">₹{apt.price.toFixed(2)}</strong></span>
                               {apt.advanceAmountRequired > 0 && (
-                                <span>Advance Req: <strong className="text-amber-800">${apt.advanceAmountRequired.toFixed(2)}</strong></span>
+                                <span>Advance Req: <strong className="text-amber-800">₹{apt.advanceAmountRequired.toFixed(2)}</strong></span>
                               )}
-                              <span>Paid: <strong className="text-emerald-700">${(apt.amountPaid || 0).toFixed(2)}</strong></span>
+                              <span>Paid: <strong className="text-emerald-700">₹{(apt.amountPaid || 0).toFixed(2)}</strong></span>
+                              {apt.amountPaid > 0 && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold text-[10px]">
+                                  <ShieldCheck className="w-3 h-3 text-emerald-600" /> Escrow Protected
+                                </span>
+                              )}
                               {apt.paymentTransactionReference && (
                                 <span className="font-mono bg-ivory px-1.5 py-0.5 rounded border border-border-color">UTR: {apt.paymentTransactionReference}</span>
                               )}
@@ -958,7 +1207,7 @@ export default function CustomerDashboard() {
                           {canPay && (
                             <button
                               onClick={() => openPaymentModal(apt)}
-                              className="px-4 py-2 bg-primary-rose text-white text-xs font-semibold rounded-lg hover:bg-primary-rose/90 transition-all shadow-sm flex items-center gap-1.5"
+                              className="px-4 py-2 bg-primary-rose text-white text-xs font-semibold rounded-lg hover:bg-primary-rose/90 transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
                             >
                               <CreditCard className="w-3.5 h-3.5" /> Pay Advance
                             </button>
@@ -987,11 +1236,20 @@ export default function CustomerDashboard() {
                             )
                           )}
 
+                          {apt.status === 'Completed' && (
+                            <Link
+                              to={`/salons/${apt.salonSlug}`}
+                              className="px-3 py-2 bg-soft-blush hover:bg-soft-blush/80 text-deep-plum border border-border-color rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5 text-primary-rose" /> Rebook
+                            </Link>
+                          )}
+
                           {(apt.amountPaid > 0 || apt.paymentStatus === 'Paid' || apt.paymentStatus === 'PartiallyPaid' || apt.status === 'Completed') && (
                             <button
                               type="button"
                               onClick={() => setActiveInvoiceAptId(apt.id)}
-                              className="px-3 py-2 bg-soft-blush border border-border-color text-deep-plum text-xs font-medium rounded-lg hover:bg-soft-blush/80 transition-colors flex items-center gap-1"
+                              className="px-3 py-2 bg-soft-blush border border-border-color text-deep-plum text-xs font-medium rounded-lg hover:bg-soft-blush/80 transition-colors flex items-center gap-1 cursor-pointer"
                               title="Digital GST Tax Invoice & Receipt"
                             >
                               <FileText className="w-3.5 h-3.5 text-primary-rose" /> Invoice
@@ -1000,7 +1258,7 @@ export default function CustomerDashboard() {
 
                           <button
                             onClick={() => openDetailsModal(apt)}
-                            className="px-3.5 py-2 bg-white border border-border-color text-deep-plum text-xs font-medium rounded-lg hover:bg-ivory transition-colors"
+                            className="px-3.5 py-2 bg-white border border-border-color text-deep-plum text-xs font-medium rounded-lg hover:bg-ivory transition-colors cursor-pointer"
                           >
                             Details
                           </button>
@@ -1008,7 +1266,7 @@ export default function CustomerDashboard() {
                           {!isTerminalStatus(apt.status) && (
                             <button
                               onClick={() => openCancelModal(apt)}
-                              className="px-3.5 py-2 border border-border-color text-danger text-xs font-medium rounded-lg hover:bg-red-50 transition-colors"
+                              className="px-3.5 py-2 border border-border-color text-danger text-xs font-medium rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
                             >
                               Cancel
                             </button>
@@ -1023,16 +1281,16 @@ export default function CustomerDashboard() {
           </div>
         )}
 
-        {/* ----------------- TAB 3: PAYMENTS & ADVANCE ----------------- */}
+        {/* ----------------- TAB 3: PAYMENTS & ESCROW ----------------- */}
         {activeTab === 'payments' && (
           <div className="space-y-6 animate-in fade-in">
-            {/* Advance Deposit Explanation Banner */}
-            <div className="p-5 bg-ivory/60 rounded-2xl border border-border-color flex items-start gap-3">
-              <Info className="w-5 h-5 text-primary-rose shrink-0 mt-0.5" />
+            {/* Advance Deposit & Escrow Trust Banner */}
+            <div className="p-5 bg-gradient-to-r from-emerald-50/70 via-white to-soft-blush/40 rounded-2xl border border-emerald-200/60 flex items-start gap-3.5 shadow-2xs">
+              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
               <div className="space-y-1 text-xs text-muted leading-relaxed">
-                <span className="font-semibold text-deep-plum text-sm block">How Advance Deposits Work</span>
+                <span className="font-semibold text-deep-plum text-sm block">100% Platform Escrow Protected Deposits</span>
                 <p>
-                  Salons may require an advance deposit to secure your appointment slot. You can transfer funds directly to the salon's verified UPI ID or scan their QR code, then submit your 12-digit UTR transaction reference number. Salon staff will verify the payment before your treatment.
+                  Any advance deposit you pay is held safely in platform escrow trust. Funds are only settled to salon owners after your treatment is delivered. If you cancel prior to the 24-hour refundable cancellation window, your deposit is protected and refunded.
                 </p>
               </div>
             </div>
@@ -1041,7 +1299,7 @@ export default function CustomerDashboard() {
             <div className="bg-white border border-border-color rounded-2xl shadow-sm overflow-hidden">
               <div className="px-6 py-4 bg-ivory/50 border-b border-border-color flex items-center justify-between">
                 <h3 className="font-serif font-semibold text-deep-plum text-base">Booking Payment Ledger</h3>
-                <span className="text-xs text-muted font-medium">Total Paid: ${totalPaidSum.toFixed(2)}</span>
+                <span className="text-xs text-muted font-medium">Total Paid: ₹{totalPaidSum.toFixed(2)}</span>
               </div>
 
               {appointments.length === 0 ? (
@@ -1057,13 +1315,18 @@ export default function CustomerDashboard() {
                           <div className="flex flex-wrap items-center gap-2">
                             <h4 className="font-semibold text-deep-plum text-base">{apt.salonName} — {apt.serviceName}</h4>
                             {getPaymentBadge(apt.paymentStatus)}
+                            {apt.amountPaid > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold text-[10px]">
+                                <ShieldCheck className="w-3 h-3 text-emerald-600" /> Escrow Protected
+                              </span>
+                            )}
                           </div>
 
                           <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted">
-                            <span>Service Total: <strong className="text-deep-plum">${apt.price.toFixed(2)}</strong></span>
-                            <span>Advance Required: <strong className="text-amber-800">${apt.advanceAmountRequired.toFixed(2)}</strong></span>
-                            <span>Amount Paid: <strong className="text-emerald-700">${(apt.amountPaid || 0).toFixed(2)}</strong></span>
-                            <span>Balance Due: <strong className="text-deep-plum">${balanceDue.toFixed(2)}</strong></span>
+                            <span>Service Total: <strong className="text-deep-plum">₹{apt.price.toFixed(2)}</strong></span>
+                            <span>Advance Required: <strong className="text-amber-800">₹{apt.advanceAmountRequired.toFixed(2)}</strong></span>
+                            <span>Amount Paid: <strong className="text-emerald-700">₹{(apt.amountPaid || 0).toFixed(2)}</strong></span>
+                            <span>Balance Due: <strong className="text-deep-plum">₹{balanceDue.toFixed(2)}</strong></span>
                           </div>
 
                           {/* UPI & Verification Sub-box */}
@@ -1206,6 +1469,439 @@ export default function CustomerDashboard() {
           </div>
         )}
 
+        {/* ----------------- TAB: BEAUTY DOSSIER & HEALTH PASSPORT (PHASE 2) ----------------- */}
+        {activeTab === 'dossier' && (
+          <div className="space-y-8 animate-in fade-in max-w-4xl">
+            {/* Dossier Header Spotlight */}
+            <div className="bg-gradient-to-r from-soft-blush via-white to-rose-tint/30 rounded-3xl p-6 sm:p-8 border border-border-color shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-primary-rose/10 text-primary-rose">
+                    Client Health & Consultation Passport
+                  </span>
+                  {dossier?.isPatchTested && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Patch Test Verified ({dossier.patchTestDate ? new Date(dossier.patchTestDate).toLocaleDateString() : 'Safe'})
+                    </span>
+                  )}
+                </div>
+                <h3 className="font-serif font-bold text-deep-plum text-2xl sm:text-3xl">
+                  {user?.fullName}'s Beauty Dossier
+                </h3>
+                <p className="text-xs sm:text-sm text-muted leading-relaxed max-w-xl">
+                  Your personalized hair, skin, and allergy records. This data is securely shared with your chosen beauty specialists before technical chemical services (balayage, bleach, peels) to prevent adverse reactions.
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                {!isEditingDossier ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingDossier(true)}
+                    className="px-5 py-2.5 bg-primary-rose text-white text-xs font-semibold rounded-xl hover:bg-primary-rose/90 transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+                  >
+                    <span>Edit Profile Notes</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingDossier(false)}
+                    className="px-4 py-2 bg-white border border-border-color text-deep-plum text-xs font-semibold rounded-xl hover:bg-ivory transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Notification messages */}
+            {dossierSuccess && (
+              <div className="p-4 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-2xl border border-emerald-200 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>{dossierSuccess}</span>
+              </div>
+            )}
+            {dossierError && (
+              <div className="p-4 bg-red-50 text-red-800 text-xs font-semibold rounded-2xl border border-red-200 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600" />
+                <span>{dossierError}</span>
+              </div>
+            )}
+
+            {/* Allergy & Safety Alert Banner */}
+            <div className={`p-5 rounded-2xl border flex items-start gap-4 ${
+              dossierForm.allergies || dossier?.allergies
+                ? 'bg-amber-50/70 border-amber-200 text-amber-900'
+                : 'bg-emerald-50/50 border-emerald-200/60 text-emerald-900'
+            }`}>
+              <ShieldCheck className={`w-6 h-6 shrink-0 mt-0.5 ${
+                dossierForm.allergies || dossier?.allergies ? 'text-amber-600' : 'text-emerald-600'
+              }`} />
+              <div className="space-y-1">
+                <h4 className="font-semibold text-sm">
+                  {dossierForm.allergies || dossier?.allergies
+                    ? 'Active Chemical Sensitivity / Allergy Alerts'
+                    : 'No Known Chemical Allergies Logged'}
+                </h4>
+                <p className="text-xs opacity-90 leading-relaxed">
+                  {dossierForm.allergies || dossier?.allergies
+                    ? `Noted Sensitivities: "${dossierForm.allergies || dossier?.allergies}". Specialists are required to review this before mixing color, bleach, or chemical perms.`
+                    : 'If you have known sensitivities to PPD hair dyes, ammonia, essential oils, or latex, please log them below.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Main Form & Dossier Cards */}
+            <form onSubmit={handleSaveDossier} className="space-y-6">
+              <div className="bg-white rounded-3xl border border-border-color shadow-sm p-6 sm:p-8 space-y-6">
+                <div className="border-b border-border-color pb-4 flex items-center justify-between">
+                  <h4 className="font-serif font-semibold text-deep-plum text-lg flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-primary-rose" />
+                    Hair & Skin Consultation Profile
+                  </h4>
+                  <span className="text-xs text-muted">
+                    Last Synced: {dossier?.createdAtUtc ? new Date(dossier.createdAtUtc).toLocaleDateString() : 'Active'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Known Allergies */}
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-bold text-deep-plum uppercase tracking-wider block">
+                      Known Chemical Allergies & Scalp Sensitivities
+                    </label>
+                    {isEditingDossier ? (
+                      <textarea
+                        rows={2}
+                        value={dossierForm.allergies}
+                        onChange={(e) => setDossierForm(prev => ({ ...prev, allergies: e.target.value }))}
+                        placeholder="e.g., Sensitive to high-ammonia color, allergic to synthetic fragrance or tea tree oil..."
+                        className="w-full p-3.5 text-xs border border-border-color rounded-xl focus:ring-2 focus:ring-primary-rose/30 outline-none"
+                      />
+                    ) : (
+                      <div className="p-3.5 bg-ivory/60 rounded-xl border border-border-color text-xs text-deep-plum min-h-[44px]">
+                        {dossier?.allergies || <span className="text-muted italic">None recorded. Click "Edit Profile Notes" to add.</span>}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Skin & Hair Notes */}
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-xs font-bold text-deep-plum uppercase tracking-wider block">
+                      Hair Texture, Porosity & Skin Type Notes
+                    </label>
+                    {isEditingDossier ? (
+                      <textarea
+                        rows={3}
+                        value={dossierForm.skinOrHairNotes}
+                        onChange={(e) => setDossierForm(prev => ({ ...prev, skinOrHairNotes: e.target.value }))}
+                        placeholder="e.g., Fine wavy hair with high porosity; prone to dryness on ends; dry scalp with cool undertones..."
+                        className="w-full p-3.5 text-xs border border-border-color rounded-xl focus:ring-2 focus:ring-primary-rose/30 outline-none"
+                      />
+                    ) : (
+                      <div className="p-3.5 bg-ivory/60 rounded-xl border border-border-color text-xs text-deep-plum min-h-[50px] leading-relaxed">
+                        {dossier?.skinOrHairNotes || <span className="text-muted italic">No hair or skin notes added yet.</span>}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Emergency Contact Name */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-deep-plum uppercase tracking-wider block">
+                      Emergency Contact Name
+                    </label>
+                    {isEditingDossier ? (
+                      <input
+                        type="text"
+                        value={dossierForm.emergencyContactName}
+                        onChange={(e) => setDossierForm(prev => ({ ...prev, emergencyContactName: e.target.value }))}
+                        placeholder="Full name of contact"
+                        className="w-full p-3 text-xs border border-border-color rounded-xl focus:ring-2 focus:ring-primary-rose/30 outline-none"
+                      />
+                    ) : (
+                      <div className="p-3 bg-ivory/60 rounded-xl border border-border-color text-xs text-deep-plum">
+                        {dossier?.emergencyContactName || <span className="text-muted italic">Not provided</span>}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Emergency Contact Phone */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-deep-plum uppercase tracking-wider block">
+                      Emergency Contact Phone
+                    </label>
+                    {isEditingDossier ? (
+                      <input
+                        type="text"
+                        value={dossierForm.emergencyContactPhone}
+                        onChange={(e) => setDossierForm(prev => ({ ...prev, emergencyContactPhone: e.target.value }))}
+                        placeholder="+91 98765 43210"
+                        className="w-full p-3 text-xs border border-border-color rounded-xl focus:ring-2 focus:ring-primary-rose/30 outline-none"
+                      />
+                    ) : (
+                      <div className="p-3 bg-ivory/60 rounded-xl border border-border-color text-xs text-deep-plum">
+                        {dossier?.emergencyContactPhone || <span className="text-muted italic">Not provided</span>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {isEditingDossier && (
+                  <div className="pt-4 border-t border-border-color flex justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingDossier(false)}
+                      className="px-5 py-2.5 bg-white border border-border-color text-deep-plum text-xs font-semibold rounded-xl hover:bg-ivory transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingDossier}
+                      className="px-6 py-2.5 bg-primary-rose text-white text-xs font-semibold rounded-xl hover:bg-primary-rose/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                    >
+                      {savingDossier ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Saving Dossier...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Save & Sync Dossier</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </form>
+
+            {/* Professional Formula History Vault */}
+            <div className="bg-white rounded-3xl border border-border-color shadow-sm p-6 sm:p-8 space-y-6">
+              <div className="border-b border-border-color pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 className="font-serif font-semibold text-deep-plum text-lg flex items-center gap-2">
+                    <Scissors className="w-5 h-5 text-primary-rose" />
+                    My Professional Salon Formula Vault
+                  </h4>
+                  <p className="text-xs text-muted">
+                    Exact shades, bleach levels, toners, and processing times recorded by your stylists across visits
+                  </p>
+                </div>
+                <span className="text-xs text-muted font-mono font-medium">
+                  {dossier?.formulas?.length || 0} Recorded Formulas
+                </span>
+              </div>
+
+              {!dossier?.formulas || dossier.formulas.length === 0 ? (
+                <div className="p-12 text-center text-muted text-xs space-y-2">
+                  <Scissors className="w-10 h-10 mx-auto text-muted/30" />
+                  <p className="font-medium text-deep-plum text-sm">No Chemical Formulas Recorded Yet</p>
+                  <p className="max-w-md mx-auto">
+                    When you receive color, gloss, toner, or botanical treatments, your specialist logs the precise chemical ratio and developer here for future visits.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {dossier.formulas.map((f) => (
+                    <div
+                      key={f.id}
+                      className="p-5 rounded-2xl bg-ivory/50 border border-border-color hover:border-primary-rose/30 transition-all space-y-3"
+                    >
+                      <div className="flex items-center justify-between pb-2 border-b border-border-color/60">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-soft-blush text-primary-rose">
+                          {f.category}
+                        </span>
+                        <span className="text-xs text-muted">
+                          {new Date(f.serviceDateUtc).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted font-medium mb-1">Formula & Shade:</div>
+                        <p className="font-mono text-xs font-semibold text-deep-plum bg-white p-2.5 rounded-lg border border-border-color/80">
+                          {f.formulaDetails}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs text-muted pt-1">
+                        {f.developer && (
+                          <div>
+                            <span className="block text-[10px] font-bold uppercase tracking-wider text-muted/80">Developer</span>
+                            <span className="font-medium text-deep-plum">{f.developer}</span>
+                          </div>
+                        )}
+                        {f.processingTimeMinutes && (
+                          <div>
+                            <span className="block text-[10px] font-bold uppercase tracking-wider text-muted/80">Process Time</span>
+                            <span className="font-medium text-deep-plum">{f.processingTimeMinutes} mins</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {f.notes && (
+                        <p className="text-xs text-muted bg-soft-blush/30 p-2.5 rounded-lg border border-dusty-rose/20 leading-relaxed italic">
+                          "{f.notes}"
+                        </p>
+                      )}
+
+                      <div className="text-[11px] text-muted pt-1 flex items-center justify-between border-t border-border-color/60">
+                        <span>at {f.salonName}</span>
+                        {f.staffName && <span>Stylist: {f.staffName}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ----------------- TAB: AI STYLIST & CONSULTATION (PHASE 4) ----------------- */}
+        {activeTab === 'ai-stylist' && (
+          <div className="space-y-8 animate-in fade-in max-w-4xl">
+            {/* AI Hero Banner */}
+            <div className="bg-gradient-to-br from-soft-blush via-white to-rose-tint/40 rounded-3xl p-6 sm:p-8 border border-dusty-rose/40 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="space-y-2.5 max-w-xl">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-primary-rose/10 text-primary-rose">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>AI Powered Virtual Consultation</span>
+                </div>
+                <h3 className="font-serif font-bold text-deep-plum text-2xl sm:text-3xl">
+                  Intelligent Style & Treatment Recommendations
+                </h3>
+                <p className="text-xs sm:text-sm text-muted leading-relaxed">
+                  Powered by our hair geometry and colorimetry algorithm. Discover personalized haircuts, tonal color palettes, and seasonal spa treatments tailored to your facial symmetry and styling routine.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAiModal(true)}
+                className="px-6 py-3 bg-primary-rose text-white text-xs font-bold rounded-2xl hover:bg-primary-rose/90 shadow-md transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap active:scale-[0.98]"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Start AI Consultation</span>
+              </button>
+            </div>
+
+            {/* Saved or Active Recommendation View */}
+            {savedAiConsultation ? (
+              <div className="space-y-6">
+                <div className="bg-white rounded-3xl border border-border-color shadow-sm p-6 sm:p-8 space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-border-color">
+                    <div>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-primary-rose block">
+                        Your Tailored Style Archetype
+                      </span>
+                      <h4 className="font-serif font-bold text-deep-plum text-2xl">
+                        {savedAiConsultation.recommendedStyleTitle || 'Effortless Modern Silhouette'}
+                      </h4>
+                    </div>
+                    <button
+                      onClick={() => setShowAiModal(true)}
+                      className="text-xs font-semibold text-primary-rose hover:underline self-start sm:self-auto cursor-pointer"
+                    >
+                      Re-run Consultation ↺
+                    </button>
+                  </div>
+
+                  {/* Summary Narrative */}
+                  <p className="text-sm text-deep-plum leading-relaxed bg-soft-blush/30 p-5 rounded-2xl border border-dusty-rose/30">
+                    {savedAiConsultation.consultationSummary ||
+                      'A custom balanced approach designed to accentuate your facial cheekbones while minimizing daily blowout time.'}
+                  </p>
+
+                  {/* 3 Pillars: Cut, Color, Routine */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-5 rounded-2xl bg-ivory/60 border border-border-color space-y-2">
+                      <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center text-primary-rose shadow-2xs">
+                        <Scissors className="w-4 h-4" />
+                      </div>
+                      <h5 className="font-serif font-semibold text-deep-plum text-sm">Recommended Cut & Texture</h5>
+                      <p className="text-xs text-muted leading-relaxed">
+                        {savedAiConsultation.cutTechnique || 'Soft face-framing layers with curtain fringe to soften jawline angles.'}
+                      </p>
+                    </div>
+
+                    <div className="p-5 rounded-2xl bg-ivory/60 border border-border-color space-y-2">
+                      <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center text-primary-rose shadow-2xs">
+                        <Palette className="w-4 h-4" />
+                      </div>
+                      <h5 className="font-serif font-semibold text-deep-plum text-sm">Color Tone & Formula</h5>
+                      <p className="text-xs text-muted leading-relaxed">
+                        {savedAiConsultation.colorPalette || 'Warm dimensional caramel balayage with high-shine root melt gloss.'}
+                      </p>
+                    </div>
+
+                    <div className="p-5 rounded-2xl bg-ivory/60 border border-border-color space-y-2">
+                      <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center text-primary-rose shadow-2xs">
+                        <Clock className="w-4 h-4" />
+                      </div>
+                      <h5 className="font-serif font-semibold text-deep-plum text-sm">Maintenance Routine</h5>
+                      <p className="text-xs text-muted leading-relaxed">
+                        {savedAiConsultation.routineAdvice || 'Low to moderate routine: air-dry with texture mousse, refresh toner at 6 weeks.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Recommended Salon Treatments */}
+                  <div className="pt-4 border-t border-border-color space-y-4">
+                    <h5 className="font-serif font-semibold text-deep-plum text-base">
+                      Curated Treatments to Request at Salon
+                    </h5>
+                    <div className="flex flex-wrap gap-2">
+                      {(savedAiConsultation.matchingServices || ['Balayage & Glaze', 'Precision Layered Cut', 'Olaplex Rebonding', 'Scalp Clarifying Detox']).map((srv, i) => (
+                        <span
+                          key={i}
+                          className="px-3.5 py-1.5 rounded-xl bg-soft-blush text-deep-plum font-medium text-xs border border-border-color"
+                        >
+                          {typeof srv === 'string' ? srv : srv.name}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="pt-2 flex justify-end">
+                      <Link
+                        to="/salons"
+                        className="px-6 py-2.5 bg-primary-rose text-white text-xs font-semibold rounded-xl hover:bg-primary-rose/90 transition-all shadow-xs flex items-center gap-1.5"
+                      >
+                        <Compass className="w-3.5 h-3.5" />
+                        <span>Find Salons Offering These Treatments</span>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Onboarding Empty State */
+              <div className="bg-white rounded-3xl border border-border-color shadow-sm p-8 sm:p-12 text-center space-y-6">
+                <div className="w-16 h-16 rounded-3xl bg-soft-blush flex items-center justify-center text-primary-rose mx-auto shadow-xs">
+                  <Sparkles className="w-8 h-8" />
+                </div>
+                <div className="space-y-2 max-w-md mx-auto">
+                  <h4 className="font-serif font-bold text-deep-plum text-xl">
+                    No Virtual Consultations Yet
+                  </h4>
+                  <p className="text-xs sm:text-sm text-muted leading-relaxed">
+                    Tell our AI your hair length, face shape, daily routine, and occasion vibe. It generates tailored cut recommendations and salon treatment combinations instantly.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAiModal(true)}
+                  className="px-6 py-3 bg-primary-rose text-white text-xs font-bold rounded-xl hover:bg-primary-rose/90 transition-all shadow-md inline-flex items-center gap-2 cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Launch 30-Second AI Consultation</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ----------------- TAB 5: ACCOUNT PROFILE ----------------- */}
         {activeTab === 'account' && (
           <div className="space-y-6 animate-in fade-in max-w-3xl">
@@ -1317,8 +2013,10 @@ export default function CustomerDashboard() {
                     <strong className="text-deep-plum">{activeDetailsApt.serviceName}</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted">Stylist / Staff:</span>
-                    <strong className="text-deep-plum">{activeDetailsApt.staffName}</strong>
+                    <span className="text-muted">Specialist / Stylist:</span>
+                    <strong className="text-deep-plum">
+                      {activeDetailsApt.staffName} {activeDetailsApt.staffTitle ? `(${activeDetailsApt.staffTitle})` : ''}
+                    </strong>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted">Scheduled Time:</span>
@@ -1336,22 +2034,27 @@ export default function CustomerDashboard() {
                 <div className="space-y-2.5 p-4 bg-soft-blush/20 rounded-xl border border-border-color">
                   <div className="flex justify-between">
                     <span className="text-muted">Total Treatment Price:</span>
-                    <strong className="text-deep-plum font-semibold">${activeDetailsApt.price.toFixed(2)}</strong>
+                    <strong className="text-deep-plum font-semibold">₹{activeDetailsApt.price.toFixed(2)}</strong>
                   </div>
                   {activeDetailsApt.advanceAmountRequired > 0 && (
                     <div className="flex justify-between">
                       <span className="text-amber-800 font-medium">Advance Amount Required:</span>
-                      <strong className="text-amber-900">${activeDetailsApt.advanceAmountRequired.toFixed(2)}</strong>
+                      <strong className="text-amber-900">₹{activeDetailsApt.advanceAmountRequired.toFixed(2)}</strong>
                     </div>
                   )}
                   <div className="flex justify-between">
                     <span className="text-emerald-800 font-medium">Amount Paid to Date:</span>
-                    <strong className="text-emerald-900">${(activeDetailsApt.amountPaid || 0).toFixed(2)}</strong>
+                    <div className="text-right">
+                      <strong className="text-emerald-900">₹{(activeDetailsApt.amountPaid || 0).toFixed(2)}</strong>
+                      {activeDetailsApt.amountPaid > 0 && (
+                        <span className="block text-[10px] text-emerald-700 font-semibold">🔒 Held in Platform Escrow</span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex justify-between pt-1 border-t border-border-color/60">
-                    <span className="text-muted">Remaining Balance:</span>
+                    <span className="text-muted">Remaining Balance (At Salon):</span>
                     <strong className="text-deep-plum font-bold">
-                      ${Math.max(0, activeDetailsApt.price - (activeDetailsApt.amountPaid || 0)).toFixed(2)}
+                      ₹{Math.max(0, activeDetailsApt.price - (activeDetailsApt.amountPaid || 0)).toFixed(2)}
                     </strong>
                   </div>
                 </div>
@@ -2274,6 +2977,19 @@ export default function CustomerDashboard() {
             onClose={() => setActiveInvoiceAptId(null)} 
           />
         )}
+
+        {/* AI Virtual Beauty Stylist Modal (Phase 4) */}
+        <AiStylistModal
+          isOpen={showAiModal}
+          onClose={() => setShowAiModal(false)}
+          onSelectService={(service) => {
+            setShowAiModal(false);
+            if (service) {
+              handleAiConsultationSuccess(service);
+            }
+            handleTabChange('salons');
+          }}
+        />
 
       </div>
     </DashboardLayout>

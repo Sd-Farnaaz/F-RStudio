@@ -32,6 +32,7 @@ export default function DashboardLayout({ children }) {
       { name: 'Salon Management', href: '/superadmin/salons', icon: Store },
       { name: 'KYC Verification', href: '/superadmin/kyc', icon: ShieldCheck },
       { name: 'User Management', href: '/superadmin/users', icon: Users },
+      { name: 'Escrow & Settlements', href: '/superadmin/settlements', icon: DollarSign },
     ];
   } else if (role === 'Admin') {
     navigation = [
@@ -52,7 +53,9 @@ export default function DashboardLayout({ children }) {
     navigation = [
       { name: 'Overview', href: '/my-bookings', icon: Home },
       { name: 'My Appointments', href: '/my-bookings?tab=appointments', icon: Calendar },
-      { name: 'Payments', href: '/my-bookings?tab=payments', icon: CreditCard },
+      { name: 'Beauty Dossier', href: '/my-bookings?tab=dossier', icon: ShieldCheck },
+      { name: 'AI Stylist', href: '/my-bookings?tab=ai-stylist', icon: Sparkles },
+      { name: 'Payments & Escrow', href: '/my-bookings?tab=payments', icon: CreditCard },
       { name: 'Discover Salons', href: '/my-bookings?tab=salons', icon: Compass },
       { name: 'Account Profile', href: '/my-bookings?tab=account', icon: UserIcon },
     ];
