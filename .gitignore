@@ -29,6 +29,15 @@ bld/
 appsettings.secrets.json
 *.local.json
 
+# Environment files & local secrets
+.env
+.env.*
+.env.local
+.env.*.local
+.env.production
+.env.development.local
+!.env.example
+
 # Rider / JetBrains
 .idea/
 *.DotSettings.user
@@ -37,4 +46,3 @@ appsettings.secrets.json
 node_modules/
 dist/
 .vite/
-
