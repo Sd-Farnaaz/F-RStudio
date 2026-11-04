@@ -488,7 +488,7 @@ export default function SalonDetailPage() {
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-ivory text-muted border border-border-color text-[11px] font-medium rounded-full">
                           <Star className="w-3.5 h-3.5 text-muted/60" />
-                          <span>New on SalonBook</span>
+                          <span>New on F&R Beauty Studio</span>
                         </span>
                       )}
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100 text-[11px] font-medium rounded-full">

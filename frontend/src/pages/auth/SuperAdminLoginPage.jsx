@@ -40,13 +40,15 @@ export default function SuperAdminLoginPage() {
 
       <div className="max-w-md w-full bg-ivory rounded-3xl shadow-2xl p-8 sm:p-10 border border-border-color relative z-10 space-y-6">
         <div className="flex flex-col items-center text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-soft-blush to-rose-tint rounded-2xl border border-dusty-rose/40 flex items-center justify-center mb-4 shadow-2xs">
-            <Shield className="w-8 h-8 text-primary-rose" />
-          </div>
+          <img 
+            src="/images/fr-beauty-studio-logo.png" 
+            alt="F&R Beauty Studio Logo" 
+            className="w-16 h-16 object-contain rounded-full border border-dusty-rose/40 shadow-xs mb-4" 
+          />
           <span className="text-xs font-semibold uppercase tracking-widest text-primary-rose bg-soft-blush px-3 py-1 rounded-full border border-dusty-rose/30 mb-2">
             Platform Governance
           </span>
-          <h1 className="text-3xl font-serif font-medium text-deep-plum">SalonBook</h1>
+          <h1 className="text-3xl font-serif font-medium text-deep-plum">F&R Beauty Studio</h1>
           <p className="text-muted mt-1 text-xs">Sign in to platform root administrative console</p>
         </div>
 
@@ -68,7 +70,7 @@ export default function SuperAdminLoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
-              placeholder="e.g. superadmin@salonbook.com"
+              placeholder="e.g. superadmin@frbeautystudio.com"
               className="w-full px-4 py-2.5 bg-white text-xs border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-rose/50 text-deep-plum placeholder:text-muted/60 transition-all" 
             />
           </div>
@@ -113,7 +115,7 @@ export default function SuperAdminLoginPage() {
             href="/" 
             className="text-xs text-muted hover:text-deep-plum font-medium transition-colors"
           >
-            ← Return to SalonBook Public Portal
+            ← Return to F&R Beauty Studio Public Portal
           </a>
         </div>
       </div>

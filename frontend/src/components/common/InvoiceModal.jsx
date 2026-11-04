@@ -285,7 +285,7 @@ export default function InvoiceModal({ appointmentId, onClose, preloadedInvoice 
               {/* Footer Note */}
               <div className="text-center pt-4 border-t border-border-color text-[11px] text-muted">
                 <p>Thank you for choosing {invoice.salonName}! For queries, please reach out directly to the salon.</p>
-                <p className="text-[10px] text-muted/70 mt-0.5">Powered by SalonBook SaaS Platform</p>
+                <p className="text-[10px] text-muted/70 mt-0.5">Powered by F&R Beauty Studio Platform</p>
               </div>
 
             </div>

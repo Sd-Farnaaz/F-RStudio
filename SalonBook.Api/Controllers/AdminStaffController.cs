@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SalonBook.Api.Common;
 using SalonBook.Api.Data;
 using SalonBook.Api.DTOs;
 using SalonBook.Api.Models;
@@ -43,12 +44,23 @@ public class AdminStaffController : ControllerBase
             return Forbid();
         }
 
-        // Subscription Tier Gating: Starter (1 staff), Growth (10 staff), LuxuryPro (unlimited)
+        // Subscription Tier & Status Gating: Starter (5), Growth (20), Pro (50)
         var salon = await _dbContext.Salons.AsNoTracking().FirstOrDefaultAsync(s => s.Id == salonId.Value, cancellationToken);
-        var tier = salon?.SubscriptionTier ?? "Starter";
-        int? staffLimit = tier.Equals("Starter", StringComparison.OrdinalIgnoreCase) ? 1 
-                        : tier.Equals("Growth", StringComparison.OrdinalIgnoreCase) ? 10 
-                        : null;
+        if (salon == null) return NotFound(new { message = "Salon not found." });
+
+        if (salon.SubscriptionStatus == "Expired" || !salon.IsActive)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                message = "Your salon subscription is currently expired or inactive. Please renew or upgrade your subscription on the Plan & Billing page to add specialists.",
+                upgradeRequired = true,
+                currentTier = salon.SubscriptionTier ?? "Starter"
+            });
+        }
+
+        var tier = salon.SubscriptionTier ?? "Starter";
+        var planConfig = SubscriptionPlanCatalog.GetPlanByTier(tier) ?? SubscriptionPlanCatalog.StarterPlan;
+        int? staffLimit = planConfig.MaxStaff;
 
         if (staffLimit.HasValue)
         {
@@ -57,7 +69,7 @@ public class AdminStaffController : ControllerBase
             {
                 return StatusCode(StatusCodes.Status403Forbidden, new
                 {
-                    message = $"Your {tier} plan allows a maximum of {staffLimit.Value} active specialist{(staffLimit.Value > 1 ? "s" : "")}. Please upgrade your salon subscription to Growth or Luxury Pro to add more specialists.",
+                    message = $"Your {planConfig.Name} allows a maximum of {staffLimit.Value} active specialist{(staffLimit.Value > 1 ? "s" : "")}. Please upgrade your salon subscription to add more specialists.",
                     upgradeRequired = true,
                     currentTier = tier,
                     staffLimit = staffLimit.Value

@@ -9,15 +9,18 @@ public class NotificationService : INotificationService
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly IEmailService _emailService;
+    private readonly IEmailTemplateBuilder _templateBuilder;
     private readonly ILogger<NotificationService> _logger;
 
     public NotificationService(
         ApplicationDbContext dbContext,
         IEmailService emailService,
+        IEmailTemplateBuilder templateBuilder,
         ILogger<NotificationService> logger)
     {
         _dbContext = dbContext;
         _emailService = emailService;
+        _templateBuilder = templateBuilder;
         _logger = logger;
     }
 
@@ -51,6 +54,10 @@ public class NotificationService : INotificationService
 
             case "AppointmentCancelled":
                 await HandleAppointmentCancelledAsync(appt, salonAdmins, cancellationToken);
+                break;
+
+            case "AppointmentRescheduled":
+                await HandleAppointmentRescheduledAsync(appt, salonAdmins, cancellationToken);
                 break;
 
             case "AppointmentConfirmed":
@@ -99,10 +106,10 @@ public class NotificationService : INotificationService
         // 2. Customer Email Notification
         if (!string.IsNullOrWhiteSpace(appt.Customer.Email))
         {
-            var customerEmailSubject = $"Appointment Confirmation: {appt.ServiceNameAtBooking} at {appt.Salon.Name}";
-            var customerEmailBody = $"<p>Dear {appt.Customer.FullName},</p><p>Your appointment for <strong>{appt.ServiceNameAtBooking}</strong> with {appt.Staff.FullName} at <strong>{appt.Salon.Name}</strong> is confirmed for <strong>{formattedDate} UTC</strong>.</p><p>Price: {appt.PriceAtBooking} {appt.Salon.CurrencyCode}</p><p>Thank you for choosing SalonBook!</p>";
+            var template = _templateBuilder.BuildBookingConfirmationEmail(appt);
 
-            var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, customerEmailSubject, customerEmailBody, cancellationToken);
+
+            var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, template.Subject, template.HtmlBody, template.PlainTextBody, cancellationToken);
 
             var customerEmail = new Notification
             {
@@ -111,8 +118,8 @@ public class NotificationService : INotificationService
                 AppointmentId = appt.Id,
                 Type = "AppointmentCreated",
                 Channel = "Email",
-                Subject = customerEmailSubject,
-                Message = customerEmailBody,
+                Subject = template.Subject,
+                Message = template.HtmlBody,
                 Status = emailResult.Success ? "Sent" : (emailResult.Skipped ? "Skipped" : "Failed"),
                 SentAtUtc = emailResult.Success ? DateTime.UtcNow : null,
                 ErrorMessage = emailResult.ErrorMessage,
@@ -142,10 +149,10 @@ public class NotificationService : INotificationService
 
             if (!string.IsNullOrWhiteSpace(admin.Email))
             {
-                var adminEmailSubject = $"[SalonBook] New Appointment: {appt.ServiceNameAtBooking}";
-                var adminEmailBody = $"<p>A new appointment has been scheduled:</p><ul><li><strong>Customer:</strong> {appt.Customer.FullName}</li><li><strong>Service:</strong> {appt.ServiceNameAtBooking}</li><li><strong>Staff:</strong> {appt.Staff.FullName}</li><li><strong>Date/Time:</strong> {formattedDate} UTC</li></ul>";
+                var adminTemplate = _templateBuilder.BuildOwnerNewBookingEmail(appt, admin.FullName);
 
-                var adminEmailResult = await _emailService.SendEmailAsync(admin.Email, adminEmailSubject, adminEmailBody, cancellationToken);
+
+                var adminEmailResult = await _emailService.SendEmailAsync(admin.Email, adminTemplate.Subject, adminTemplate.HtmlBody, adminTemplate.PlainTextBody, cancellationToken);
 
                 var adminEmail = new Notification
                 {
@@ -154,8 +161,8 @@ public class NotificationService : INotificationService
                     AppointmentId = appt.Id,
                     Type = "AppointmentCreated",
                     Channel = "Email",
-                    Subject = adminEmailSubject,
-                    Message = adminEmailBody,
+                    Subject = adminTemplate.Subject,
+                    Message = adminTemplate.HtmlBody,
                     Status = adminEmailResult.Success ? "Sent" : (adminEmailResult.Skipped ? "Skipped" : "Failed"),
                     SentAtUtc = adminEmailResult.Success ? DateTime.UtcNow : null,
                     ErrorMessage = adminEmailResult.ErrorMessage,
@@ -226,9 +233,8 @@ public class NotificationService : INotificationService
         // Customer Email
         if (!string.IsNullOrWhiteSpace(appt.Customer.Email))
         {
-            var emailSubject = $"Appointment Cancelled: {appt.ServiceNameAtBooking} at {appt.Salon.Name}";
-            var emailBody = $"<p>Dear {appt.Customer.FullName},</p><p>Your appointment for <strong>{appt.ServiceNameAtBooking}</strong> on {appt.StartAtUtc:yyyy-MM-dd HH:mm} UTC has been cancelled.</p><p><strong>Reason:</strong> {reason}</p>";
-            var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, emailSubject, emailBody, cancellationToken);
+            var cancelTemplate = _templateBuilder.BuildAppointmentCancelledEmail(appt, isForCustomer: true);
+            var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, cancelTemplate.Subject, cancelTemplate.HtmlBody, cancelTemplate.PlainTextBody, cancellationToken);
 
             _dbContext.Notifications.Add(new Notification
             {
@@ -237,8 +243,8 @@ public class NotificationService : INotificationService
                 AppointmentId = appt.Id,
                 Type = "AppointmentCancelled",
                 Channel = "Email",
-                Subject = emailSubject,
-                Message = emailBody,
+                Subject = cancelTemplate.Subject,
+                Message = cancelTemplate.HtmlBody,
                 Status = emailResult.Success ? "Sent" : (emailResult.Skipped ? "Skipped" : "Failed"),
                 SentAtUtc = emailResult.Success ? DateTime.UtcNow : null,
                 ErrorMessage = emailResult.ErrorMessage,
@@ -247,7 +253,7 @@ public class NotificationService : INotificationService
             });
         }
 
-        // Admins InApp
+        // Admins InApp & Email
         foreach (var admin in salonAdmins)
         {
             _dbContext.Notifications.Add(new Notification
@@ -263,6 +269,28 @@ public class NotificationService : INotificationService
                 SentAtUtc = DateTime.UtcNow,
                 CreatedAtUtc = DateTime.UtcNow
             });
+
+            if (!string.IsNullOrWhiteSpace(admin.Email))
+            {
+                var adminCancelTemplate = _templateBuilder.BuildAppointmentCancelledEmail(appt, isForCustomer: false, adminName: admin.FullName);
+                var adminEmailResult = await _emailService.SendEmailAsync(admin.Email, adminCancelTemplate.Subject, adminCancelTemplate.HtmlBody, adminCancelTemplate.PlainTextBody, cancellationToken);
+
+                _dbContext.Notifications.Add(new Notification
+                {
+                    RecipientUserId = admin.Id,
+                    SalonId = appt.SalonId,
+                    AppointmentId = appt.Id,
+                    Type = "AppointmentCancelled",
+                    Channel = "Email",
+                    Subject = adminCancelTemplate.Subject,
+                    Message = adminCancelTemplate.HtmlBody,
+                    Status = adminEmailResult.Success ? "Sent" : (adminEmailResult.Skipped ? "Skipped" : "Failed"),
+                    SentAtUtc = adminEmailResult.Success ? DateTime.UtcNow : null,
+                    ErrorMessage = adminEmailResult.ErrorMessage,
+                    LastErrorCode = adminEmailResult.ErrorCode,
+                    CreatedAtUtc = DateTime.UtcNow
+                });
+            }
         }
 
         // Cancel / Skip all pending reminders for this appointment
@@ -277,6 +305,111 @@ public class NotificationService : INotificationService
             reminder.ProcessedAtUtc = DateTime.UtcNow;
         }
     }
+
+    private async Task HandleAppointmentRescheduledAsync(Appointment appt, List<User> salonAdmins, CancellationToken cancellationToken)
+    {
+        var formattedDate = appt.StartAtUtc.ToString("yyyy-MM-dd HH:mm");
+
+        // 1. Customer InApp Notification
+        _dbContext.Notifications.Add(new Notification
+        {
+            RecipientUserId = appt.CustomerId,
+            SalonId = appt.SalonId,
+            AppointmentId = appt.Id,
+            Type = "AppointmentRescheduled",
+            Channel = "InApp",
+            Subject = $"Appointment Rescheduled: {appt.ServiceNameAtBooking}",
+            Message = $"Your appointment for {appt.ServiceNameAtBooking} at {appt.Salon.Name} has been rescheduled to {formattedDate} UTC.",
+            Status = "Sent",
+            SentAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        // 2. Customer Email
+        if (!string.IsNullOrWhiteSpace(appt.Customer.Email))
+        {
+            var reschedTemplate = _templateBuilder.BuildAppointmentRescheduledEmail(appt, isForCustomer: true);
+            var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, reschedTemplate.Subject, reschedTemplate.HtmlBody, reschedTemplate.PlainTextBody, cancellationToken);
+
+            _dbContext.Notifications.Add(new Notification
+            {
+                RecipientUserId = appt.CustomerId,
+                SalonId = appt.SalonId,
+                AppointmentId = appt.Id,
+                Type = "AppointmentRescheduled",
+                Channel = "Email",
+                Subject = reschedTemplate.Subject,
+                Message = reschedTemplate.HtmlBody,
+                Status = emailResult.Success ? "Sent" : (emailResult.Skipped ? "Skipped" : "Failed"),
+                SentAtUtc = emailResult.Success ? DateTime.UtcNow : null,
+                ErrorMessage = emailResult.ErrorMessage,
+                LastErrorCode = emailResult.ErrorCode,
+                CreatedAtUtc = DateTime.UtcNow
+            });
+        }
+
+        // 3. Admins InApp & Email Notifications
+        foreach (var admin in salonAdmins)
+        {
+            _dbContext.Notifications.Add(new Notification
+            {
+                RecipientUserId = admin.Id,
+                SalonId = appt.SalonId,
+                AppointmentId = appt.Id,
+                Type = "AppointmentRescheduled",
+                Channel = "InApp",
+                Subject = $"Appointment Rescheduled: {appt.Customer.FullName} - {appt.ServiceNameAtBooking}",
+                Message = $"Appointment #{appt.Id} for {appt.Customer.FullName} ({appt.ServiceNameAtBooking}) was rescheduled to {formattedDate} UTC.",
+                Status = "Sent",
+                SentAtUtc = DateTime.UtcNow,
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            if (!string.IsNullOrWhiteSpace(admin.Email))
+            {
+                var adminReschedTemplate = _templateBuilder.BuildAppointmentRescheduledEmail(appt, isForCustomer: false, adminName: admin.FullName);
+                var adminEmailResult = await _emailService.SendEmailAsync(admin.Email, adminReschedTemplate.Subject, adminReschedTemplate.HtmlBody, adminReschedTemplate.PlainTextBody, cancellationToken);
+
+                _dbContext.Notifications.Add(new Notification
+                {
+                    RecipientUserId = admin.Id,
+                    SalonId = appt.SalonId,
+                    AppointmentId = appt.Id,
+                    Type = "AppointmentRescheduled",
+                    Channel = "Email",
+                    Subject = adminReschedTemplate.Subject,
+                    Message = adminReschedTemplate.HtmlBody,
+                    Status = adminEmailResult.Success ? "Sent" : (adminEmailResult.Skipped ? "Skipped" : "Failed"),
+                    SentAtUtc = adminEmailResult.Success ? DateTime.UtcNow : null,
+                    ErrorMessage = adminEmailResult.ErrorMessage,
+                    LastErrorCode = adminEmailResult.ErrorCode,
+                    CreatedAtUtc = DateTime.UtcNow
+                });
+            }
+        }
+
+        // 4. Update pending reminders for new time
+        var pendingReminders = await _dbContext.AppointmentReminders
+            .Where(r => r.AppointmentId == appt.Id && r.Status == "Pending")
+            .ToListAsync(cancellationToken);
+
+        foreach (var reminder in pendingReminders)
+        {
+            if (reminder.ReminderType == "24Hours")
+            {
+                reminder.ScheduledForUtc = appt.StartAtUtc.AddHours(-24);
+            }
+            else if (reminder.ReminderType == "2Hours")
+            {
+                reminder.ScheduledForUtc = appt.StartAtUtc.AddHours(-2);
+            }
+            else if (reminder.ReminderType == "1HourAfter")
+            {
+                reminder.ScheduledForUtc = appt.EndAtUtc.AddHours(1);
+            }
+        }
+    }
+
 
     private async Task HandleAppointmentStatusChangedAsync(Appointment appt, List<User> salonAdmins, string eventType, CancellationToken cancellationToken)
     {
@@ -336,17 +469,8 @@ public class NotificationService : INotificationService
 
             if (!string.IsNullOrWhiteSpace(admin.Email))
             {
-                var emailSubject = $"[SalonBook] Payment Proof Submitted for Appointment #{appt.Id}";
-                var emailBody = $"<p>Customer <strong>{appt.Customer.FullName}</strong> has submitted payment proof for appointment #{appt.Id}:</p>" +
-                                $"<ul>" +
-                                $"<li><strong>Service:</strong> {appt.ServiceNameAtBooking}</li>" +
-                                $"<li><strong>Amount Paid:</strong> {appt.AmountPaid} {currency}</li>" +
-                                $"<li><strong>Payment Method:</strong> {method}</li>" +
-                                $"<li><strong>Transaction Reference:</strong> {txnRef}</li>" +
-                                $"</ul>" +
-                                $"<p>Please log in to your SalonBook admin dashboard to review and verify this payment.</p>";
-
-                var emailResult = await _emailService.SendEmailAsync(admin.Email, emailSubject, emailBody, cancellationToken);
+                var proofTemplate = _templateBuilder.BuildPaymentProofSubmittedEmail(appt, admin.FullName);
+                var emailResult = await _emailService.SendEmailAsync(admin.Email, proofTemplate.Subject, proofTemplate.HtmlBody, proofTemplate.PlainTextBody, cancellationToken);
 
                 _dbContext.Notifications.Add(new Notification
                 {
@@ -355,8 +479,8 @@ public class NotificationService : INotificationService
                     AppointmentId = appt.Id,
                     Type = "PaymentProofSubmitted",
                     Channel = "Email",
-                    Subject = emailSubject,
-                    Message = emailBody,
+                    Subject = proofTemplate.Subject,
+                    Message = proofTemplate.HtmlBody,
                     Status = emailResult.Success ? "Sent" : (emailResult.Skipped ? "Skipped" : "Failed"),
                     SentAtUtc = emailResult.Success ? DateTime.UtcNow : null,
                     ErrorMessage = emailResult.ErrorMessage,
@@ -414,15 +538,8 @@ public class NotificationService : INotificationService
         // Customer Email Notification
         if (!string.IsNullOrWhiteSpace(appt.Customer.Email))
         {
-            var emailSubject = $"[SalonBook] {subject}";
-            var emailBody = $"<p>Dear {appt.Customer.FullName},</p>" +
-                            $"<p>{message}</p>" +
-                            $"<p><strong>Appointment:</strong> #{appt.Id} - {appt.ServiceNameAtBooking}<br/>" +
-                            $"<strong>Salon:</strong> {appt.Salon.Name}<br/>" +
-                            $"<strong>Scheduled Time:</strong> {appt.StartAtUtc:yyyy-MM-dd HH:mm} UTC</p>" +
-                            $"<p>Thank you for using SalonBook!</p>";
-
-            var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, emailSubject, emailBody, cancellationToken);
+            var paymentTemplate = _templateBuilder.BuildPaymentStatusEmail(appt, eventType);
+            var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, paymentTemplate.Subject, paymentTemplate.HtmlBody, paymentTemplate.PlainTextBody, cancellationToken);
 
             _dbContext.Notifications.Add(new Notification
             {
@@ -431,8 +548,8 @@ public class NotificationService : INotificationService
                 AppointmentId = appt.Id,
                 Type = eventType,
                 Channel = "Email",
-                Subject = emailSubject,
-                Message = emailBody,
+                Subject = paymentTemplate.Subject,
+                Message = paymentTemplate.HtmlBody,
                 Status = emailResult.Success ? "Sent" : (emailResult.Skipped ? "Skipped" : "Failed"),
                 SentAtUtc = emailResult.Success ? DateTime.UtcNow : null,
                 ErrorMessage = emailResult.ErrorMessage,
@@ -554,10 +671,11 @@ public class NotificationService : INotificationService
         // 4. Email Notification
         if (!string.IsNullOrWhiteSpace(appt.Customer.Email))
         {
-            var emailSubject = $"{inAppSubject} - {appt.ServiceNameAtBooking}";
-            var emailBody = $"<p>Dear {appt.Customer.FullName},</p><p>{inAppMessage}</p><p><strong>Appointment:</strong> #{appt.Id} - {appt.ServiceNameAtBooking}<br/><strong>Salon:</strong> {appt.Salon.Name}<br/><strong>Time:</strong> {appt.StartAtUtc:yyyy-MM-dd HH:mm} UTC</p><p>Thank you for choosing SalonBook!</p>";
+            var reminderTemplate = isPostVisit
+                ? _templateBuilder.BuildPostVisitReviewEmail(appt)
+                : _templateBuilder.BuildAppointmentReminderEmail(appt, reminder.ReminderType);
 
-            var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, emailSubject, emailBody, cancellationToken);
+            var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, reminderTemplate.Subject, reminderTemplate.HtmlBody, reminderTemplate.PlainTextBody, cancellationToken);
 
             _dbContext.Notifications.Add(new Notification
             {
@@ -566,8 +684,8 @@ public class NotificationService : INotificationService
                 AppointmentId = appt.Id,
                 Type = reminderNotificationType,
                 Channel = "Email",
-                Subject = emailSubject,
-                Message = emailBody,
+                Subject = reminderTemplate.Subject,
+                Message = reminderTemplate.HtmlBody,
                 Status = emailResult.Success ? "Sent" : (emailResult.Skipped ? "Skipped" : "Failed"),
                 SentAtUtc = emailResult.Success ? DateTime.UtcNow : null,
                 ErrorMessage = emailResult.ErrorMessage,

@@ -219,7 +219,7 @@ export default function LandingPage() {
                 Explore the Salon Directory
               </h3>
               <p className="text-xs sm:text-sm text-muted mb-6">
-                New luxury salons are regularly joining SalonBook. Browse all registered locations to find an opening near you.
+                New luxury salons are regularly joining F&R Beauty Studio. Browse all registered locations to find an opening near you.
               </p>
               <Link 
                 to="/salons" 
@@ -354,7 +354,7 @@ export default function LandingPage() {
               Intuitive Experience
             </span>
             <h2 className="text-3xl sm:text-4xl font-serif font-medium text-deep-plum">
-              How SalonBook Works
+              How F&R Beauty Studio Works
             </h2>
             <p className="text-sm text-muted mt-2">
               Select a path below to see how our platform connects clients with beauty professionals.
@@ -546,7 +546,7 @@ export default function LandingPage() {
             <div className="relative z-10 max-w-2xl space-y-6">
               <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-dusty-rose text-xs font-semibold uppercase tracking-wider shadow-2xs">
                 <Sparkles className="w-3.5 h-3.5 text-dusty-rose" />
-                <span>Join SalonBook Today</span>
+                <span>Join F&R Beauty Studio Today</span>
               </span>
 
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-medium leading-[1.15] text-white">
@@ -554,7 +554,7 @@ export default function LandingPage() {
               </h2>
 
               <p className="text-base sm:text-lg text-soft-blush/90 leading-relaxed font-normal">
-                Whether you are a beauty professional scaling your business or a client looking for a seamless, confirmed appointment, SalonBook delivers luxury at every touchpoint.
+                Whether you are a beauty professional scaling your business or a client looking for a seamless, confirmed appointment, F&R Beauty Studio delivers luxury at every touchpoint.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3.5 pt-4">

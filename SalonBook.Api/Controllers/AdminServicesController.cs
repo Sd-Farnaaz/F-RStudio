@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SalonBook.Api.Common;
 using SalonBook.Api.Data;
 using SalonBook.Api.DTOs;
 using SalonBook.Api.Models;
@@ -47,20 +48,33 @@ public class AdminServicesController : ControllerBase
             return Forbid();
         }
 
-        // Subscription Tier Gating: Starter (5 services max), Growth / LuxuryPro (unlimited)
+        // Subscription Tier & Status Gating: Starter (5), Growth (15), Pro (unlimited)
         var salon = await _dbContext.Salons.AsNoTracking().FirstOrDefaultAsync(s => s.Id == salonId.Value, cancellationToken);
-        var tier = salon?.SubscriptionTier ?? "Starter";
-        if (tier.Equals("Starter", StringComparison.OrdinalIgnoreCase))
+        if (salon == null) return NotFound(new { message = "Salon not found." });
+
+        if (salon.SubscriptionStatus == "Expired" || !salon.IsActive)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                message = "Your salon subscription is currently expired or inactive. Please renew or upgrade your subscription on the Plan & Billing page to create services.",
+                upgradeRequired = true,
+                currentTier = salon.SubscriptionTier ?? "Starter"
+            });
+        }
+
+        var tier = salon.SubscriptionTier ?? "Starter";
+        var planConfig = SubscriptionPlanCatalog.GetPlanByTier(tier) ?? SubscriptionPlanCatalog.StarterPlan;
+        if (planConfig.MaxServices.HasValue)
         {
             var activeServicesCount = await _dbContext.Services.AsNoTracking().CountAsync(s => s.SalonId == salonId.Value && s.IsActive, cancellationToken);
-            if (activeServicesCount >= 5)
+            if (activeServicesCount >= planConfig.MaxServices.Value)
             {
                 return StatusCode(StatusCodes.Status403Forbidden, new
                 {
-                    message = "Your Starter plan allows a maximum of 5 active services. Please upgrade your salon subscription to Growth or Luxury Pro to offer unlimited services.",
+                    message = $"Your {planConfig.Name} allows a maximum of {planConfig.MaxServices.Value} active catalog services. Please upgrade your subscription to add more services.",
                     upgradeRequired = true,
                     currentTier = tier,
-                    servicesLimit = 5
+                    servicesLimit = planConfig.MaxServices.Value
                 });
             }
         }

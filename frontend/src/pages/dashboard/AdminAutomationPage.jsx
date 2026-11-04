@@ -387,7 +387,7 @@ export default function AdminAutomationPage() {
                   <div>
                     <h4 className="text-sm font-bold text-deep-plum">Thank You & 1-Tap Review</h4>
                     <p className="text-xs text-muted mt-1 leading-relaxed">
-                      Warm thank-you message inviting 5-star Google & SalonBook reviews while satisfaction is at its peak.
+                      Warm thank-you message inviting 5-star Google & F&R Beauty Studio reviews while satisfaction is at its peak.
                     </p>
                   </div>
                   <div className="p-2.5 rounded-xl bg-white border border-border-color/80 text-[11px] font-mono text-muted/90">

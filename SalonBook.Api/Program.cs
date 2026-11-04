@@ -38,6 +38,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // 3. JWT & Security Options
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.Configure<RazorpayOptions>(builder.Configuration.GetSection(RazorpayOptions.SectionName));
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 
 // In production, ensure SecretKey is set securely
@@ -57,10 +58,14 @@ builder.Services.AddScoped<IMediaStorageService, LocalMediaStorageService>();
 builder.Services.AddScoped<ISalonImageStorageService, LocalSalonImageStorageService>();
 builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddSingleton<IEmailTemplateBuilder, EmailTemplateBuilder>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
 builder.Services.AddScoped<IAiStylistService, AiStylistService>();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<IRazorpaySubscriptionService, RazorpaySubscriptionService>();
 builder.Services.AddHostedService<AppointmentReminderWorker>();
+builder.Services.AddHostedService<SubscriptionLifecycleWorker>();
 
 // 5. Authentication with JWT Bearer
 var signingKey = Encoding.UTF8.GetBytes(string.IsNullOrWhiteSpace(jwtOptions.SecretKey) ? "Development_Fallback_Key_32_Characters_Minimum!" : jwtOptions.SecretKey);
@@ -175,7 +180,7 @@ builder.Services.AddSwaggerGen(options =>
 
     options.AddSecurityRequirement(doc => new OpenApiSecurityRequirement
     {
-        [new OpenApiSecuritySchemeReference("Bearer")] = new List<string>()
+        [new OpenApiSecuritySchemeReference("Bearer", doc)] = new List<string>()
     });
 });
 

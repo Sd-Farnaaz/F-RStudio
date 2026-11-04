@@ -17,6 +17,7 @@ public class PaymentsController : ControllerBase
     private readonly ICurrentUserService _currentUserService;
     private readonly INotificationService _notificationService;
     private readonly IConfiguration _configuration;
+    private readonly IRazorpaySubscriptionService _razorpaySubscriptionService;
     private readonly ILogger<PaymentsController> _logger;
 
     public PaymentsController(
@@ -24,12 +25,14 @@ public class PaymentsController : ControllerBase
         ICurrentUserService currentUserService,
         INotificationService notificationService,
         IConfiguration configuration,
+        IRazorpaySubscriptionService razorpaySubscriptionService,
         ILogger<PaymentsController> logger)
     {
         _dbContext = dbContext;
         _currentUserService = currentUserService;
         _notificationService = notificationService;
         _configuration = configuration;
+        _razorpaySubscriptionService = razorpaySubscriptionService;
         _logger = logger;
     }
 
@@ -105,7 +108,7 @@ public class PaymentsController : ControllerBase
         }
 
         // Public key for client-side checkout
-        var keyId = _configuration["Razorpay:KeyId"] ?? "rzp_test_SalonBook2026MockKey";
+        var keyId = _configuration["Razorpay:KeyId"] ?? "rzp_test_TtEAB1fZHDnzUW";
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var orderId = $"order_sb_{appointment.Id}_{timestamp}";
         var amountInPaise = (long)Math.Round(payableAmount * 100, MidpointRounding.AwayFromZero);
@@ -352,5 +355,27 @@ public class PaymentsController : ControllerBase
         };
 
         return Ok(invoice);
+    }
+
+    /// <summary>
+    /// Official Razorpay webhook endpoint for asynchronous payment and order events.
+    /// </summary>
+    [HttpPost("razorpay-webhook")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> RazorpayWebhook(CancellationToken cancellationToken)
+    {
+        using var reader = new System.IO.StreamReader(Request.Body, System.Text.Encoding.UTF8);
+        var rawBody = await reader.ReadToEndAsync(cancellationToken);
+        var signature = Request.Headers["X-Razorpay-Signature"].ToString();
+
+        var handled = await _razorpaySubscriptionService.ProcessWebhookEventAsync(rawBody, signature, cancellationToken);
+        if (!handled)
+        {
+            return BadRequest(new { message = "Webhook processing failed or invalid signature." });
+        }
+
+        return Ok(new { status = "success" });
     }
 }

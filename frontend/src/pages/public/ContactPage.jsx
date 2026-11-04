@@ -13,7 +13,7 @@ import {
   ExternalLink 
 } from 'lucide-react';
 
-const SUPPORT_EMAIL = 'support@salonbook.com';
+const SUPPORT_EMAIL = 'rufnixstudio@gmail.com';
 
 const INQUIRY_TOPICS = [
   'Salon Partnership & Onboarding',
@@ -64,7 +64,7 @@ export default function ContactPage() {
     if (!validate()) return;
 
     // Build mailto URI
-    const subject = `[SalonBook Inquiry] ${formData.topic} - ${formData.fullName.trim()}`;
+    const subject = `[F&R Beauty Studio Inquiry] ${formData.topic} - ${formData.fullName.trim()}`;
     const body = `Name: ${formData.fullName.trim()}\nEmail: ${formData.email.trim()}\nTopic: ${formData.topic}\n\nMessage:\n${formData.message.trim()}`;
     const mailtoUrl = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
@@ -74,7 +74,7 @@ export default function ContactPage() {
   };
 
   const handleCopyMessage = () => {
-    const fullText = `To: ${SUPPORT_EMAIL}\nSubject: [SalonBook Inquiry] ${formData.topic} - ${formData.fullName.trim()}\nFrom: ${formData.fullName.trim()} (${formData.email.trim()})\n\n${formData.message.trim()}`;
+    const fullText = `To: ${SUPPORT_EMAIL}\nSubject: [F&R Beauty Studio Inquiry] ${formData.topic} - ${formData.fullName.trim()}\nFrom: ${formData.fullName.trim()} (${formData.email.trim()})\n\n${formData.message.trim()}`;
     navigator.clipboard.writeText(fullText).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 3000);
@@ -97,7 +97,7 @@ export default function ContactPage() {
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif font-medium text-deep-plum max-w-3xl mx-auto leading-tight">
-              Get in touch with the SalonBook team.
+              Get in touch with the F&R Beauty Studio team.
             </h1>
 
             <p className="text-base sm:text-lg text-muted max-w-2xl mx-auto leading-relaxed">
@@ -121,7 +121,7 @@ export default function ContactPage() {
                     Direct Contact Channels
                   </h3>
                   <p className="text-xs sm:text-sm text-muted leading-relaxed">
-                    Our team provides support for salon owners, stylists, and clients using SalonBook.
+                    Our team provides support for salon owners, stylists, and clients using F&R Beauty Studio.
                   </p>
                 </div>
 

@@ -16,15 +16,21 @@ public class SuperAdminController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IEmailService _emailService;
+    private readonly IEmailTemplateBuilder _emailTemplateBuilder;
     private readonly ILogger<SuperAdminController> _logger;
 
     public SuperAdminController(
         ApplicationDbContext dbContext,
         ICurrentUserService currentUserService,
+        IEmailService emailService,
+        IEmailTemplateBuilder emailTemplateBuilder,
         ILogger<SuperAdminController> logger)
     {
         _dbContext = dbContext;
         _currentUserService = currentUserService;
+        _emailService = emailService;
+        _emailTemplateBuilder = emailTemplateBuilder;
         _logger = logger;
     }
 
@@ -192,6 +198,10 @@ public class SuperAdminController : ControllerBase
 
                 // Cross-Phase Data
                 SubscriptionTier = s.SubscriptionTier ?? "Starter",
+                SubscriptionStatus = s.SubscriptionStatus ?? "Active",
+                DeactivationReason = s.DeactivationReason,
+                IsSuspendedByAdmin = s.IsSuspendedByAdmin,
+                TrialEndsAtUtc = s.TrialEndsAtUtc,
                 AverageRating = s.Reviews.Any() ? Math.Round(s.Reviews.Average(r => r.Rating), 1) : 0,
                 TotalReviews = s.Reviews.Count,
                 TotalConsultationCards = _dbContext.ClientConsultationCards.Count(c => c.SalonId == s.Id),
@@ -277,6 +287,9 @@ public class SuperAdminController : ControllerBase
             SubscriptionTier = salon.SubscriptionTier ?? "Starter",
             SubscriptionBillingCycle = salon.SubscriptionBillingCycle ?? "Monthly",
             SubscriptionStatus = salon.SubscriptionStatus ?? "Active",
+            DeactivationReason = salon.DeactivationReason,
+            IsSuspendedByAdmin = salon.IsSuspendedByAdmin,
+            TrialEndsAtUtc = salon.TrialEndsAtUtc,
             SubscriptionPrice = salon.SubscriptionPrice,
             SubscriptionRenewsAtUtc = salon.SubscriptionRenewsAtUtc,
             GstNumber = salon.GstNumber,
@@ -313,6 +326,8 @@ public class SuperAdminController : ControllerBase
         }
 
         salon.IsActive = request.IsActive;
+        salon.IsSuspendedByAdmin = !request.IsActive;
+        salon.DeactivationReason = !request.IsActive ? (request.Reason ?? "SuperAdminSuspension") : null;
         salon.UpdatedAtUtc = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -635,6 +650,63 @@ public class SuperAdminController : ControllerBase
             status = payout.Status,
             utrNumber = payout.UtrNumber,
             disbursedAtUtc = payout.DisbursedAtUtc
+        });
+    }
+
+    /// <summary>
+    /// Temporary authenticated SuperAdmin-only endpoint to send a real test email verifying Brevo SMTP credentials.
+    /// </summary>
+    [HttpPost("email/test")]
+    [ProducesResponseType(typeof(SendTestEmailResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(SendTestEmailResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> SendTestEmail(
+        [FromBody] SendTestEmailRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.RecipientEmail))
+        {
+            return BadRequest(new SendTestEmailResponse
+            {
+                Success = false,
+                Message = "Recipient email address is required.",
+                ErrorCode = "INVALID_RECIPIENT",
+                SentAtUtc = DateTime.UtcNow
+            });
+        }
+
+        var recipient = request.RecipientEmail.Trim();
+
+        var testTemplate = _emailTemplateBuilder.BuildInternalSmtpTestEmail(recipient);
+        var result = await _emailService.SendEmailAsync(recipient, testTemplate.Subject, testTemplate.HtmlBody, testTemplate.PlainTextBody, cancellationToken);
+
+        if (!result.Success)
+        {
+            _logger.LogWarning("SuperAdmin test email to {Recipient} failed or was skipped: {ErrorCode} - {ErrorMessage}",
+                recipient, result.ErrorCode, result.ErrorMessage);
+
+            return BadRequest(new SendTestEmailResponse
+            {
+                Success = false,
+                Message = result.Skipped
+                    ? $"Email sending was skipped: {result.ErrorMessage}"
+                    : $"Failed to send test email: {result.ErrorMessage}",
+                RecipientEmail = recipient,
+                ErrorCode = result.ErrorCode,
+                ErrorMessage = result.ErrorMessage,
+                SentAtUtc = DateTime.UtcNow
+            });
+        }
+
+        _logger.LogInformation("SuperAdmin test email successfully dispatched to {Recipient}", recipient);
+
+        return Ok(new SendTestEmailResponse
+        {
+            Success = true,
+            Message = "Test email sent successfully via Brevo SMTP.",
+            RecipientEmail = recipient,
+            SentAtUtc = DateTime.UtcNow
         });
     }
 }

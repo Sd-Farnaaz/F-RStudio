@@ -327,7 +327,7 @@ export default function AdminCustomersPage() {
                 <div className="p-3 bg-soft-blush/40 rounded-xl border border-border-color text-xs text-muted flex items-start gap-2">
                   <Info className="w-4 h-4 text-primary-rose shrink-0 mt-0.5" />
                   <span>
-                    This account is created with customer privileges (Role: User) and can sign in to book appointments at any salon on SalonBook.
+                    This account is created with customer privileges (Role: User) and can sign in to book appointments at any salon on F&R Beauty Studio.
                   </span>
                 </div>
 

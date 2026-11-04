@@ -36,28 +36,28 @@ export default function TierUpgradePromptModal({ isOpen, onClose, title, message
           <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-xl flex items-start gap-3">
             <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-900 leading-relaxed">
-              {message || 'You have reached the maximum allowance for your current plan. Upgrade to Growth or Luxury Pro to expand your team and services.'}
+              {message || 'You have reached the maximum allowance for your current plan. Upgrade to Growth or Pro to expand your team and services.'}
             </p>
           </div>
 
           <div className="space-y-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted">Perks in Growth & Luxury Pro:</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted">Perks in Growth & Pro:</h4>
             <div className="grid grid-cols-1 gap-2.5 text-xs text-deep-plum">
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Up to 10 Specialists (or Unlimited on Luxury Pro)</span>
+                <span>Up to 20 Specialists on Growth (up to 50 on Pro)</span>
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Unlimited Services & Category Customization</span>
+                <span>Up to 15 Catalog Services on Growth (Unlimited on Pro)</span>
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Instant Payment Gateway & Digital GST Invoicing</span>
+                <span>Instant Razorpay Online Payments & Automated Invoicing</span>
               </div>
               <div className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Reduced Settlement Fees (down to 0% on Luxury Pro)</span>
+                <span>Reduced Settlement Fees (down to 0% on Pro)</span>
               </div>
             </div>
           </div>

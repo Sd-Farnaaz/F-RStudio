@@ -79,7 +79,7 @@ export default function FeaturesPage() {
                 Zero Double-Booking with Live Concurrency Protection
               </h2>
               <p className="text-sm sm:text-base text-muted leading-relaxed">
-                SalonBook calculates real availability in real time across specialist working shifts, breaks, and existing appointments. When two clients choose the same moment, our database-level concurrency safeguards ensure conflicting slots are locked instantly.
+                F&R Beauty Studio calculates real availability in real time across specialist working shifts, breaks, and existing appointments. When two clients choose the same moment, our database-level concurrency safeguards ensure conflicting slots are locked instantly.
               </p>
               
               <ul className="space-y-2.5 pt-2 text-xs sm:text-sm text-deep-plum">
@@ -288,7 +288,7 @@ export default function FeaturesPage() {
                 Dual-Channel In-App & Email Notifications
               </h2>
               <p className="text-sm sm:text-base text-muted leading-relaxed">
-                Keep both clients and salon teams aligned without manual phone tag. SalonBook includes an active in-app notification center with live unread badge counters, instant mark-as-read toggles, and hosted background worker tasks for 24-hour and 2-hour appointment reminders.
+                Keep both clients and salon teams aligned without manual phone tag. F&R Beauty Studio includes an active in-app notification center with live unread badge counters, instant mark-as-read toggles, and hosted background worker tasks for 24-hour and 2-hour appointment reminders.
               </p>
 
               <ul className="space-y-2.5 pt-2 text-xs sm:text-sm text-deep-plum">
@@ -427,7 +427,7 @@ export default function FeaturesPage() {
         <section className="py-20 text-center">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
             <h2 className="text-3xl sm:text-4xl font-serif font-medium text-deep-plum">
-              Experience the SalonBook difference today.
+              Experience the F&R Beauty Studio difference today.
             </h2>
             <p className="text-sm sm:text-base text-muted max-w-xl mx-auto leading-relaxed">
               Join the modern platform designed specifically for beauty professionals and their clients.

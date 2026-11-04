@@ -49,7 +49,7 @@ export default function SignupPage() {
   return (
     <AuthLayout 
       title="Create your account" 
-      subtitle="Join SalonBook to discover exceptional studios and book your beauty visits."
+      subtitle="Join F&R Beauty Studio to discover exceptional studios and book your beauty visits."
       imageSrc="https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&w=1200&q=85"
     >
       {error && (

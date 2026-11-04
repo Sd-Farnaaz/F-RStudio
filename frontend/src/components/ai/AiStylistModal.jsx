@@ -123,7 +123,7 @@ export default function AiStylistModal({ isOpen, onClose, salonSlug, onSelectSer
 
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-xs font-semibold text-rose-tint mb-3">
             <Sparkles className="w-3.5 h-3.5 text-accent-gold animate-pulse" />
-            <span>SalonBook Neural Stylist v2.4</span>
+            <span>F&R Studio Neural Stylist v2.4</span>
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-serif font-medium tracking-tight">

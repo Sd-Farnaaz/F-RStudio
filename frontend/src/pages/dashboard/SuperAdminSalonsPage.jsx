@@ -891,9 +891,9 @@ export default function SuperAdminSalonsPage() {
                     onChange={(e) => setTierModal(prev => ({ ...prev, tier: e.target.value }))}
                     className="w-full px-3.5 py-2.5 bg-ivory text-xs border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-rose/40 text-deep-plum font-medium"
                   >
-                    <option value="Starter">Starter Solo (₹999/mo - 1 Staff, Core POS)</option>
-                    <option value="Growth">Growth Studio (₹2,499/mo - Up to 5 Staff, Dossiers & Formulas)</option>
-                    <option value="LuxuryPro">Luxury Pro (₹4,999/mo - Unlimited Staff, Priority Escrow)</option>
+                    <option value="Starter">Starter Trial (₹0 / 30-Day - 5 Staff, 5 Services)</option>
+                    <option value="Growth">Growth Studio (₹1,499/mo - 20 Staff, 15 Services)</option>
+                    <option value="Pro">Pro Flagship (₹2,999/mo - 50 Staff, Unlimited Services)</option>
                   </select>
                 </div>
 

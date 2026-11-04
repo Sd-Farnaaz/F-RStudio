@@ -57,7 +57,7 @@ export default function AdminRegisterPage() {
 
   return (
     <AuthLayout 
-      title="Partner with SalonBook" 
+      title="Partner with F&R Beauty Studio" 
       subtitle="Register your business to begin managing appointments, specialists, and payments."
       imageSrc="https://images.unsplash.com/photo-1633681926022-84c23e8cb2d6?auto=format&fit=crop&w=1200&q=85"
     >

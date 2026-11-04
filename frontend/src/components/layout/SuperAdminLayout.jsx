@@ -96,15 +96,17 @@ export default function SuperAdminLayout({ children, title, breadcrumbs = [] }) 
         {/* Brand Header */}
         <div className="h-18 shrink-0 flex items-center justify-between px-6 border-b border-border-color bg-white">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-deep-plum flex items-center justify-center text-white shadow-xs">
-              <Shield className="w-5 h-5 text-dusty-rose" />
-            </div>
+            <img 
+              src="/images/fr-beauty-studio-logo.png" 
+              alt="F&R Beauty Studio Logo" 
+              className="w-10 h-10 object-contain rounded-full border border-border-color shadow-2xs" 
+            />
             <div>
               <Link 
                 to="/superadmin/dashboard" 
-                className="font-serif text-xl font-bold text-deep-plum tracking-tight flex items-center gap-1.5"
+                className="font-serif text-lg font-bold text-deep-plum tracking-tight flex items-center gap-1.5"
               >
-                SalonBook
+                F&R Beauty Studio
               </Link>
               <div className="flex items-center gap-1.5">
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -190,7 +192,7 @@ export default function SuperAdminLayout({ children, title, breadcrumbs = [] }) 
                 {user?.fullName || 'Super Administrator'}
               </p>
               <p className="text-[11px] text-muted truncate">
-                {user?.email || 'superadmin@salonbook.com'}
+                {user?.email || 'superadmin@frbeautystudio.com'}
               </p>
             </div>
           </div>

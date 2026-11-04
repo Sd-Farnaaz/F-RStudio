@@ -81,7 +81,14 @@ export default function DashboardLayout({ children }) {
       {/* Sidebar */}
       <div className={`fixed inset-y-0 left-0 w-72 bg-white border-r border-border-color flex flex-col transform transition-transform duration-300 ease-in-out z-50 lg:translate-x-0 lg:static shadow-xl lg:shadow-none ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-border-color">
-          <Link to={getLogoLink()} className="text-2xl font-serif font-semibold text-primary-rose">SalonBook</Link>
+          <Link to={getLogoLink()} className="flex items-center gap-2.5 text-xl font-serif font-semibold text-deep-plum">
+            <img 
+              src="/images/fr-beauty-studio-logo.png" 
+              alt="F&R Beauty Studio Logo" 
+              className="w-8 h-8 object-contain rounded-full border border-border-color shadow-2xs" 
+            />
+            <span>F&R <span className="text-primary-rose">Studio</span></span>
+          </Link>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-muted hover:text-deep-plum">
             <X className="w-6 h-6" />
           </button>
@@ -137,13 +144,21 @@ export default function DashboardLayout({ children }) {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Topbar */}
         <header className="h-16 bg-white border-b border-border-color flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0 shadow-sm z-30 relative">
-          <div className="flex items-center lg:hidden">
+          <div className="flex items-center gap-2.5 lg:hidden">
             <button 
               onClick={() => setSidebarOpen(true)}
               className="text-muted hover:text-deep-plum focus:outline-none p-1.5 rounded-md hover:bg-soft-blush transition-colors"
             >
               <Menu className="h-6 w-6" />
             </button>
+            <Link to={getLogoLink()} className="flex items-center gap-2 font-serif font-semibold text-deep-plum text-sm">
+              <img 
+                src="/images/fr-beauty-studio-logo.png" 
+                alt="F&R Beauty Studio" 
+                className="w-7 h-7 object-contain rounded-full border border-border-color shadow-2xs" 
+              />
+              <span>F&R Studio</span>
+            </Link>
           </div>
           
           <div className="flex-1 flex justify-end items-center gap-4">

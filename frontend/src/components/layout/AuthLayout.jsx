@@ -9,9 +9,14 @@ export default function AuthLayout({ children, title, subtitle, imageSrc }) {
         
         {/* Header Bar */}
         <div className="flex items-center justify-between mb-8 sm:mb-12">
-          <Link to="/" className="group flex items-center gap-2 focus:outline-none">
-            <span className="font-serif text-2xl font-bold tracking-tight text-deep-plum">
-              Salon<span className="text-primary-rose">Book</span>
+          <Link to="/" className="group flex items-center gap-2.5 focus:outline-none">
+            <img 
+              src="/images/fr-beauty-studio-logo.png" 
+              alt="F&R Beauty Studio Logo" 
+              className="w-9 h-9 object-contain rounded-full border border-border-color shadow-2xs group-hover:scale-105 transition-transform" 
+            />
+            <span className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-deep-plum">
+              F&R <span className="text-primary-rose">Beauty Studio</span>
             </span>
           </Link>
 

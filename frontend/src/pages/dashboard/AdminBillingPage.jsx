@@ -1,34 +1,34 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { subscriptionService } from '../../services/subscriptionService';
+import { useAuth } from '../../context/AuthContext';
 import { 
   CreditCard, Check, Sparkles, ShieldCheck, Zap, AlertCircle, 
-  CheckCircle2, RefreshCw, X, ArrowRight, Star, Building2, Smartphone, Users, Scissors
+  CheckCircle2, RefreshCw, X, ArrowRight, Star, Clock, 
+  Users, Scissors, AlertTriangle, Receipt, ExternalLink, HelpCircle
 } from 'lucide-react';
 
 export default function AdminBillingPage() {
+  const { user } = useAuth();
   const [subscription, setSubscription] = useState(null);
+  const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [error, setError] = useState('');
   const [billingCycle, setBillingCycle] = useState('Monthly'); // 'Monthly' | 'Annual'
 
-  // Upgrade Modal State
-  const [targetPlan, setTargetPlan] = useState(null);
-  const [upgrading, setUpgrading] = useState(false);
-  const [upgradeError, setUpgradeError] = useState('');
-  const [upgradeSuccess, setUpgradeSuccess] = useState('');
-  const [selectedMethod, setSelectedMethod] = useState('UPI');
+  // Checkout Execution States
+  const [initiatingPlan, setInitiatingPlan] = useState(null);
+  const [checkoutState, setCheckoutState] = useState('idle'); // 'idle' | 'initiating' | 'open' | 'verifying' | 'success' | 'failed' | 'cancelled'
+  const [checkoutError, setCheckoutError] = useState('');
+  const [verificationResult, setVerificationResult] = useState(null);
 
-  // Cancel State
+  // Cancel Renewal State
   const [cancelling, setCancelling] = useState(false);
   const [cancelMessage, setCancelMessage] = useState('');
 
-  useEffect(() => {
-    fetchSubscription();
-  }, []);
-
-  const fetchSubscription = async () => {
+  const fetchSubscription = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -42,53 +42,152 @@ export default function AdminBillingPage() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const fetchTransactions = useCallback(async () => {
+    try {
+      setLoadingTransactions(true);
+      const list = await subscriptionService.getSubscriptionTransactions();
+      setTransactions(Array.isArray(list) ? list : []);
+    } catch (err) {
+      console.warn('Failed to load transaction history:', err);
+    } finally {
+      setLoadingTransactions(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSubscription();
+    fetchTransactions();
+  }, [fetchSubscription, fetchTransactions]);
+
+  // Dynamically load Razorpay SDK script if not already on the page
+  const ensureRazorpayLoaded = () => {
+    return new Promise((resolve) => {
+      if (typeof window !== 'undefined' && window.Razorpay) {
+        resolve(true);
+        return;
+      }
+      const existingScript = document.querySelector('script[src*="checkout.razorpay.com"]');
+      if (existingScript) {
+        let checks = 0;
+        const interval = setInterval(() => {
+          checks++;
+          if (window.Razorpay) {
+            clearInterval(interval);
+            resolve(true);
+          } else if (checks > 30) {
+            clearInterval(interval);
+            resolve(false);
+          }
+        }, 100);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
   };
 
-  const handleOpenUpgrade = (plan) => {
-    setTargetPlan(plan);
-    setUpgradeError('');
-    setUpgradeSuccess('');
-  };
-
-  const handleConfirmUpgrade = async (e) => {
-    e.preventDefault();
-    if (!targetPlan) return;
+  // Launch official Razorpay Checkout modal
+  const handleLaunchCheckout = async (plan) => {
+    if (!plan || plan.tier === 'Starter') return;
 
     try {
-      setUpgrading(true);
-      setUpgradeError('');
-      setUpgradeSuccess('');
+      setInitiatingPlan(plan.tier);
+      setCheckoutState('initiating');
+      setCheckoutError('');
+      setVerificationResult(null);
 
-      const res = await subscriptionService.upgradeSubscription({
-        tier: targetPlan.tier,
-        billingCycle: billingCycle,
-        paymentMethod: selectedMethod
+      const loaded = await ensureRazorpayLoaded();
+      if (!loaded || !window.Razorpay) {
+        throw new Error('Unable to load Razorpay payment gateway script. Please check your internet connection.');
+      }
+
+      // 1. Authoritative Backend Order Creation
+      const orderData = await subscriptionService.createSubscriptionOrder({
+        tier: plan.tier,
+        billingCycle: billingCycle
       });
 
-      setUpgradeSuccess(res.message || `Successfully upgraded to the ${targetPlan.name} plan!`);
+      setCheckoutState('open');
+
+      // 2. Configure Official Checkout options
+      const options = {
+        key: orderData.keyId || import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TtEAB1fZHDnzUW',
+        amount: orderData.amountInPaise,
+        currency: orderData.currency || 'INR',
+        name: 'F&R Beauty Studio',
+        description: orderData.description || `${plan.name} Subscription (${billingCycle})`,
+        image: '/images/fr-beauty-studio-logo.png',
+        order_id: orderData.orderId,
+        prefill: {
+          name: user?.fullName || orderData.salonName || '',
+          email: user?.email || orderData.salonEmail || ''
+        },
+        theme: {
+          color: '#B66B70' // Primary Rose Brand Color
+        },
+        modal: {
+          ondismiss: function () {
+            setCheckoutState('cancelled');
+            setCheckoutError('Payment modal was closed. No funds were debited.');
+            setInitiatingPlan(null);
+          }
+        },
+        handler: async function (response) {
+          // 3. Cryptographic Server-Side Verification
+          // Do not trust the frontend alone — the server verifies the HMAC SHA256 signature!
+          setCheckoutState('verifying');
+          try {
+            const verifyResponse = await subscriptionService.verifySubscriptionPayment({
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+              paymentMethod: 'Razorpay Test Mode'
+            });
+
+            setVerificationResult(verifyResponse);
+            setCheckoutState('success');
+            await fetchSubscription();
+            await fetchTransactions();
+          } catch (err) {
+            setCheckoutState('failed');
+            setCheckoutError(err.message || 'Payment verification failed on the server.');
+          } finally {
+            setInitiatingPlan(null);
+          }
+        }
+      };
+
+      const razorpayInstance = new window.Razorpay(options);
       
-      // Refresh state
-      setTimeout(async () => {
-        await fetchSubscription();
-        setTargetPlan(null);
-        setUpgradeSuccess('');
-      }, 1500);
+      razorpayInstance.on('payment.failed', function (resp) {
+        setCheckoutState('failed');
+        setCheckoutError(resp.error?.description || 'Payment was declined or cancelled at the gateway.');
+        setInitiatingPlan(null);
+      });
+
+      razorpayInstance.open();
     } catch (err) {
-      setUpgradeError(err.message || 'Failed to upgrade plan. Please try again.');
-    } finally {
-      setUpgrading(false);
+      setCheckoutState('failed');
+      setCheckoutError(err.message || 'Failed to initiate Razorpay checkout order.');
+      setInitiatingPlan(null);
     }
   };
 
   const handleCancelSubscription = async () => {
-    if (!window.confirm('Are you sure you want to cancel your plan renewal? Your premium perks remain active until the end of this billing cycle.')) {
+    if (!window.confirm('Are you sure you want to cancel automatic renewal? Your plan privileges will remain active until the end of your billing cycle.')) {
       return;
     }
 
     try {
       setCancelling(true);
       const res = await subscriptionService.cancelSubscription();
-      setCancelMessage(res.message || 'Subscription cancelled successfully.');
+      setCancelMessage(res.message || 'Subscription renewal cancelled.');
       await fetchSubscription();
     } catch (err) {
       alert(err.message || 'Failed to cancel subscription.');
@@ -99,25 +198,31 @@ export default function AdminBillingPage() {
 
   const isCurrentPlan = (tier) => {
     if (!subscription) return false;
-    return subscription.currentTier.toLowerCase() === tier.toLowerCase();
+    const current = (subscription.currentTier || '').toLowerCase();
+    const target = (tier || '').toLowerCase();
+    if (target === 'pro' && (current === 'pro' || current === 'luxurypro')) return true;
+    return current === target;
   };
 
   const getTierBadge = (tier) => {
     switch (tier?.toLowerCase()) {
+      case 'pro':
       case 'luxurypro':
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-deep-plum text-white flex items-center gap-1"><Sparkles className="w-3 h-3 text-amber-300" /> Luxury Pro</span>;
+        return <span className="px-3 py-1 text-xs font-semibold rounded-full bg-deep-plum text-white flex items-center gap-1 shadow-2xs"><Sparkles className="w-3 h-3 text-accent-gold" /> Pro Flagship</span>;
       case 'growth':
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-primary-rose text-white flex items-center gap-1"><Zap className="w-3 h-3" /> Growth Studio</span>;
+        return <span className="px-3 py-1 text-xs font-semibold rounded-full bg-primary-rose text-white flex items-center gap-1 shadow-2xs"><Zap className="w-3 h-3" /> Growth Studio</span>;
       default:
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-ivory border border-border-color text-deep-plum">Starter Solo</span>;
+        return <span className="px-3 py-1 text-xs font-semibold rounded-full bg-ivory border border-border-color text-deep-plum">Starter Trial</span>;
     }
   };
 
   return (
     <DashboardLayout>
-      <div className="space-y-8 max-w-7xl mx-auto pb-12 animate-in fade-in">
+      <div className="space-y-8 max-w-7xl mx-auto pb-16 animate-in fade-in">
         
-        {/* Page Header */}
+        {/* ========================================================================= */}
+        {/* 1. HEADER & TEST MODE NOTICE BANNER                                       */}
+        {/* ========================================================================= */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-color pb-6">
           <div>
             <div className="flex items-center gap-3">
@@ -125,7 +230,7 @@ export default function AdminBillingPage() {
               {subscription && getTierBadge(subscription.currentTier)}
             </div>
             <p className="text-sm text-muted mt-1">
-              Manage your salon subscription tier, specialist quotas, and platform revenue privileges.
+              Manage your salon subscription, specialist quotas, and Razorpay payment credentials.
             </p>
           </div>
 
@@ -135,11 +240,62 @@ export default function AdminBillingPage() {
               disabled={cancelling}
               className="text-xs text-muted hover:text-danger underline transition-colors self-start md:self-auto cursor-pointer"
             >
-              {cancelling ? 'Cancelling...' : 'Cancel Paid Subscription'}
+              {cancelling ? 'Cancelling...' : 'Cancel Subscription Renewal'}
             </button>
           )}
         </div>
 
+        {/* Razorpay Test Mode Notice */}
+        <div className="p-4 bg-amber-50/80 border border-amber-200/80 rounded-2xl flex items-start gap-3 text-xs sm:text-sm text-amber-900 shadow-2xs">
+          <HelpCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <span className="font-semibold block text-amber-950">Razorpay Test Mode Active</span>
+            <p className="text-amber-800 leading-relaxed text-xs">
+              All transactions on this page run in Razorpay Test Mode using Key ID <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono text-amber-950">rzp_test_TtEAB1fZHDnzUW</code>. Payments are simulated and will never charge real bank accounts or credit cards.
+            </p>
+          </div>
+        </div>
+
+        {/* Trial Status or Expiry Warning Banners */}
+        {subscription?.isTrialActive && (
+          <div className="p-4 bg-soft-blush/40 border border-primary-rose/30 rounded-2xl flex items-center justify-between gap-4 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary-rose/10 flex items-center justify-center text-primary-rose">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-deep-plum text-sm">
+                  Complimentary 30-Day Starter Trial Active
+                </h4>
+                <p className="text-xs text-muted">
+                  {subscription.remainingTrialDays != null 
+                    ? `${subscription.remainingTrialDays} days remaining` 
+                    : 'Active trial period'}
+                  {subscription.trialEndsAtUtc && ` • Expires ${new Date(subscription.trialEndsAtUtc).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                </p>
+              </div>
+            </div>
+            <span className="text-xs font-semibold text-primary-rose bg-white px-3 py-1.5 rounded-xl border border-primary-rose/20 shadow-2xs">
+              Trial Mode
+            </span>
+          </div>
+        )}
+
+        {subscription?.isSubscriptionExpired && (
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3 shadow-2xs">
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-serif font-bold text-rose-900 text-sm">
+                Subscription Expired: Temporary Deactivation
+              </h4>
+              <p className="text-xs text-rose-800 mt-0.5 leading-relaxed">
+                Your salon subscription period has ended. Client bookings and specialist catalog modifications are paused. Please upgrade or renew below to reactivate your studio immediately.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Global Error Banner */}
         {error && (
           <div className="p-4 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200 flex items-center gap-2">
             <AlertCircle className="w-5 h-5 shrink-0" />
@@ -154,6 +310,82 @@ export default function AdminBillingPage() {
           </div>
         )}
 
+        {/* ========================================================================= */}
+        {/* 2. CHECKOUT PROGRESS & RESULT ALERTS                                      */}
+        {/* ========================================================================= */}
+        {checkoutState === 'verifying' && (
+          <div className="p-5 bg-soft-blush/60 border border-primary-rose/40 rounded-2xl flex items-center gap-3 animate-pulse">
+            <RefreshCw className="w-5 h-5 text-primary-rose animate-spin shrink-0" />
+            <div className="text-xs sm:text-sm">
+              <span className="font-semibold text-deep-plum block">Verifying Payment Cryptographically...</span>
+              <span className="text-muted">The server is validating the Razorpay signature and activating your subscription.</span>
+            </div>
+          </div>
+        )}
+
+        {checkoutState === 'success' && verificationResult && (
+          <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start justify-between gap-4 animate-in zoom-in-95">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-emerald-950 text-base">
+                  Payment Verified & Plan Activated!
+                </h4>
+                <p className="text-xs text-emerald-800 mt-1">
+                  Your salon is now active on the <strong>{verificationResult.tier}</strong> plan ({verificationResult.billingCycle}).
+                  Payment reference: <code className="bg-emerald-100 px-1 py-0.5 rounded font-mono">{verificationResult.transactionReference}</code>.
+                </p>
+                {verificationResult.renewsAtUtc && (
+                  <p className="text-[11px] text-emerald-700 mt-1">
+                    Valid through: {new Date(verificationResult.renewsAtUtc).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => { setCheckoutState('idle'); setVerificationResult(null); }}
+              className="text-emerald-700 hover:text-emerald-900 p-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {checkoutState === 'failed' && checkoutError && (
+          <div className="p-5 bg-rose-50 border border-rose-200 rounded-2xl flex items-start justify-between gap-3 animate-in fade-in">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold text-rose-950 text-xs sm:text-sm block">Payment or Verification Failed</span>
+                <p className="text-xs text-rose-800 mt-0.5">{checkoutError}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => { setCheckoutState('idle'); setCheckoutError(''); }}
+              className="text-rose-700 hover:text-rose-900 p-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {checkoutState === 'cancelled' && (
+          <div className="p-4 bg-ivory border border-border-color rounded-2xl flex items-center justify-between text-xs text-muted">
+            <span>{checkoutError || 'Checkout modal was dismissed.'}</span>
+            <button
+              onClick={() => { setCheckoutState('idle'); setCheckoutError(''); }}
+              className="text-muted hover:text-deep-plum p-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 3. USAGE & CAPACITY QUOTAS                                                */}
+        {/* ========================================================================= */}
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center gap-3 text-muted">
             <RefreshCw className="w-8 h-8 animate-spin text-primary-rose" />
@@ -161,7 +393,6 @@ export default function AdminBillingPage() {
           </div>
         ) : subscription ? (
           <>
-            {/* 3 Capacity & Quota Meters */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Specialists Quota */}
               <div className="bg-white p-6 rounded-2xl border border-border-color shadow-2xs space-y-3">
@@ -192,7 +423,7 @@ export default function AdminBillingPage() {
                 </div>
                 <div className="flex justify-between items-center text-xs pt-1">
                   <span className="text-muted">
-                    {subscription.canAddStaff ? 'Capacity available' : 'Quota reached'}
+                    {subscription.canAddStaff ? 'Capacity available' : 'Limit reached'}
                   </span>
                   <Link to="/admin/staff" className="text-primary-rose hover:underline font-medium">
                     Manage Team →
@@ -200,7 +431,7 @@ export default function AdminBillingPage() {
                 </div>
               </div>
 
-              {/* Services Quota */}
+              {/* Services Catalog Quota */}
               <div className="bg-white p-6 rounded-2xl border border-border-color shadow-2xs space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wider text-muted">Services Catalog</span>
@@ -229,7 +460,7 @@ export default function AdminBillingPage() {
                 </div>
                 <div className="flex justify-between items-center text-xs pt-1">
                   <span className="text-muted">
-                    {subscription.canAddService ? 'Capacity available' : 'Quota reached'}
+                    {subscription.canAddService ? 'Capacity available' : 'Limit reached'}
                   </span>
                   <Link to="/admin/services" className="text-primary-rose hover:underline font-medium">
                     Catalog Menu →
@@ -237,7 +468,7 @@ export default function AdminBillingPage() {
                 </div>
               </div>
 
-              {/* Commission Rate & Payout Privileges */}
+              {/* Platform Settlement Privilege */}
               <div className="bg-white p-6 rounded-2xl border border-border-color shadow-2xs space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wider text-muted">Platform Payout Fee</span>
@@ -245,16 +476,16 @@ export default function AdminBillingPage() {
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-bold font-serif text-deep-plum">
-                    {subscription.currentTier.toLowerCase() === 'luxurypro' ? '0.0%' 
+                    {subscription.hasZeroCommission ? '0.0%' 
                      : subscription.currentTier.toLowerCase() === 'growth' ? '2.5%' 
                      : '5.0%'}
                   </span>
                   <span className="text-xs text-muted">per booking settlement</span>
                 </div>
                 <p className="text-xs text-muted leading-relaxed">
-                  {subscription.currentTier.toLowerCase() === 'luxurypro' 
-                    ? '100% revenue retention unlocked with instant zero-commission escrow.'
-                    : 'Upgrade to Luxury Pro to eliminate all platform fees completely.'}
+                  {subscription.hasZeroCommission
+                    ? '100% revenue retention unlocked with priority zero-commission escrow.'
+                    : 'Upgrade to Pro to eliminate platform settlement commission completely.'}
                 </p>
                 <div className="pt-1">
                   <Link to="/admin/payouts" className="text-xs text-primary-rose hover:underline font-medium">
@@ -264,7 +495,7 @@ export default function AdminBillingPage() {
               </div>
             </div>
 
-            {/* Billing Cycle Toggle */}
+            {/* Billing Cadence Switcher */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 bg-white rounded-2xl border border-border-color shadow-2xs">
               <div>
                 <h3 className="font-serif font-bold text-deep-plum text-base">Select Billing Cadence</h3>
@@ -300,13 +531,18 @@ export default function AdminBillingPage() {
               </div>
             </div>
 
-            {/* 3-Tier Pricing Cards */}
+            {/* ========================================================================= */}
+            {/* 4. SUBSCRIPTION PLAN CARDS (Starter Trial, Growth, Pro)                   */}
+            {/* ========================================================================= */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
               {(subscription.availablePlans || []).map((plan) => {
                 const isCurrent = isCurrentPlan(plan.tier);
+                const isStarter = plan.tier === 'Starter';
                 const price = billingCycle === 'Annual' ? plan.annualPrice : plan.monthlyPrice;
                 const priceDisplay = price === 0 ? 'Free' : `₹${price.toLocaleString('en-IN')}`;
-                const periodDisplay = price === 0 ? 'forever' : billingCycle === 'Annual' ? '/year' : '/month';
+                const periodDisplay = price === 0 ? 'for 30 days' : billingCycle === 'Annual' ? '/year' : '/month';
+
+                const isUpgradingThis = initiatingPlan === plan.tier;
 
                 return (
                   <div
@@ -352,10 +588,22 @@ export default function AdminBillingPage() {
                         )}
                       </div>
 
+                      {/* Quotas overview */}
+                      <div className="grid grid-cols-2 gap-2 p-3 bg-ivory rounded-xl border border-border-color text-xs">
+                        <div>
+                          <span className="text-muted block text-[10px] uppercase font-semibold">Services</span>
+                          <strong className="text-deep-plum">{plan.maxServices ? `Up to ${plan.maxServices}` : 'Unlimited'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-muted block text-[10px] uppercase font-semibold">Specialists</span>
+                          <strong className="text-deep-plum">{plan.maxStaff ? `Up to ${plan.maxStaff}` : 'Unlimited'}</strong>
+                        </div>
+                      </div>
+
                       {/* Features List */}
                       <div className="space-y-3 pt-3 border-t border-border-color">
                         <span className="text-xs font-semibold uppercase tracking-wider text-muted block">
-                          Included Features
+                          Included Capabilities
                         </span>
                         <ul className="space-y-2.5 text-xs text-deep-plum">
                           {plan.features.map((feat, idx) => (
@@ -368,24 +616,60 @@ export default function AdminBillingPage() {
                       </div>
                     </div>
 
-                    {/* Action Button */}
+                    {/* Action Button: Razorpay Checkout Trigger */}
                     <div className="pt-8">
                       {isCurrent ? (
-                        <div className="w-full py-3 bg-ivory text-deep-plum text-center text-xs font-semibold rounded-xl border border-border-color cursor-default">
-                          Your Active Subscription
+                        <div className="space-y-2">
+                          <div className="w-full py-3 bg-ivory text-deep-plum text-center text-xs font-semibold rounded-xl border border-border-color cursor-default">
+                            {subscription.isSubscriptionExpired ? 'Plan Expired' : 'Active Subscription'}
+                          </div>
+                          {price > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleLaunchCheckout(plan)}
+                              disabled={isUpgradingThis || checkoutState === 'initiating' || checkoutState === 'verifying'}
+                              className="w-full py-2.5 text-xs font-semibold text-primary-rose bg-white border border-primary-rose/40 hover:bg-soft-blush rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              {isUpgradingThis ? (
+                                <>
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  <span>Launching Checkout...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <RefreshCw className="w-3.5 h-3.5" />
+                                  <span>Renew Subscription (Test Mode)</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      ) : isStarter ? (
+                        <div className="w-full py-3 bg-ivory text-muted text-center text-xs font-semibold rounded-xl border border-border-color cursor-default">
+                          Trial Plan (Initial Signup Only)
                         </div>
                       ) : (
                         <button
                           type="button"
-                          onClick={() => handleOpenUpgrade(plan)}
-                          className={`w-full py-3 text-xs font-semibold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer ${
+                          onClick={() => handleLaunchCheckout(plan)}
+                          disabled={isUpgradingThis || checkoutState === 'initiating' || checkoutState === 'verifying'}
+                          className={`w-full py-3 text-xs font-semibold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 ${
                             plan.isPopular
                               ? 'bg-primary-rose text-white hover:bg-primary-rose/90 shadow-md'
                               : 'bg-deep-plum text-white hover:bg-deep-plum/90'
                           }`}
                         >
-                          <span>Upgrade to {plan.name}</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
+                          {isUpgradingThis ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                              <span>Preparing Razorpay...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>Pay with Razorpay (Test)</span>
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </>
+                          )}
                         </button>
                       )}
                     </div>
@@ -393,142 +677,110 @@ export default function AdminBillingPage() {
                 );
               })}
             </div>
-          </>
-        ) : null}
 
-        {/* ----------------- CHECKOUT / UPGRADE MODAL ----------------- */}
-        {targetPlan && (
-          <div className="fixed inset-0 z-50 bg-deep-plum/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
-            <div className="bg-white rounded-2xl max-w-lg w-full border border-border-color shadow-2xl overflow-hidden my-8">
-              
-              <div className="px-6 py-4 border-b border-border-color bg-ivory/70 flex items-center justify-between">
+            {/* ========================================================================= */}
+            {/* 5. TRANSACTION HISTORY & AUDIT LEDGER                                      */}
+            {/* ========================================================================= */}
+            <div className="bg-white rounded-3xl border border-border-color shadow-2xs overflow-hidden mt-10">
+              <div className="p-6 border-b border-border-color flex items-center justify-between">
                 <div>
-                  <h3 className="font-serif font-semibold text-deep-plum text-lg">Confirm Plan Upgrade</h3>
-                  <p className="text-xs text-muted">Upgrading to {targetPlan.name} ({billingCycle})</p>
+                  <h3 className="font-serif font-bold text-deep-plum text-lg flex items-center gap-2">
+                    <Receipt className="w-5 h-5 text-primary-rose" />
+                    Subscription Transaction Ledger
+                  </h3>
+                  <p className="text-xs text-muted mt-0.5">
+                    Official record of Razorpay orders, payment signatures, and plan activations for your studio.
+                  </p>
                 </div>
                 <button
-                  onClick={() => setTargetPlan(null)}
-                  className="p-1 rounded-md text-muted hover:text-deep-plum hover:bg-white transition-colors"
+                  type="button"
+                  onClick={fetchTransactions}
+                  disabled={loadingTransactions}
+                  className="p-2 text-muted hover:text-deep-plum rounded-lg hover:bg-ivory transition-colors cursor-pointer"
+                  title="Refresh transaction history"
                 >
-                  <X className="w-5 h-5" />
+                  <RefreshCw className={`w-4 h-4 ${loadingTransactions ? 'animate-spin text-primary-rose' : ''}`} />
                 </button>
               </div>
 
-              {upgradeSuccess ? (
-                <div className="p-8 text-center space-y-4 animate-in zoom-in-95">
-                  <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                    <CheckCircle2 className="w-9 h-9" />
-                  </div>
-                  <h4 className="font-serif font-bold text-deep-plum text-xl">Plan Activated Successfully!</h4>
-                  <p className="text-xs text-muted">{upgradeSuccess}</p>
+              {loadingTransactions ? (
+                <div className="py-12 text-center text-muted text-xs">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-primary-rose" />
+                  Loading payment history...
+                </div>
+              ) : transactions.length === 0 ? (
+                <div className="p-10 text-center space-y-2">
+                  <p className="text-sm font-medium text-deep-plum">No paid transactions recorded yet</p>
+                  <p className="text-xs text-muted max-w-sm mx-auto">
+                    When you upgrade or renew your subscription through Razorpay Test Mode, verified transaction references and receipts will appear here.
+                  </p>
                 </div>
               ) : (
-                <form onSubmit={handleConfirmUpgrade} className="p-6 space-y-6">
-                  {/* Order Summary Box */}
-                  <div className="p-4 bg-soft-blush/30 rounded-xl border border-border-color space-y-2.5 text-xs">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted font-medium">Selected Tier:</span>
-                      <strong className="text-deep-plum font-semibold">{targetPlan.name}</strong>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted">Billing Cycle:</span>
-                      <span className="font-medium text-deep-plum">{billingCycle}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted">Staff Quota:</span>
-                      <span className="font-medium text-deep-plum">
-                        {targetPlan.maxStaff ? `${targetPlan.maxStaff} Specialists` : 'Unlimited'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted">Platform Settlement Fee:</span>
-                      <span className="font-medium text-emerald-700">{targetPlan.commissionPercent}%</span>
-                    </div>
-                    <div className="flex justify-between items-center pt-2 border-t border-border-color/60 text-sm">
-                      <span className="font-semibold text-deep-plum">Total Payable:</span>
-                      <strong className="text-primary-rose text-base">
-                        ₹{(billingCycle === 'Annual' ? targetPlan.annualPrice : targetPlan.monthlyPrice).toLocaleString('en-IN')}
-                      </strong>
-                    </div>
-                  </div>
-
-                  {/* Payment Method Selector */}
-                  <div>
-                    <label className="block text-xs font-semibold text-deep-plum mb-2">Select Payment Method</label>
-                    <div className="grid grid-cols-3 gap-2.5">
-                      {[
-                        { id: 'UPI', label: 'UPI / QR', icon: Smartphone },
-                        { id: 'Card', label: 'Cards', icon: CreditCard },
-                        { id: 'NetBanking', label: 'Net Banking', icon: Building2 },
-                      ].map(m => {
-                        const Icon = m.icon;
-                        const isSelected = selectedMethod === m.id;
-                        return (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() => setSelectedMethod(m.id)}
-                            className={`p-3 rounded-xl border text-left transition-all ${
-                              isSelected
-                                ? 'border-primary-rose bg-soft-blush/30 ring-1 ring-primary-rose'
-                                : 'border-border-color bg-white hover:bg-ivory/50'
-                            }`}
-                          >
-                            <Icon className={`w-4 h-4 mb-1.5 ${isSelected ? 'text-primary-rose' : 'text-muted'}`} />
-                            <div className="text-xs font-semibold text-deep-plum">{m.label}</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {upgradeError && (
-                    <div className="p-3.5 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200 flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>{upgradeError}</span>
-                    </div>
-                  )}
-
-                  <div className="p-3 bg-ivory rounded-xl border border-border-color flex items-center gap-2.5 text-[11px] text-muted">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>256-Bit SSL Encrypted SaaS Subscription • Instant Activation</span>
-                  </div>
-
-                  <div className="pt-2 flex justify-end gap-3 border-t border-border-color">
-                    <button
-                      type="button"
-                      onClick={() => setTargetPlan(null)}
-                      disabled={upgrading}
-                      className="px-4 py-2 text-xs text-muted hover:text-deep-plum transition-colors cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={upgrading}
-                      className="px-6 py-2.5 bg-primary-rose text-white text-xs font-semibold rounded-xl hover:bg-primary-rose/90 transition-all shadow-sm flex items-center gap-2 disabled:opacity-60 cursor-pointer"
-                    >
-                      {upgrading ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span>Processing Upgrade...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="w-4 h-4" />
-                          <span>
-                            Confirm & Pay ₹{(billingCycle === 'Annual' ? targetPlan.annualPrice : targetPlan.monthlyPrice).toLocaleString('en-IN')}
-                          </span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-ivory/60 border-b border-border-color text-muted font-semibold uppercase tracking-wider text-[11px]">
+                        <th className="py-3.5 px-6">Order ID</th>
+                        <th className="py-3.5 px-6">Payment ID</th>
+                        <th className="py-3.5 px-6">Plan Tier</th>
+                        <th className="py-3.5 px-6">Amount</th>
+                        <th className="py-3.5 px-6">Status</th>
+                        <th className="py-3.5 px-6">Verification</th>
+                        <th className="py-3.5 px-6">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-color/60 text-deep-plum">
+                      {transactions.map((tx) => (
+                        <tr key={tx.id} className="hover:bg-ivory/30 transition-colors">
+                          <td className="py-3.5 px-6 font-mono text-muted">{tx.razorpayOrderId}</td>
+                          <td className="py-3.5 px-6 font-mono">
+                            {tx.razorpayPaymentId || <span className="text-muted/60">—</span>}
+                          </td>
+                          <td className="py-3.5 px-6 font-medium">
+                            {tx.planTier} ({tx.billingCycle})
+                          </td>
+                          <td className="py-3.5 px-6 font-semibold">
+                            ₹{tx.amount.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-3.5 px-6">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                              tx.status === 'Paid' 
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : tx.status === 'Failed'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}>
+                              {tx.status}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-6">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono ${
+                              tx.verificationStatus === 'Verified'
+                                ? 'text-emerald-700 font-semibold'
+                                : tx.verificationStatus === 'Failed'
+                                ? 'text-rose-700 font-semibold'
+                                : 'text-muted'
+                            }`}>
+                              {tx.verificationStatus}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-6 text-muted">
+                            {new Date(tx.createdAtUtc).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
-
             </div>
-          </div>
-        )}
+
+          </>
+        ) : null}
 
       </div>
     </DashboardLayout>

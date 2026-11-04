@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SalonBook.Api.Common;
 using SalonBook.Api.Data;
 using SalonBook.Api.DTOs;
 using SalonBook.Api.Models;
@@ -14,91 +15,23 @@ public class SalonSubscriptionController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IRazorpaySubscriptionService _razorpaySubscriptionService;
     private readonly ILogger<SalonSubscriptionController> _logger;
 
     public SalonSubscriptionController(
         ApplicationDbContext dbContext,
         ICurrentUserService currentUserService,
+        IRazorpaySubscriptionService razorpaySubscriptionService,
         ILogger<SalonSubscriptionController> logger)
     {
         _dbContext = dbContext;
         _currentUserService = currentUserService;
+        _razorpaySubscriptionService = razorpaySubscriptionService;
         _logger = logger;
     }
 
-    private static readonly List<SubscriptionPlanInfo> SystemPlans = new()
-    {
-        new SubscriptionPlanInfo
-        {
-            Tier = "Starter",
-            Name = "Starter Solo",
-            Tagline = "Ideal for independent solo stylists and boutique chairs.",
-            MonthlyPrice = 0.00m,
-            AnnualPrice = 0.00m,
-            MaxStaff = 1,
-            MaxServices = 5,
-            CommissionPercent = 5.0m,
-            IsPopular = false,
-            Features = new List<string>
-            {
-                "1 Specialist Staff Profile",
-                "Up to 5 Salon Services",
-                "Direct UPI & QR Code Payments",
-                "Standard Calendar Scheduling",
-                "Basic Client Appointment Ledger",
-                "5% Platform Settlement Fee"
-            }
-        },
-        new SubscriptionPlanInfo
-        {
-            Tier = "Growth",
-            Name = "Growth Studio",
-            Tagline = "For expanding salons seeking online payments and client retention.",
-            MonthlyPrice = 1499.00m,
-            AnnualPrice = 14990.00m,
-            MaxStaff = 10,
-            MaxServices = null, // Unlimited
-            CommissionPercent = 2.5m,
-            IsPopular = true,
-            Features = new List<string>
-            {
-                "Up to 10 Specialist Profiles",
-                "Unlimited Salon Services & Categories",
-                "Instant Online Payment Gateway (UPI / Cards / Net Banking)",
-                "Automated Advance Deposits & No-Show Shield",
-                "Digital GST Tax Invoicing & Downloadable Receipts",
-                "Verified Customer Reviews & Owner Reply Engine",
-                "Automated SMS & Email Appointment Reminders",
-                "Reduced 2.5% Platform Settlement Fee"
-            }
-        },
-        new SubscriptionPlanInfo
-        {
-            Tier = "LuxuryPro",
-            Name = "Luxury Pro",
-            Tagline = "The complete enterprise suite for luxury spas, premium chains & studios.",
-            MonthlyPrice = 3999.00m,
-            AnnualPrice = 39990.00m,
-            MaxStaff = null, // Unlimited
-            MaxServices = null, // Unlimited
-            CommissionPercent = 0.0m,
-            IsPopular = false,
-            Features = new List<string>
-            {
-                "Unlimited Staff Specialists & Multi-Chair Management",
-                "Unlimited Services with Multi-Treatment Bundle Builder",
-                "0% Platform Commission — Retain 100% of Revenue",
-                "Automated Daily Escrow Payouts & Fast-Track Settlement",
-                "Branded Invoices with Custom Salon Logo & GSTIN",
-                "Advanced Financial & Revenue Performance Analytics",
-                "Multi-Channel VIP Client Notifications",
-                "Dedicated 24/7 Concierge & Account Manager"
-            }
-        }
-    };
-
     /// <summary>
-    /// Retrieve current subscription plan, entitlement limits, and usage metrics for the authenticated salon.
+    /// Retrieve current subscription plan, entitlement limits, trial countdown, and usage metrics for the authenticated salon.
     /// </summary>
     [HttpGet("vendor/subscription")]
     [Authorize(Policy = "SalonAdminOnly")]
@@ -125,12 +58,24 @@ public class SalonSubscriptionController : ControllerBase
             .AsNoTracking()
             .CountAsync(s => s.SalonId == salonId.Value && s.IsActive, cancellationToken);
 
-        var currentTier = salon.SubscriptionTier ?? "Starter";
-        var planConfig = SystemPlans.FirstOrDefault(p => p.Tier.Equals(currentTier, StringComparison.OrdinalIgnoreCase)) 
-                         ?? SystemPlans[0];
+        var currentTier = salon.SubscriptionTier ?? SubscriptionPlanCatalog.Starter;
+        var planConfig = SubscriptionPlanCatalog.GetPlanByTier(currentTier) ?? SubscriptionPlanCatalog.StarterPlan;
 
         var canAddStaff = !planConfig.MaxStaff.HasValue || staffCount < planConfig.MaxStaff.Value;
         var canAddService = !planConfig.MaxServices.HasValue || servicesCount < planConfig.MaxServices.Value;
+
+        var now = DateTime.UtcNow;
+        var isTrialActive = (salon.SubscriptionStatus == "Trial" || salon.SubscriptionTier == "Starter") &&
+                            salon.TrialEndsAtUtc.HasValue && salon.TrialEndsAtUtc.Value > now;
+
+        int? remainingTrialDays = null;
+        if (salon.TrialEndsAtUtc.HasValue && salon.TrialEndsAtUtc.Value > now)
+        {
+            remainingTrialDays = Math.Max(0, (int)Math.Ceiling((salon.TrialEndsAtUtc.Value - now).TotalDays));
+        }
+
+        var isExpired = salon.SubscriptionStatus == "Expired" ||
+                        (salon.SubscriptionRenewsAtUtc.HasValue && salon.SubscriptionRenewsAtUtc.Value <= now);
 
         var response = new SalonSubscriptionResponse
         {
@@ -142,25 +87,112 @@ public class SalonSubscriptionController : ControllerBase
             CurrentPrice = salon.SubscriptionPrice,
             StartedAtUtc = salon.SubscriptionStartedAtUtc,
             RenewsAtUtc = salon.SubscriptionRenewsAtUtc,
+            TrialEndsAtUtc = salon.TrialEndsAtUtc,
+            RemainingTrialDays = remainingTrialDays,
+            IsTrialActive = isTrialActive,
+            IsSubscriptionExpired = isExpired,
+            DeactivationReason = salon.DeactivationReason,
+            IsSuspendedByAdmin = salon.IsSuspendedByAdmin,
+            IsActive = salon.IsActive,
             StaffCount = staffCount,
             StaffLimit = planConfig.MaxStaff,
             ServicesCount = servicesCount,
             ServicesLimit = planConfig.MaxServices,
             CanAddStaff = canAddStaff,
             CanAddService = canAddService,
-            HasAdvanceDepositEngine = !currentTier.Equals("Starter", StringComparison.OrdinalIgnoreCase),
+            HasAdvanceDepositEngine = !currentTier.Equals(SubscriptionPlanCatalog.Starter, StringComparison.OrdinalIgnoreCase),
             HasVerifiedReviewsAccess = true,
-            HasZeroCommission = currentTier.Equals("LuxuryPro", StringComparison.OrdinalIgnoreCase),
-            HasCustomBranding = currentTier.Equals("LuxuryPro", StringComparison.OrdinalIgnoreCase),
-            HasPrioritySupport = !currentTier.Equals("Starter", StringComparison.OrdinalIgnoreCase),
-            AvailablePlans = SystemPlans
+            HasZeroCommission = currentTier.Equals("Pro", StringComparison.OrdinalIgnoreCase) || currentTier.Equals("LuxuryPro", StringComparison.OrdinalIgnoreCase),
+            HasCustomBranding = currentTier.Equals("Pro", StringComparison.OrdinalIgnoreCase) || currentTier.Equals("LuxuryPro", StringComparison.OrdinalIgnoreCase),
+            HasPrioritySupport = !currentTier.Equals(SubscriptionPlanCatalog.Starter, StringComparison.OrdinalIgnoreCase),
+            AvailablePlans = SubscriptionPlanCatalog.AllPlans.ToList()
         };
 
         return Ok(response);
     }
 
     /// <summary>
-    /// Upgrade or change salon subscription plan tier and billing cycle.
+    /// Create a Razorpay payment order for upgrading or renewing a salon subscription plan.
+    /// </summary>
+    [HttpPost("vendor/subscription/create-order")]
+    [Authorize(Policy = "SalonAdminOnly")]
+    [ProducesResponseType(typeof(SubscriptionOrderResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CreateOrder(
+        [FromBody] CreateSubscriptionOrderRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var salonId = _currentUserService.SalonId;
+        if (!salonId.HasValue) return Forbid();
+
+        try
+        {
+            var response = await _razorpaySubscriptionService.CreateSubscriptionOrderAsync(salonId.Value, request, cancellationToken);
+            return Ok(response);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Cryptographically verify Razorpay payment signature and activate/renew subscription.
+    /// </summary>
+    [HttpPost("vendor/subscription/verify-payment")]
+    [Authorize(Policy = "SalonAdminOnly")]
+    [ProducesResponseType(typeof(SubscriptionPaymentVerificationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> VerifyPayment(
+        [FromBody] VerifySubscriptionPaymentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var salonId = _currentUserService.SalonId;
+        if (!salonId.HasValue) return Forbid();
+
+        try
+        {
+            var response = await _razorpaySubscriptionService.VerifySubscriptionPaymentAsync(salonId.Value, request, cancellationToken);
+            return Ok(response);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Retrieve transaction ledger of subscription orders and payments for this salon.
+    /// </summary>
+    [HttpGet("vendor/subscription/transactions")]
+    [Authorize(Policy = "SalonAdminOnly")]
+    [ProducesResponseType(typeof(IReadOnlyList<SubscriptionTransactionItemResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetTransactions(CancellationToken cancellationToken = default)
+    {
+        var salonId = _currentUserService.SalonId;
+        if (!salonId.HasValue) return Forbid();
+
+        var transactions = await _razorpaySubscriptionService.GetSalonTransactionsAsync(salonId.Value, cancellationToken);
+        return Ok(transactions);
+    }
+
+    /// <summary>
+    /// Direct instant upgrade endpoint (retained for backward compatibility and manual administrative changes).
     /// </summary>
     [HttpPost("vendor/subscription/upgrade")]
     [Authorize(Policy = "SalonAdminOnly")]
@@ -179,14 +211,14 @@ public class SalonSubscriptionController : ControllerBase
         var salon = await _dbContext.Salons.FirstOrDefaultAsync(s => s.Id == salonId.Value, cancellationToken);
         if (salon == null) return NotFound(new { message = "Salon not found." });
 
-        var targetPlan = SystemPlans.FirstOrDefault(p => p.Tier.Equals(request.Tier, StringComparison.OrdinalIgnoreCase));
+        var targetPlan = SubscriptionPlanCatalog.GetPlanByTier(request.Tier);
         if (targetPlan == null)
         {
-            return BadRequest(new { message = $"Invalid subscription tier '{request.Tier}'. Supported tiers: Starter, Growth, LuxuryPro." });
+            return BadRequest(new { message = $"Invalid subscription tier '{request.Tier}'. Supported tiers: Starter, Growth, Pro." });
         }
 
         var billingCycle = request.BillingCycle.Equals("Annual", StringComparison.OrdinalIgnoreCase) ? "Annual" : "Monthly";
-        var price = billingCycle == "Annual" ? targetPlan.AnnualPrice : targetPlan.MonthlyPrice;
+        var (price, _) = SubscriptionPlanCatalog.GetPriceDetails(targetPlan.Tier, billingCycle);
 
         var now = DateTime.UtcNow;
         var renewsAt = billingCycle == "Annual" ? now.AddYears(1) : now.AddMonths(1);
@@ -200,7 +232,12 @@ public class SalonSubscriptionController : ControllerBase
         salon.SubscriptionRenewsAtUtc = renewsAt;
         salon.UpdatedAtUtc = now;
 
-        // In-App Notification for Salon Manager
+        if (!salon.IsSuspendedByAdmin && salon.DeactivationReason != "SuperAdminSuspension")
+        {
+            salon.IsActive = true;
+            salon.DeactivationReason = null;
+        }
+
         if (_currentUserService.UserId.HasValue)
         {
             _dbContext.Notifications.Add(new Notification
@@ -210,7 +247,7 @@ public class SalonSubscriptionController : ControllerBase
                 Type = "SubscriptionUpgraded",
                 Channel = "InApp",
                 Subject = $"Plan Upgraded to {targetPlan.Name}!",
-                Message = $"Your salon subscription is now active on the {targetPlan.Name} ({billingCycle}) plan. Your enhanced specialist limits and platform perks are unlocked immediately.",
+                Message = $"Your salon subscription is now active on the {targetPlan.Name} ({billingCycle}) plan. Your enhanced limits are unlocked immediately.",
                 Status = "Sent",
                 SentAtUtc = now,
                 CreatedAtUtc = now
@@ -279,9 +316,10 @@ public class SalonSubscriptionController : ControllerBase
 
         var starterCount = salons.Count(s => (s.SubscriptionTier ?? "Starter").Equals("Starter", StringComparison.OrdinalIgnoreCase));
         var growthCount = salons.Count(s => (s.SubscriptionTier ?? "").Equals("Growth", StringComparison.OrdinalIgnoreCase));
-        var luxuryProCount = salons.Count(s => (s.SubscriptionTier ?? "").Equals("LuxuryPro", StringComparison.OrdinalIgnoreCase));
+        var proCount = salons.Count(s => (s.SubscriptionTier ?? "").Equals("Pro", StringComparison.OrdinalIgnoreCase) || 
+                                         (s.SubscriptionTier ?? "").Equals("LuxuryPro", StringComparison.OrdinalIgnoreCase));
 
-        // Calculate MRR: monthly price + (annual price / 12)
+        // Calculate MRR
         decimal mrr = 0m;
         foreach (var s in salons.Where(s => (s.SubscriptionStatus ?? "Active") == "Active"))
         {
@@ -309,7 +347,9 @@ public class SalonSubscriptionController : ControllerBase
             Price = s.SubscriptionPrice,
             RenewsAtUtc = s.SubscriptionRenewsAtUtc,
             StaffCount = s.StaffMembers.Count,
-            ServicesCount = s.Services.Count
+            ServicesCount = s.Services.Count,
+            DeactivationReason = s.DeactivationReason,
+            IsActive = s.IsActive
         }).ToList();
 
         return Ok(new SuperAdminSubscriptionOverviewResponse
@@ -317,7 +357,7 @@ public class SalonSubscriptionController : ControllerBase
             TotalSalons = salons.Count,
             StarterCount = starterCount,
             GrowthCount = growthCount,
-            LuxuryProCount = luxuryProCount,
+            ProCount = proCount,
             MonthlyRecurringRevenue = Math.Round(mrr, 2),
             AnnualRunRate = Math.Round(arr, 2),
             Salons = items
@@ -340,14 +380,14 @@ public class SalonSubscriptionController : ControllerBase
         var salon = await _dbContext.Salons.FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
         if (salon == null) return NotFound(new { message = "Salon not found." });
 
-        var targetPlan = SystemPlans.FirstOrDefault(p => p.Tier.Equals(request.Tier, StringComparison.OrdinalIgnoreCase));
+        var targetPlan = SubscriptionPlanCatalog.GetPlanByTier(request.Tier);
         if (targetPlan == null)
         {
             return BadRequest(new { message = $"Invalid tier '{request.Tier}'." });
         }
 
         var billingCycle = request.BillingCycle.Equals("Annual", StringComparison.OrdinalIgnoreCase) ? "Annual" : "Monthly";
-        var price = billingCycle == "Annual" ? targetPlan.AnnualPrice : targetPlan.MonthlyPrice;
+        var (price, _) = SubscriptionPlanCatalog.GetPriceDetails(targetPlan.Tier, billingCycle);
 
         salon.SubscriptionTier = targetPlan.Tier;
         salon.SubscriptionBillingCycle = billingCycle;
@@ -355,6 +395,12 @@ public class SalonSubscriptionController : ControllerBase
         salon.SubscriptionPrice = price;
         salon.SubscriptionRenewsAtUtc = billingCycle == "Annual" ? DateTime.UtcNow.AddYears(1) : DateTime.UtcNow.AddMonths(1);
         salon.UpdatedAtUtc = DateTime.UtcNow;
+
+        if (!salon.IsSuspendedByAdmin && salon.DeactivationReason != "SuperAdminSuspension")
+        {
+            salon.IsActive = true;
+            salon.DeactivationReason = null;
+        }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

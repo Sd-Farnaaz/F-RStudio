@@ -22,6 +22,8 @@ public class AuthController : ControllerBase
     private readonly ISlugService _slugService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IHostEnvironment _env;
+    private readonly IEmailService _emailService;
+    private readonly IEmailTemplateBuilder _emailTemplateBuilder;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
@@ -31,6 +33,8 @@ public class AuthController : ControllerBase
         ISlugService slugService,
         ICurrentUserService currentUserService,
         IHostEnvironment env,
+        IEmailService emailService,
+        IEmailTemplateBuilder emailTemplateBuilder,
         ILogger<AuthController> logger)
     {
         _dbContext = dbContext;
@@ -39,6 +43,8 @@ public class AuthController : ControllerBase
         _slugService = slugService;
         _currentUserService = currentUserService;
         _env = env;
+        _emailService = emailService;
+        _emailTemplateBuilder = emailTemplateBuilder;
         _logger = logger;
     }
 
@@ -121,6 +127,14 @@ public class AuthController : ControllerBase
                     TimeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? "Asia/Kolkata" : request.TimeZone.Trim(),
                     CurrencyCode = string.IsNullOrWhiteSpace(request.CurrencyCode) ? "INR" : request.CurrencyCode.Trim().ToUpperInvariant(),
                     OnboardingState = "Created",
+                    SubscriptionTier = "Starter",
+                    SubscriptionBillingCycle = "Monthly",
+                    SubscriptionStatus = "Trial",
+                    SubscriptionPrice = 0.00m,
+                    SubscriptionStartedAtUtc = DateTime.UtcNow,
+                    SubscriptionRenewsAtUtc = DateTime.UtcNow.AddDays(30),
+                    TrialEndsAtUtc = DateTime.UtcNow.AddDays(30),
+                    HasUsedTrial = true,
                     CreatedAtUtc = DateTime.UtcNow
                 };
 
@@ -163,6 +177,16 @@ public class AuthController : ControllerBase
                 await transaction.CommitAsync(cancellationToken);
 
                 _logger.LogInformation("Salon '{SalonName}' ({Slug}) registered with Admin {Email}", salon.Name, salon.Slug, adminUser.Email);
+
+                try
+                {
+                    var welcomeTemplate = _emailTemplateBuilder.BuildSalonAdminWelcomeEmail(adminUser.FullName, salon.Name, salon.Slug);
+                    await _emailService.SendEmailAsync(adminUser.Email, welcomeTemplate.Subject, welcomeTemplate.HtmlBody, welcomeTemplate.PlainTextBody, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to dispatch partner welcome email for {Email}", adminUser.Email);
+                }
 
                 var response = new AuthResponse
                 {
@@ -263,6 +287,16 @@ public class AuthController : ControllerBase
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("New customer registered: {Email}", customer.Email);
+
+        try
+        {
+            var welcomeTemplate = _emailTemplateBuilder.BuildCustomerWelcomeEmail(customer.FullName, customer.Email);
+            await _emailService.SendEmailAsync(customer.Email, welcomeTemplate.Subject, welcomeTemplate.HtmlBody, welcomeTemplate.PlainTextBody, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispatch customer welcome email for {Email}", customer.Email);
+        }
 
         var response = new AuthResponse
         {
@@ -421,6 +455,12 @@ public class AuthController : ControllerBase
             if (_env.IsDevelopment())
             {
                 devToken = rawToken;
+            }
+
+            if (!string.IsNullOrWhiteSpace(user.Email))
+            {
+                var resetTemplate = _emailTemplateBuilder.BuildPasswordResetEmail(user.FullName, rawToken, expirationMinutes: 30);
+                await _emailService.SendEmailAsync(user.Email, resetTemplate.Subject, resetTemplate.HtmlBody, resetTemplate.PlainTextBody, cancellationToken);
             }
         }
 

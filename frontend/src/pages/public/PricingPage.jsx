@@ -243,7 +243,7 @@ export default function PricingPage() {
                   Are there any hidden fees or commission percentages taken from bookings?
                 </h4>
                 <p className="text-xs sm:text-sm text-muted leading-relaxed">
-                  No. SalonBook does not collect a percentage fee or per-booking surcharge. When clients submit advance deposits via UPI, those funds go directly from the client to your salon's specified UPI account.
+                  No. F&R Beauty Studio does not collect a percentage fee or per-booking surcharge. When clients submit advance deposits via UPI, those funds go directly from the client to your salon's specified UPI account.
                 </p>
               </div>
 
@@ -287,7 +287,7 @@ export default function PricingPage() {
               Ready to take your salon to the next level?
             </h2>
             <p className="text-sm text-muted">
-              Join SalonBook today with zero platform subscription fees.
+              Join F&R Beauty Studio today with zero platform subscription fees.
             </p>
             <div className="pt-2 flex flex-wrap justify-center gap-3">
               <Link

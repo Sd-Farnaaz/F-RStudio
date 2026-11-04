@@ -546,7 +546,7 @@ export default function SuperAdminUsersPage() {
                   <p className="text-deep-plum font-medium">
                     {statusModal.isActive
                       ? 'Activating this account will allow the user to authenticate and access platform capabilities according to their role.'
-                      : 'Deactivating this account will immediately block future login attempts for this user across SalonBook.'}
+                      : 'Deactivating this account will immediately block future login attempts for this user across F&R Beauty Studio.'}
                   </p>
                 </div>
 

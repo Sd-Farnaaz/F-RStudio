@@ -185,11 +185,11 @@ export default function SuperAdminSalonDetailPage() {
 
   const getTierBadge = (tier) => {
     const t = (tier || 'Starter').toLowerCase();
-    if (t.includes('luxury')) {
+    if (t.includes('pro') || t.includes('luxury')) {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
           <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-          Luxury Pro Tier
+          Pro Tier
         </span>
       );
     }
@@ -197,14 +197,14 @@ export default function SuperAdminSalonDetailPage() {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
           <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
-          Growth Studio Tier
+          Growth Tier
         </span>
       );
     }
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-stone-100 text-stone-700 border border-stone-200">
         <Zap className="w-3.5 h-3.5 text-stone-500" />
-        Starter Solo Tier
+        Starter Trial
       </span>
     );
   };
@@ -307,9 +307,9 @@ export default function SuperAdminSalonDetailPage() {
                         Active Directory
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 bg-gray-100 px-2.5 py-0.5 rounded-full border border-gray-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                        Suspended / Inactive
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                        Suspended / Inactive {salon.deactivationReason ? `(${salon.deactivationReason})` : ''}
                       </span>
                     )}
 
@@ -818,9 +818,9 @@ export default function SuperAdminSalonDetailPage() {
                     onChange={(e) => setTierModal(prev => ({ ...prev, tier: e.target.value }))}
                     className="w-full px-3.5 py-2.5 bg-ivory text-xs border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-rose/40 text-deep-plum font-medium"
                   >
-                    <option value="Starter">Starter Solo (₹999/mo - 1 Staff, Core POS)</option>
-                    <option value="Growth">Growth Studio (₹2,499/mo - Up to 5 Staff, Dossiers & Formulas)</option>
-                    <option value="LuxuryPro">Luxury Pro (₹4,999/mo - Unlimited Staff, Escrow & Priority)</option>
+                    <option value="Starter">Starter Trial (₹0 / 30 Days - 5 Services, 5 Staff)</option>
+                    <option value="Growth">Growth (₹1,499/mo - 15 Services, 20 Staff)</option>
+                    <option value="Pro">Pro (₹2,999/mo - Unlimited Services, 50 Staff)</option>
                   </select>
                 </div>
 

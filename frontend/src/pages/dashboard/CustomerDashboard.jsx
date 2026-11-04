@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import ErrorBoundary from '../../components/common/ErrorBoundary';
 import { useAuth } from '../../context/AuthContext';
 import { appointmentService } from '../../services/appointmentService';
 import { paymentService } from '../../services/paymentService';
@@ -17,6 +18,44 @@ import {
   Camera, CornerDownRight, Image as ImageIcon, Send, ThumbsUp,
   Smartphone, Building2, Zap, Palette
 } from 'lucide-react';
+
+const formatCurrency = (val) => {
+  const num = Number(val);
+  return isNaN(num) ? '0.00' : num.toFixed(2);
+};
+
+const formatDateSafe = (dateVal, options) => {
+  if (!dateVal) return '—';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '—';
+    return options ? d.toLocaleDateString(undefined, options) : d.toLocaleDateString();
+  } catch {
+    return '—';
+  }
+};
+
+const formatTimeSafe = (dateVal) => {
+  if (!dateVal) return '—';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '—';
+  }
+};
+
+const formatDateTimeSafe = (dateVal, options) => {
+  if (!dateVal) return '—';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return '—';
+    return options ? d.toLocaleString(undefined, options) : d.toLocaleString();
+  } catch {
+    return '—';
+  }
+};
 
 export default function CustomerDashboard() {
   const { user, logout } = useAuth();
@@ -194,6 +233,66 @@ export default function CustomerDashboard() {
     }
   };
 
+  const fetchAppointments = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const data = await appointmentService.getMyAppointments({ pageSize: 100 });
+      const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+      setAppointments(items);
+    } catch (err) {
+      console.warn('Failed to load customer bookings:', err);
+      setError(err.message || 'Failed to load bookings.');
+      setAppointments([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchSalons = useCallback(async () => {
+    try {
+      setSalonsLoading(true);
+      const data = await publicService.getSalons({ pageSize: 12 });
+      const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+      setSalons(items);
+    } catch (err) {
+      console.warn('Failed to load salons list:', err);
+      setSalons([]);
+    } finally {
+      setSalonsLoading(false);
+    }
+  }, []);
+
+  const fetchDossier = useCallback(async () => {
+    try {
+      setDossierLoading(true);
+      setDossierError('');
+      const data = await customerDossierService.getDossier();
+      if (data && typeof data === 'object') {
+        setDossier(data);
+        setDossierForm({
+          allergies: data.allergies || '',
+          skinOrHairNotes: data.skinOrHairNotes || '',
+          emergencyContactName: data.emergencyContactName || '',
+          emergencyContactPhone: data.emergencyContactPhone || ''
+        });
+        setCareReminders(Array.isArray(data.careReminders) ? data.careReminders : []);
+      } else {
+        setDossier(null);
+        setCareReminders([]);
+      }
+    } catch (err) {
+      console.warn('Failed to load customer dossier:', err);
+      if (err.status !== 404 && err.status !== 403) {
+        setDossierError(err.message || 'Failed to load beauty dossier');
+      }
+      setDossier(null);
+      setCareReminders([]);
+    } finally {
+      setDossierLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchAppointments();
     if (activeTab === 'salons' || activeTab === 'overview') {
@@ -202,30 +301,7 @@ export default function CustomerDashboard() {
     if (activeTab === 'dossier' || activeTab === 'overview') {
       fetchDossier();
     }
-  }, [activeTab]);
-
-  const fetchDossier = async () => {
-    try {
-      setDossierLoading(true);
-      setDossierError('');
-      const data = await customerDossierService.getDossier();
-      setDossier(data);
-      setDossierForm({
-        allergies: data.allergies || '',
-        skinOrHairNotes: data.skinOrHairNotes || '',
-        emergencyContactName: data.emergencyContactName || '',
-        emergencyContactPhone: data.emergencyContactPhone || ''
-      });
-      if (data.careReminders) {
-        setCareReminders(data.careReminders);
-      }
-    } catch (err) {
-      console.warn('Failed to load customer dossier:', err);
-      setDossierError(err.message || 'Failed to load beauty dossier');
-    } finally {
-      setDossierLoading(false);
-    }
-  };
+  }, [activeTab, fetchAppointments, fetchSalons, fetchDossier]);
 
   const handleSaveDossier = async (e) => {
     e.preventDefault();
@@ -251,31 +327,6 @@ export default function CustomerDashboard() {
       localStorage.setItem('salonbook_ai_style_profile', JSON.stringify(recommendation));
     } catch (e) {
       console.warn('Failed to persist AI recommendation to localStorage', e);
-    }
-  };
-
-  const fetchAppointments = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      const data = await appointmentService.getMyAppointments({ pageSize: 100 });
-      setAppointments(data.items || data || []);
-    } catch (err) {
-      setError(err.message || 'Failed to load bookings.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchSalons = async () => {
-    try {
-      setSalonsLoading(true);
-      const data = await publicService.getSalons({ pageSize: 12 });
-      setSalons(data.items || data || []);
-    } catch (err) {
-      console.warn('Failed to load salons list:', err);
-    } finally {
-      setSalonsLoading(false);
     }
   };
 
@@ -394,7 +445,7 @@ export default function CustomerDashboard() {
       ));
 
       setGatewaySuccessData(verifyRes);
-      setPaymentSubmitSuccess(`Payment of ₹${verifyRes.amountPaid.toFixed(2)} verified successfully!`);
+      setPaymentSubmitSuccess(`Payment of ₹${formatCurrency(verifyRes?.amountPaid)} verified successfully!`);
     } catch (err) {
       setPaymentSubmitError(err.message || 'Payment transaction failed. Please try again or use direct UPI transfer.');
     } finally {
@@ -430,8 +481,8 @@ export default function CustomerDashboard() {
       return;
     }
 
-    if (amt > activePaymentApt.price) {
-      setPaymentSubmitError(`Submitted amount cannot exceed the total price of $${activePaymentApt.price}.`);
+    if (amt > (Number(activePaymentApt.price) || 0)) {
+      setPaymentSubmitError(`Submitted amount cannot exceed the total price of ₹${formatCurrency(activePaymentApt.price)}.`);
       return;
     }
 
@@ -496,18 +547,24 @@ export default function CustomerDashboard() {
 
   const isTerminalStatus = (status) => ['Cancelled', 'Completed', 'NoShow'].includes(status);
 
-  // Derived Real Data Metrics
+  // Derived Real Data Metrics (Strictly Array-Guarded)
+  const appointmentList = Array.isArray(appointments) ? appointments : [];
+  const salonList = Array.isArray(salons) ? salons : [];
+
   const now = new Date();
-  const upcomingAppointments = appointments.filter(a => !isTerminalStatus(a.status) && new Date(a.startAtUtc) > now);
-  const completedAppointments = appointments.filter(a => a.status === 'Completed');
-  const cancelledAppointments = appointments.filter(a => a.status === 'Cancelled');
-  const totalPaidSum = appointments.reduce((sum, a) => sum + (Number(a.amountPaid) || 0), 0);
-  const nextVisit = upcomingAppointments.sort((a, b) => new Date(a.startAtUtc) - new Date(b.startAtUtc))[0];
+  const upcomingAppointments = appointmentList.filter(a => a && !isTerminalStatus(a.status) && a.startAtUtc && new Date(a.startAtUtc) > now);
+  const completedAppointments = appointmentList.filter(a => a?.status === 'Completed');
+  const cancelledAppointments = appointmentList.filter(a => a?.status === 'Cancelled');
+  const totalPaidSum = appointmentList.reduce((sum, a) => sum + (Number(a?.amountPaid) || 0), 0);
+  const nextVisit = upcomingAppointments.length > 0 
+    ? [...upcomingAppointments].sort((a, b) => new Date(a.startAtUtc || 0) - new Date(b.startAtUtc || 0))[0] 
+    : null;
 
   // Filtering for Appointments Tab
-  const filteredAppointments = appointments.filter(a => {
+  const filteredAppointments = appointmentList.filter(a => {
+    if (!a) return false;
     if (appointmentFilter === 'upcoming') {
-      if (isTerminalStatus(a.status) || new Date(a.startAtUtc) <= now) return false;
+      if (isTerminalStatus(a.status) || !a.startAtUtc || new Date(a.startAtUtc) <= now) return false;
     } else if (appointmentFilter === 'completed') {
       if (a.status !== 'Completed') return false;
     } else if (appointmentFilter === 'cancelled') {
@@ -526,7 +583,8 @@ export default function CustomerDashboard() {
   });
 
   // Filtered Salons for Discovery Tab
-  const filteredSalons = salons.filter(s => {
+  const filteredSalons = salonList.filter(s => {
+    if (!s) return false;
     if (!salonSearch.trim()) return true;
     const q = salonSearch.toLowerCase();
     return s.name?.toLowerCase().includes(q) || 
@@ -536,7 +594,8 @@ export default function CustomerDashboard() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto pb-16 space-y-8">
+      <ErrorBoundary onReset={fetchAppointments}>
+        <div className="max-w-7xl mx-auto pb-16 space-y-8">
         
         {/* Personalized Welcome Header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -765,7 +824,7 @@ export default function CustomerDashboard() {
                 </div>
                 <div className="mt-4">
                   <span className="text-2xl font-serif font-bold text-deep-plum">
-                    {loading ? '—' : `₹${totalPaidSum.toFixed(2)}`}
+                    {loading ? '—' : `₹${formatCurrency(totalPaidSum)}`}
                   </span>
                   <p className="text-[11px] text-muted mt-1 flex items-center">
                     <span>Verified transfers</span> <ChevronRight className="w-3 h-3 ml-0.5" />
@@ -807,7 +866,7 @@ export default function CustomerDashboard() {
                   <div className="space-y-3">
                     <div>
                       <span className="text-xs font-bold uppercase tracking-wider text-primary-rose">
-                        {new Date(nextVisit.startAtUtc).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                        {formatDateSafe(nextVisit.startAtUtc, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                       </span>
                       <h4 className="text-2xl font-serif font-bold text-deep-plum mt-0.5">
                         {nextVisit.serviceName} at {nextVisit.salonName}
@@ -817,14 +876,14 @@ export default function CustomerDashboard() {
                     <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
                       <span className="flex items-center">
                         <Clock className="w-4 h-4 mr-1.5 text-primary-rose/70" />
-                        {new Date(nextVisit.startAtUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({nextVisit.durationMinutes} min)
+                        {formatTimeSafe(nextVisit.startAtUtc)} ({nextVisit.durationMinutes || 0} min)
                       </span>
                       <span className="flex items-center">
                         <User className="w-4 h-4 mr-1.5 text-primary-rose/70" />
                         Specialist: {nextVisit.staffName} {nextVisit.staffTitle ? `(${nextVisit.staffTitle})` : ''}
                       </span>
                       <span className="flex items-center font-medium text-deep-plum">
-                        Total: ₹{nextVisit.price.toFixed(2)}
+                        Total: ₹{formatCurrency(nextVisit.price)}
                       </span>
                     </div>
 
@@ -832,14 +891,14 @@ export default function CustomerDashboard() {
                     <div className="flex flex-wrap items-center gap-3 pt-1">
                       <span className="text-xs text-muted">Payment:</span>
                       {getPaymentBadge(nextVisit.paymentStatus)}
-                      {nextVisit.advanceAmountRequired > 0 && (
+                      {Number(nextVisit.advanceAmountRequired) > 0 && (
                         <span className="text-xs text-amber-800 font-medium">
-                          (Advance Required: ₹{nextVisit.advanceAmountRequired.toFixed(2)})
+                          (Advance Required: ₹{formatCurrency(nextVisit.advanceAmountRequired)})
                         </span>
                       )}
-                      {nextVisit.amountPaid > 0 && (
+                      {Number(nextVisit.amountPaid) > 0 && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold">
-                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Escrow Protected (₹{nextVisit.amountPaid.toFixed(2)})
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Escrow Protected (₹{formatCurrency(nextVisit.amountPaid)})
                         </span>
                       )}
                     </div>
@@ -891,15 +950,15 @@ export default function CustomerDashboard() {
                     onClick={() => handleTabChange('appointments')}
                     className="text-xs font-semibold text-primary-rose hover:underline"
                   >
-                    View All ({appointments.length})
+                    View All ({appointmentList.length})
                   </button>
                 </div>
 
-                {appointments.length === 0 ? (
+                {appointmentList.length === 0 ? (
                   <p className="text-xs text-muted py-6 text-center">No booking history recorded yet.</p>
                 ) : (
                   <div className="space-y-3">
-                    {appointments.slice(0, 3).map(apt => (
+                    {appointmentList.slice(0, 3).map(apt => (
                       <div 
                         key={apt.id} 
                         onClick={() => openDetailsModal(apt)}
@@ -927,7 +986,7 @@ export default function CustomerDashboard() {
               <div className="bg-white rounded-2xl border border-border-color shadow-sm p-6 space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-border-color">
                   <h4 className="font-serif font-semibold text-deep-plum text-base flex items-center gap-2">
-                    <Compass className="w-4 h-4 text-primary-rose" /> Salons on SalonBook
+                    <Compass className="w-4 h-4 text-primary-rose" /> Salons on F&R Beauty Studio
                   </h4>
                   <button 
                     onClick={() => handleTabChange('salons')}
@@ -937,11 +996,11 @@ export default function CustomerDashboard() {
                   </button>
                 </div>
 
-                {salons.length === 0 ? (
+                {salonList.length === 0 ? (
                   <p className="text-xs text-muted py-6 text-center">Loading available salons...</p>
                 ) : (
                   <div className="space-y-3">
-                    {salons.slice(0, 3).map(s => (
+                    {salonList.slice(0, 3).map(s => (
                       <Link 
                         key={s.id || s.slug}
                         to={`/salons/${s.slug}`}
@@ -1172,8 +1231,8 @@ export default function CustomerDashboard() {
                             </div>
 
                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
-                              <span className="flex items-center"><Clock className="w-4 h-4 mr-1 text-primary-rose/70" /> {new Date(apt.startAtUtc).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'})}</span>
-                              <span className="flex items-center"><Scissors className="w-4 h-4 mr-1 text-primary-rose/70" /> {apt.serviceName} ({apt.durationMinutes} min)</span>
+                              <span className="flex items-center"><Clock className="w-4 h-4 mr-1 text-primary-rose/70" /> {formatDateTimeSafe(apt.startAtUtc, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'})}</span>
+                              <span className="flex items-center"><Scissors className="w-4 h-4 mr-1 text-primary-rose/70" /> {apt.serviceName} ({apt.durationMinutes || 0} min)</span>
                               <span className="flex items-center">
                                 <User className="w-4 h-4 mr-1 text-primary-rose/70" />
                                 Specialist: {apt.staffName} {apt.staffTitle ? `(${apt.staffTitle})` : ''}
@@ -1181,12 +1240,12 @@ export default function CustomerDashboard() {
                             </div>
 
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted pt-1">
-                              <span>Total: <strong className="text-deep-plum">₹{apt.price.toFixed(2)}</strong></span>
-                              {apt.advanceAmountRequired > 0 && (
-                                <span>Advance Req: <strong className="text-amber-800">₹{apt.advanceAmountRequired.toFixed(2)}</strong></span>
+                              <span>Total: <strong className="text-deep-plum">₹{formatCurrency(apt.price)}</strong></span>
+                              {Number(apt.advanceAmountRequired) > 0 && (
+                                <span>Advance Req: <strong className="text-amber-800">₹{formatCurrency(apt.advanceAmountRequired)}</strong></span>
                               )}
-                              <span>Paid: <strong className="text-emerald-700">₹{(apt.amountPaid || 0).toFixed(2)}</strong></span>
-                              {apt.amountPaid > 0 && (
+                              <span>Paid: <strong className="text-emerald-700">₹{formatCurrency(apt.amountPaid)}</strong></span>
+                              {Number(apt.amountPaid) > 0 && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold text-[10px]">
                                   <ShieldCheck className="w-3 h-3 text-emerald-600" /> Escrow Protected
                                 </span>
@@ -1299,15 +1358,15 @@ export default function CustomerDashboard() {
             <div className="bg-white border border-border-color rounded-2xl shadow-sm overflow-hidden">
               <div className="px-6 py-4 bg-ivory/50 border-b border-border-color flex items-center justify-between">
                 <h3 className="font-serif font-semibold text-deep-plum text-base">Booking Payment Ledger</h3>
-                <span className="text-xs text-muted font-medium">Total Paid: ₹{totalPaidSum.toFixed(2)}</span>
+                <span className="text-xs text-muted font-medium">Total Paid: ₹{formatCurrency(totalPaidSum)}</span>
               </div>
 
-              {appointments.length === 0 ? (
+              {appointmentList.length === 0 ? (
                 <div className="p-16 text-center text-muted text-xs">No appointment payment records found.</div>
               ) : (
                 <div className="divide-y divide-border-color">
-                  {appointments.map(apt => {
-                    const balanceDue = Math.max(0, apt.price - (apt.amountPaid || 0));
+                  {appointmentList.map(apt => {
+                    const balanceDue = Math.max(0, (Number(apt.price) || 0) - (Number(apt.amountPaid) || 0));
 
                     return (
                       <div key={apt.id} className="p-6 flex flex-col lg:flex-row gap-6 justify-between items-start lg:items-center hover:bg-soft-blush/20 transition-colors">
@@ -1323,10 +1382,10 @@ export default function CustomerDashboard() {
                           </div>
 
                           <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted">
-                            <span>Service Total: <strong className="text-deep-plum">₹{apt.price.toFixed(2)}</strong></span>
-                            <span>Advance Required: <strong className="text-amber-800">₹{apt.advanceAmountRequired.toFixed(2)}</strong></span>
-                            <span>Amount Paid: <strong className="text-emerald-700">₹{(apt.amountPaid || 0).toFixed(2)}</strong></span>
-                            <span>Balance Due: <strong className="text-deep-plum">₹{balanceDue.toFixed(2)}</strong></span>
+                            <span>Service Total: <strong className="text-deep-plum">₹{formatCurrency(apt.price)}</strong></span>
+                            <span>Advance Required: <strong className="text-amber-800">₹{formatCurrency(apt.advanceAmountRequired)}</strong></span>
+                            <span>Amount Paid: <strong className="text-emerald-700">₹{formatCurrency(apt.amountPaid)}</strong></span>
+                            <span>Balance Due: <strong className="text-deep-plum">₹{formatCurrency(balanceDue)}</strong></span>
                           </div>
 
                           {/* UPI & Verification Sub-box */}
@@ -1343,7 +1402,7 @@ export default function CustomerDashboard() {
                             )}
                             {apt.paymentVerifiedAtUtc && (
                               <span className="text-emerald-700 font-medium flex items-center gap-1">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> Verified on {new Date(apt.paymentVerifiedAtUtc).toLocaleDateString()}
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Verified on {formatDateSafe(apt.paymentVerifiedAtUtc)}
                               </span>
                             )}
                           </div>
@@ -1482,7 +1541,7 @@ export default function CustomerDashboard() {
                   {dossier?.isPatchTested && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      Patch Test Verified ({dossier.patchTestDate ? new Date(dossier.patchTestDate).toLocaleDateString() : 'Safe'})
+                      Patch Test Verified ({dossier?.patchTestDate ? formatDateSafe(dossier.patchTestDate) : 'Safe'})
                     </span>
                   )}
                 </div>
@@ -1561,7 +1620,7 @@ export default function CustomerDashboard() {
                     Hair & Skin Consultation Profile
                   </h4>
                   <span className="text-xs text-muted">
-                    Last Synced: {dossier?.createdAtUtc ? new Date(dossier.createdAtUtc).toLocaleDateString() : 'Active'}
+                    Last Synced: {dossier?.createdAtUtc ? formatDateSafe(dossier.createdAtUtc) : 'Active'}
                   </span>
                 </div>
 
@@ -1695,7 +1754,7 @@ export default function CustomerDashboard() {
                 </span>
               </div>
 
-              {!dossier?.formulas || dossier.formulas.length === 0 ? (
+              {!Array.isArray(dossier?.formulas) || dossier.formulas.length === 0 ? (
                 <div className="p-12 text-center text-muted text-xs space-y-2">
                   <Scissors className="w-10 h-10 mx-auto text-muted/30" />
                   <p className="font-medium text-deep-plum text-sm">No Chemical Formulas Recorded Yet</p>
@@ -1705,7 +1764,7 @@ export default function CustomerDashboard() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {dossier.formulas.map((f) => (
+                  {(dossier?.formulas || []).map((f) => (
                     <div
                       key={f.id}
                       className="p-5 rounded-2xl bg-ivory/50 border border-border-color hover:border-primary-rose/30 transition-all space-y-3"
@@ -1953,7 +2012,7 @@ export default function CustomerDashboard() {
               <div className="p-4 bg-soft-blush/30 rounded-xl border border-border-color text-xs text-muted flex items-start gap-2.5">
                 <Info className="w-4 h-4 text-primary-rose shrink-0 mt-0.5" />
                 <p className="leading-relaxed">
-                  Your customer account is a platform-wide identity on SalonBook. It allows you to schedule visits, track appointments, and submit advance payment proofs across all registered salons.
+                  Your customer account is a platform-wide identity on F&R Beauty Studio. It allows you to schedule visits, track appointments, and submit advance payment proofs across all registered salons.
                 </p>
               </div>
 
@@ -2021,7 +2080,7 @@ export default function CustomerDashboard() {
                   <div className="flex justify-between">
                     <span className="text-muted">Scheduled Time:</span>
                     <strong className="text-deep-plum">
-                      {new Date(activeDetailsApt.startAtUtc).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      {formatDateTimeSafe(activeDetailsApt.startAtUtc, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                     </strong>
                   </div>
                   <div className="flex justify-between">
@@ -2034,18 +2093,18 @@ export default function CustomerDashboard() {
                 <div className="space-y-2.5 p-4 bg-soft-blush/20 rounded-xl border border-border-color">
                   <div className="flex justify-between">
                     <span className="text-muted">Total Treatment Price:</span>
-                    <strong className="text-deep-plum font-semibold">₹{activeDetailsApt.price.toFixed(2)}</strong>
+                    <strong className="text-deep-plum font-semibold">₹{formatCurrency(activeDetailsApt.price)}</strong>
                   </div>
                   {activeDetailsApt.advanceAmountRequired > 0 && (
                     <div className="flex justify-between">
                       <span className="text-amber-800 font-medium">Advance Amount Required:</span>
-                      <strong className="text-amber-900">₹{activeDetailsApt.advanceAmountRequired.toFixed(2)}</strong>
+                      <strong className="text-amber-900">₹{formatCurrency(activeDetailsApt.advanceAmountRequired)}</strong>
                     </div>
                   )}
                   <div className="flex justify-between">
                     <span className="text-emerald-800 font-medium">Amount Paid to Date:</span>
                     <div className="text-right">
-                      <strong className="text-emerald-900">₹{(activeDetailsApt.amountPaid || 0).toFixed(2)}</strong>
+                      <strong className="text-emerald-900">₹{formatCurrency(activeDetailsApt.amountPaid)}</strong>
                       {activeDetailsApt.amountPaid > 0 && (
                         <span className="block text-[10px] text-emerald-700 font-semibold">🔒 Held in Platform Escrow</span>
                       )}
@@ -2054,7 +2113,7 @@ export default function CustomerDashboard() {
                   <div className="flex justify-between pt-1 border-t border-border-color/60">
                     <span className="text-muted">Remaining Balance (At Salon):</span>
                     <strong className="text-deep-plum font-bold">
-                      ₹{Math.max(0, activeDetailsApt.price - (activeDetailsApt.amountPaid || 0)).toFixed(2)}
+                      ₹{formatCurrency(Math.max(0, (Number(activeDetailsApt.price) || 0) - (Number(activeDetailsApt.amountPaid) || 0)))}
                     </strong>
                   </div>
                 </div>
@@ -2187,7 +2246,7 @@ export default function CustomerDashboard() {
                   <div className="p-4 bg-soft-blush/40 rounded-xl border border-border-color text-left space-y-2 text-xs">
                     <div className="flex justify-between">
                       <span className="text-muted">Amount Paid:</span>
-                      <strong className="text-emerald-700 text-sm">₹{gatewaySuccessData.amountPaid.toFixed(2)}</strong>
+                      <strong className="text-emerald-700 text-sm">₹{formatCurrency(gatewaySuccessData?.amountPaid)}</strong>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted">Transaction Reference:</span>
@@ -2232,20 +2291,20 @@ export default function CustomerDashboard() {
                   <div className="p-4 bg-soft-blush/30 rounded-xl border border-border-color space-y-2 text-xs">
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-muted font-medium">Total Service Price:</span>
-                      <strong className="text-deep-plum">₹{activePaymentApt.price.toFixed(2)}</strong>
+                      <strong className="text-deep-plum">₹{formatCurrency(activePaymentApt.price)}</strong>
                     </div>
                     <div className="flex justify-between items-center text-xs text-muted">
                       <span>Already Paid:</span>
-                      <span className="font-medium text-emerald-700">₹{(activePaymentApt.amountPaid || 0).toFixed(2)}</span>
+                      <span className="font-medium text-emerald-700">₹{formatCurrency(activePaymentApt.amountPaid)}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs text-muted pt-1 border-t border-border-color/60">
                       <span>Remaining Balance:</span>
-                      <span className="font-semibold text-deep-plum">₹{Math.max(0, activePaymentApt.price - (activePaymentApt.amountPaid || 0)).toFixed(2)}</span>
+                      <span className="font-semibold text-deep-plum">₹{formatCurrency(Math.max(0, (Number(activePaymentApt.price) || 0) - (Number(activePaymentApt.amountPaid) || 0)))}</span>
                     </div>
                     {activePaymentApt.advanceAmountRequired > 0 && (
                       <div className="flex justify-between items-center text-xs pt-1 border-t border-border-color/60 text-primary-rose">
                         <span className="font-medium">Advance Deposit Required:</span>
-                        <strong className="font-bold">₹{activePaymentApt.advanceAmountRequired.toFixed(2)}</strong>
+                        <strong className="font-bold">₹{formatCurrency(activePaymentApt.advanceAmountRequired)}</strong>
                       </div>
                     )}
                   </div>
@@ -2301,7 +2360,7 @@ export default function CustomerDashboard() {
                               }`}
                             >
                               <div className="text-xs font-semibold text-deep-plum">Advance Deposit</div>
-                              <div className="text-base font-bold text-primary-rose mt-0.5">₹{activePaymentApt.advanceAmountRequired.toFixed(2)}</div>
+                              <div className="text-base font-bold text-primary-rose mt-0.5">₹{formatCurrency(activePaymentApt.advanceAmountRequired)}</div>
                               <p className="text-[10px] text-muted mt-1">Book and reserve slot</p>
                             </button>
 
@@ -2315,7 +2374,7 @@ export default function CustomerDashboard() {
                               }`}
                             >
                               <div className="text-xs font-semibold text-deep-plum">Full Service Price</div>
-                              <div className="text-base font-bold text-deep-plum mt-0.5">₹{activePaymentApt.price.toFixed(2)}</div>
+                              <div className="text-base font-bold text-deep-plum mt-0.5">₹{formatCurrency(activePaymentApt.price)}</div>
                               <p className="text-[10px] text-muted mt-1">Pay 100% upfront</p>
                             </button>
                           </div>
@@ -2325,7 +2384,7 @@ export default function CustomerDashboard() {
                           <div>
                             <span className="text-xs font-medium text-muted block">Payable Balance</span>
                             <span className="text-base font-bold text-deep-plum">
-                              ₹{Math.max(0, activePaymentApt.price - (activePaymentApt.amountPaid || 0)).toFixed(2)}
+                              ₹{formatCurrency(Math.max(0, (Number(activePaymentApt.price) || 0) - (Number(activePaymentApt.amountPaid) || 0)))}
                             </span>
                           </div>
                           <span className="text-[11px] font-semibold text-primary-rose bg-soft-blush px-2.5 py-1 rounded-full">
@@ -2388,8 +2447,8 @@ export default function CustomerDashboard() {
                             <Zap className="w-4 h-4" />
                             <span>
                               Pay ₹{onlineAmountType === 'Advance' && activePaymentApt.advanceAmountRequired > 0 
-                                ? activePaymentApt.advanceAmountRequired.toFixed(2) 
-                                : Math.max(0, activePaymentApt.price - (activePaymentApt.amountPaid || 0)).toFixed(2)} via Secure Gateway
+                                ? formatCurrency(activePaymentApt.advanceAmountRequired) 
+                                : formatCurrency(Math.max(0, (Number(activePaymentApt.price) || 0) - (Number(activePaymentApt.amountPaid) || 0)))} via Secure Gateway
                             </span>
                           </>
                         )}
@@ -2991,7 +3050,8 @@ export default function CustomerDashboard() {
           }}
         />
 
-      </div>
+        </div>
+      </ErrorBoundary>
     </DashboardLayout>
   );
 }

@@ -74,6 +74,14 @@ public class Salon
 
     public decimal SubscriptionPrice { get; set; } = 0.00m;
 
+    public bool IsSuspendedByAdmin { get; set; } = false;
+
+    public string? DeactivationReason { get; set; } // "SuperAdminSuspension", "SubscriptionExpired", "TrialExpired"
+
+    public DateTime? TrialEndsAtUtc { get; set; }
+
+    public bool HasUsedTrial { get; set; } = false;
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedAtUtc { get; set; }
@@ -96,4 +104,6 @@ public class Salon
     public ICollection<Review> Reviews { get; set; } = new List<Review>();
 
     public ICollection<SalonOffPeakRule> OffPeakRules { get; set; } = new List<SalonOffPeakRule>();
+
+    public ICollection<SubscriptionTransaction> SubscriptionTransactions { get; set; } = new List<SubscriptionTransaction>();
 }

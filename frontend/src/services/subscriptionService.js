@@ -4,6 +4,20 @@ export const subscriptionService = {
   // Salon Vendor subscription management
   getSalonSubscription: () => fetchApi('/api/vendor/subscription', { method: 'GET' }),
   
+  createSubscriptionOrder: (data) => fetchApi('/api/vendor/subscription/create-order', {
+    method: 'POST',
+    body: data
+  }),
+
+  verifySubscriptionPayment: (data) => fetchApi('/api/vendor/subscription/verify-payment', {
+    method: 'POST',
+    body: data
+  }),
+
+  getSubscriptionTransactions: () => fetchApi('/api/vendor/subscription/transactions', {
+    method: 'GET'
+  }),
+
   upgradeSubscription: (data) => fetchApi('/api/vendor/subscription/upgrade', {
     method: 'POST',
     body: data

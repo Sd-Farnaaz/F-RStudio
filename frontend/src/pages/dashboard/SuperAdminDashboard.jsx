@@ -453,7 +453,7 @@ export default function SuperAdminDashboard() {
                     Recently Registered Salons
                   </h3>
                   <p className="text-xs text-muted mt-0.5">
-                    Latest five studios onboarded to the SalonBook multi-tenant network.
+                    Latest five studios onboarded to the F&R Beauty Studio multi-tenant network.
                   </p>
                 </div>
                 <Link

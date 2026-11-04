@@ -60,6 +60,10 @@ public class SuperAdminSalonResponse
 
     // Phase 1, 2, 3 Cross-Phase Attributes
     public string SubscriptionTier { get; set; } = "Starter";
+    public string SubscriptionStatus { get; set; } = "Active";
+    public string? DeactivationReason { get; set; }
+    public bool IsSuspendedByAdmin { get; set; }
+    public DateTime? TrialEndsAtUtc { get; set; }
     public double AverageRating { get; set; }
     public int TotalReviews { get; set; }
     public int TotalConsultationCards { get; set; }
@@ -162,4 +166,22 @@ public class UpdateUserStatusRequest
     [Required]
     public bool IsActive { get; set; }
 }
+
+public class SendTestEmailRequest
+{
+    [Required(ErrorMessage = "Recipient email address is required.")]
+    [EmailAddress(ErrorMessage = "Please provide a valid recipient email address.")]
+    public string RecipientEmail { get; set; } = string.Empty;
+}
+
+public class SendTestEmailResponse
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public string RecipientEmail { get; set; } = string.Empty;
+    public DateTime SentAtUtc { get; set; }
+    public string? ErrorMessage { get; set; }
+    public string? ErrorCode { get; set; }
+}
+
 

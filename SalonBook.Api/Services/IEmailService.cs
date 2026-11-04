@@ -10,5 +10,6 @@ public record EmailSendResult(
 public interface IEmailService
 {
     Task<EmailSendResult> SendEmailAsync(string toEmail, string subject, string body, CancellationToken cancellationToken = default);
+    Task<EmailSendResult> SendEmailAsync(string toEmail, string subject, string htmlBody, string? plainTextBody, CancellationToken cancellationToken = default);
 }
 

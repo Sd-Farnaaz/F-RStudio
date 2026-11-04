@@ -16,7 +16,7 @@ export default function JoinPage() {
             </div>
 
             <h1 className="text-4xl sm:text-5xl font-serif font-medium text-deep-plum leading-tight">
-              How would you like to use SalonBook?
+              How would you like to use F&R Beauty Studio?
             </h1>
 
             <p className="text-base sm:text-lg text-muted max-w-xl mx-auto leading-relaxed">

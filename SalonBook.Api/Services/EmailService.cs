@@ -16,7 +16,12 @@ public class EmailService : IEmailService
         _logger = logger;
     }
 
-    public async Task<EmailSendResult> SendEmailAsync(string toEmail, string subject, string body, CancellationToken cancellationToken = default)
+    public Task<EmailSendResult> SendEmailAsync(string toEmail, string subject, string body, CancellationToken cancellationToken = default)
+    {
+        return SendEmailAsync(toEmail, subject, body, plainTextBody: null, cancellationToken);
+    }
+
+    public async Task<EmailSendResult> SendEmailAsync(string toEmail, string subject, string htmlBody, string? plainTextBody, CancellationToken cancellationToken = default)
     {
         if (!_options.IsEnabled || string.IsNullOrWhiteSpace(_options.SmtpHost))
         {
@@ -29,19 +34,49 @@ public class EmailService : IEmailService
             );
         }
 
+        if (string.IsNullOrWhiteSpace(_options.SenderEmail))
+        {
+            _logger.LogWarning("Email sending skipped for {ToEmail}: Sender email address is not configured.", toEmail);
+            return new EmailSendResult(
+                Success: false,
+                ErrorMessage: "Email sending skipped: Sender email address is not configured.",
+                ErrorCode: "SMTP_SENDER_MISSING",
+                Skipped: true
+            );
+        }
+
         try
         {
+            var senderDisplayName = !string.IsNullOrWhiteSpace(_options.SenderName)
+                ? _options.SenderName
+                : "F&R Beauty Studio";
+
             using var mailMessage = new MailMessage
             {
-                From = new MailAddress(_options.SenderEmail, _options.SenderName),
-                Subject = subject,
-                Body = body,
-                IsBodyHtml = true
+                From = new MailAddress(_options.SenderEmail, senderDisplayName),
+                Subject = subject
             };
             mailMessage.To.Add(toEmail);
 
+            if (!string.IsNullOrWhiteSpace(plainTextBody))
+            {
+                var plainTextView = AlternateView.CreateAlternateViewFromString(plainTextBody, System.Text.Encoding.UTF8, "text/plain");
+                var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, System.Text.Encoding.UTF8, "text/html");
+                mailMessage.AlternateViews.Add(plainTextView);
+                mailMessage.AlternateViews.Add(htmlView);
+                mailMessage.Body = plainTextBody;
+                mailMessage.IsBodyHtml = false;
+            }
+            else
+            {
+                mailMessage.Body = htmlBody;
+                mailMessage.IsBodyHtml = true;
+            }
+
             using var smtpClient = new SmtpClient(_options.SmtpHost, _options.SmtpPort)
             {
+                DeliveryMethod = SmtpDeliveryMethod.Network,
+                UseDefaultCredentials = false,
                 EnableSsl = _options.EnableSsl,
                 Credentials = string.IsNullOrWhiteSpace(_options.SmtpUsername)
                     ? CredentialCache.DefaultNetworkCredentials
@@ -64,4 +99,3 @@ public class EmailService : IEmailService
         }
     }
 }
-

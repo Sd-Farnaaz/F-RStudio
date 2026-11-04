@@ -730,7 +730,7 @@ export default function AdminPosPage() {
                 {/* Footer Note */}
                 <div className="text-center pt-3 border-t border-dashed border-gray-300 text-[10px] text-gray-500">
                   <p>{receiptData.notes}</p>
-                  <p className="mt-1 font-semibold">Powered by SalonBook</p>
+                  <p className="mt-1 font-semibold">Powered by F&R Beauty Studio</p>
                 </div>
               </div>
 

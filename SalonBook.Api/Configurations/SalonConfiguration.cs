@@ -127,6 +127,20 @@ public class SalonConfiguration : IEntityTypeConfiguration<Salon>
         builder.Property(s => s.SubscriptionRenewsAtUtc)
             .IsRequired(false);
 
+        builder.Property(s => s.IsSuspendedByAdmin)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(s => s.DeactivationReason)
+            .HasMaxLength(100);
+
+        builder.Property(s => s.TrialEndsAtUtc)
+            .IsRequired(false);
+
+        builder.Property(s => s.HasUsedTrial)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(s => s.IsAdvancePaymentRequired)
             .IsRequired()
             .HasDefaultValue(false);
