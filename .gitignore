@@ -46,3 +46,7 @@ appsettings.secrets.json
 node_modules/
 dist/
 .vite/
+
+# Deployment packages
+publish/
+*.zip

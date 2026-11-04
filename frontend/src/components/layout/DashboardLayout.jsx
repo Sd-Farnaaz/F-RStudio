@@ -84,7 +84,7 @@ export default function DashboardLayout({ children }) {
           <Link to={getLogoLink()} className="flex items-center gap-2.5 text-xl font-serif font-semibold text-deep-plum">
             <img 
               src="/images/fr-beauty-studio-logo.png" 
-              alt="F&R Beauty Studio Logo" 
+              alt="F&R Beauty Studio" 
               className="w-8 h-8 object-contain rounded-full border border-border-color shadow-2xs" 
             />
             <span>F&R <span className="text-primary-rose">Studio</span></span>

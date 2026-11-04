@@ -13,7 +13,11 @@ async function handleResponse(response) {
   const isJson = response.headers.get('content-type')?.includes('application/json');
   let data = null;
   if (isJson) {
-    data = await response.json();
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
   } else {
     const text = await response.text();
     if (text) data = { message: text };
@@ -39,11 +43,59 @@ async function handleResponse(response) {
   return data;
 }
 
+// Mutex promise to prevent token-refresh race conditions
+let refreshPromise = null;
+
+async function refreshAuthTokens() {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
+      }
+
+      const userRole = localStorage.getItem('userRole')?.toLowerCase() || 'user';
+      const roleSegment = userRole === 'admin' ? 'admin' : userRole === 'superadmin' ? 'superadmin' : 'user';
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/${roleSegment}/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken })
+      });
+
+      if (!response.ok) {
+        // Refresh failed, clear session
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('userRole');
+        window.dispatchEvent(new Event('session-expired'));
+        throw new ApiError('Session expired. Please log in again.', 401, null);
+      }
+
+      const data = await response.json();
+      localStorage.setItem('accessToken', data.accessToken);
+      localStorage.setItem('refreshToken', data.refreshToken);
+      if (data.user?.role) {
+        localStorage.setItem('userRole', data.user.role);
+      }
+      return data.accessToken;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 export async function fetchApi(endpoint, options = {}) {
-  const { skipAuth = false, ...fetchOptions } = options;
+  const { skipAuth = false, _retry = false, ...fetchOptions } = options;
   const token = !skipAuth ? localStorage.getItem('accessToken') : null;
   const isGetOrHead = !fetchOptions.method || fetchOptions.method.toUpperCase() === 'GET' || fetchOptions.method.toUpperCase() === 'HEAD';
-  
+
   const headers = {
     ...(!isGetOrHead || fetchOptions.body ? { 'Content-Type': 'application/json' } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -59,39 +111,36 @@ export async function fetchApi(endpoint, options = {}) {
     config.body = JSON.stringify(config.body);
   }
 
+  const isPublicAuthEndpoint =
+    endpoint.includes('/login') ||
+    endpoint.includes('/register') ||
+    endpoint.includes('/refresh') ||
+    endpoint.includes('/forgot-password') ||
+    endpoint.includes('/reset-password');
+
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    
-    // Auto-refresh token if 401 and we have a refresh token (only for authenticated calls)
-    if (response.status === 401 && !options._retry && !skipAuth && localStorage.getItem('refreshToken')) {
-      config._retry = true;
+
+    // Auto-refresh token if 401 and we have a refresh token (only for authenticated API calls)
+    if (response.status === 401 && !_retry && !skipAuth && !isPublicAuthEndpoint && localStorage.getItem('refreshToken')) {
       try {
-        const userRole = localStorage.getItem('userRole')?.toLowerCase() || 'user';
-        const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/${userRole === 'admin' ? 'admin' : userRole === 'superadmin' ? 'superadmin' : 'user'}/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken: localStorage.getItem('refreshToken') })
-        });
-        
-        if (refreshResponse.ok) {
-          const { accessToken, refreshToken, user } = await refreshResponse.json();
-          localStorage.setItem('accessToken', accessToken);
-          localStorage.setItem('refreshToken', refreshToken);
-          localStorage.setItem('userRole', user.role);
-          
-          config.headers.Authorization = `Bearer ${accessToken}`;
-          const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, config);
-          return handleResponse(retryResponse);
-        } else {
-          // Refresh failed, clear session
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('userRole');
-          window.dispatchEvent(new Event('session-expired'));
-          throw new ApiError('Session expired. Please log in again.', 401, null);
+        const newAccessToken = await refreshAuthTokens();
+        const retryHeaders = {
+          ...headers,
+          Authorization: `Bearer ${newAccessToken}`,
+        };
+        const retryConfig = {
+          ...fetchOptions,
+          headers: retryHeaders,
+        };
+        if (retryConfig.body && typeof retryConfig.body !== 'string') {
+          retryConfig.body = JSON.stringify(retryConfig.body);
         }
-      } catch (err) {
-        throw new ApiError('Network error during session refresh', 0, null);
+        const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, retryConfig);
+        return handleResponse(retryResponse);
+      } catch (refreshErr) {
+        if (refreshErr instanceof ApiError) throw refreshErr;
+        throw new ApiError('Session expired. Please log in again.', 401, null);
       }
     }
 

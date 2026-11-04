@@ -120,10 +120,22 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ApplicationDbContext>("database");
 
-// 9. CORS Policy - Restricted to React/Vite development origin
+// 9. CORS Policy - Configured for production Render and local development
 const string FrontendCorsPolicy = "AllowFrontendDev";
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "http://localhost:5173", "http://localhost:5174", "http://localhost:5175" };
+var configuredOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+var defaultOrigins = new[]
+{
+    "https://salonbook-frontend.onrender.com",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175"
+};
+var allowedOrigins = configuredOrigins.Length > 0
+    ? configuredOrigins.Union(defaultOrigins, StringComparer.OrdinalIgnoreCase).ToArray()
+    : defaultOrigins;
 
 builder.Services.AddCors(options =>
 {

@@ -61,7 +61,7 @@ export default function PublicLayout({ children }) {
           <Link to={getLogoLink()} className="group flex items-center gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-rose/40 rounded-xl">
             <img 
               src="/images/fr-beauty-studio-logo.png" 
-              alt="F&R Beauty Studio Logo" 
+              alt="F&R Beauty Studio" 
               className="w-10 h-10 object-contain rounded-full border border-border-color shadow-2xs group-hover:scale-105 transition-transform" 
             />
             <span className="font-serif text-2xl sm:text-[26px] font-bold tracking-tight text-deep-plum">
@@ -414,7 +414,7 @@ export default function PublicLayout({ children }) {
               <Link to="/" className="inline-flex items-center gap-3">
                 <img 
                   src="/images/fr-beauty-studio-logo.png" 
-                  alt="F&R Beauty Studio Logo" 
+                  alt="F&R Beauty Studio" 
                   className="w-10 h-10 object-contain rounded-full border border-white/20 shadow-xs" 
                 />
                 <span className="font-serif text-2xl font-bold tracking-tight text-white block">

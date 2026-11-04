@@ -98,7 +98,7 @@ export default function SuperAdminLayout({ children, title, breadcrumbs = [] }) 
           <div className="flex items-center gap-3">
             <img 
               src="/images/fr-beauty-studio-logo.png" 
-              alt="F&R Beauty Studio Logo" 
+              alt="F&R Beauty Studio" 
               className="w-10 h-10 object-contain rounded-full border border-border-color shadow-2xs" 
             />
             <div>

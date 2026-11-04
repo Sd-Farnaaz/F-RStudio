@@ -42,7 +42,7 @@ export default function SuperAdminLoginPage() {
         <div className="flex flex-col items-center text-center">
           <img 
             src="/images/fr-beauty-studio-logo.png" 
-            alt="F&R Beauty Studio Logo" 
+            alt="F&R Beauty Studio" 
             className="w-16 h-16 object-contain rounded-full border border-dusty-rose/40 shadow-xs mb-4" 
           />
           <span className="text-xs font-semibold uppercase tracking-widest text-primary-rose bg-soft-blush px-3 py-1 rounded-full border border-dusty-rose/30 mb-2">

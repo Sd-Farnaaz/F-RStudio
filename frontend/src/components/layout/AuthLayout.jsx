@@ -12,7 +12,7 @@ export default function AuthLayout({ children, title, subtitle, imageSrc }) {
           <Link to="/" className="group flex items-center gap-2.5 focus:outline-none">
             <img 
               src="/images/fr-beauty-studio-logo.png" 
-              alt="F&R Beauty Studio Logo" 
+              alt="F&R Beauty Studio" 
               className="w-9 h-9 object-contain rounded-full border border-border-color shadow-2xs group-hover:scale-105 transition-transform" 
             />
             <span className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-deep-plum">
