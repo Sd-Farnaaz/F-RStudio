@@ -228,9 +228,9 @@ public class EmailTemplateBuilder : IEmailTemplateBuilder
             ("Booking Status", Encode(appt.Status))
         };
 
-        if (appt.IsAdvancePaymentRequired && appt.AdvancePaymentAmount > 0)
+        if (appt.AdvanceAmountRequired > 0)
         {
-            details.Add(("Advance Payment", $"{appt.AdvancePaymentAmount:N2} {currency} ({appt.PaymentStatus})"));
+            details.Add(("Advance Payment", $"{appt.AdvanceAmountRequired:N2} {currency} ({appt.PaymentStatus})"));
         }
 
         var leadHtml = $"<p style=\"margin: 0 0 16px 0;\">Dear {Encode(customerName)},</p>" +
@@ -1327,7 +1327,7 @@ public class EmailTemplateBuilder : IEmailTemplateBuilder
         if (salon == null) return "F&R Beauty Studio";
 
         var parts = new List<string>();
-        if (!string.IsNullOrWhiteSpace(salon.AddressLine1)) parts.Add(salon.AddressLine1.Trim());
+        if (!string.IsNullOrWhiteSpace(salon.AddressLine)) parts.Add(salon.AddressLine.Trim());
         if (!string.IsNullOrWhiteSpace(salon.City)) parts.Add(salon.City.Trim());
         if (!string.IsNullOrWhiteSpace(salon.PostalCode)) parts.Add(salon.PostalCode.Trim());
 

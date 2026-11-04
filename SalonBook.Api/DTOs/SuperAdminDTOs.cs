@@ -83,7 +83,6 @@ public class SuperAdminSalonDetailResponse : SuperAdminSalonResponse
 
     // Detailed Phase 2 & 3 Attributes
     public string SubscriptionBillingCycle { get; set; } = "Monthly";
-    public string SubscriptionStatus { get; set; } = "Active";
     public decimal SubscriptionPrice { get; set; }
     public DateTime? SubscriptionRenewsAtUtc { get; set; }
     public string? GstNumber { get; set; }

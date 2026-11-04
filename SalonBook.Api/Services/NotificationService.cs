@@ -494,6 +494,7 @@ public class NotificationService : INotificationService
     private async Task HandlePaymentStatusEventAsync(Appointment appt, List<User> salonAdmins, string eventType, CancellationToken cancellationToken)
     {
         var currency = appt.Salon?.CurrencyCode ?? "INR";
+        var salonName = appt.Salon?.Name ?? "the salon";
         var notesSuffix = string.IsNullOrWhiteSpace(appt.PaymentNotes) ? "" : $" Notes: {appt.PaymentNotes}";
 
         string subject;
@@ -502,22 +503,22 @@ public class NotificationService : INotificationService
         if (eventType == "PaymentVerified")
         {
             subject = $"Payment Verified: {appt.ServiceNameAtBooking}";
-            message = $"Your payment of {appt.AmountPaid} {currency} for {appt.ServiceNameAtBooking} at {appt.Salon.Name} has been verified as '{appt.PaymentStatus}'.{notesSuffix}";
+            message = $"Your payment of {appt.AmountPaid} {currency} for {appt.ServiceNameAtBooking} at {salonName} has been verified as '{appt.PaymentStatus}'.{notesSuffix}";
         }
         else if (eventType == "PaymentRejected")
         {
             subject = $"Payment Not Verified: {appt.ServiceNameAtBooking}";
-            message = $"Your payment for {appt.ServiceNameAtBooking} at {appt.Salon.Name} was marked as '{appt.PaymentStatus}'.{notesSuffix} Please verify your transaction details or contact the salon.";
+            message = $"Your payment for {appt.ServiceNameAtBooking} at {salonName} was marked as '{appt.PaymentStatus}'.{notesSuffix} Please verify your transaction details or contact the salon.";
         }
         else if (eventType == "PaymentRefunded")
         {
             subject = $"Payment Refunded: {appt.ServiceNameAtBooking}";
-            message = $"A refund of {appt.AmountPaid} {currency} for {appt.ServiceNameAtBooking} at {appt.Salon.Name} has been recorded.{notesSuffix}";
+            message = $"A refund of {appt.AmountPaid} {currency} for {appt.ServiceNameAtBooking} at {salonName} has been recorded.{notesSuffix}";
         }
         else
         {
             subject = $"Payment Update: {appt.ServiceNameAtBooking}";
-            message = $"Payment status for your appointment ({appt.ServiceNameAtBooking} at {appt.Salon.Name}) is now '{appt.PaymentStatus}'.{notesSuffix}";
+            message = $"Payment status for your appointment ({appt.ServiceNameAtBooking} at {salonName}) is now '{appt.PaymentStatus}'.{notesSuffix}";
         }
 
         // Customer InApp Notification
@@ -588,7 +589,6 @@ public class NotificationService : INotificationService
             return;
         }
 
-        string reminderTypeName;
         string reminderNotificationType;
         string inAppSubject;
         string inAppMessage;
@@ -600,7 +600,6 @@ public class NotificationService : INotificationService
 
         if (reminder.ReminderType == "24Hours")
         {
-            reminderTypeName = "24 hours";
             reminderNotificationType = "AppointmentReminder24H";
             inAppSubject = $"Reminder: Upcoming Appointment Tomorrow ({appt.Salon.Name})";
             inAppMessage = $"Your appointment for {appt.ServiceNameAtBooking} with {appt.Staff.FullName} is tomorrow at {appt.StartAtUtc:yyyy-MM-dd HH:mm} UTC. Address: {salonAddress}";
@@ -608,7 +607,6 @@ public class NotificationService : INotificationService
         }
         else if (reminder.ReminderType == "2Hours")
         {
-            reminderTypeName = "2 hours";
             reminderNotificationType = "AppointmentReminder2H";
             inAppSubject = $"Reminder: Appointment in 2 Hours ({appt.Salon.Name})";
             inAppMessage = $"Your appointment for {appt.ServiceNameAtBooking} with {appt.Staff.FullName} starts in 2 hours at {appt.StartAtUtc:HH:mm} UTC.";
@@ -616,7 +614,6 @@ public class NotificationService : INotificationService
         }
         else // 1HourAfter
         {
-            reminderTypeName = "post-visit";
             reminderNotificationType = "PostVisitThankYou";
             inAppSubject = $"Thank you for visiting {appt.Salon.Name}! ⭐️ Leave a Review";
             inAppMessage = $"Thank you for choosing {appt.Salon.Name} today for your {appt.ServiceNameAtBooking}! We would love your feedback.";
