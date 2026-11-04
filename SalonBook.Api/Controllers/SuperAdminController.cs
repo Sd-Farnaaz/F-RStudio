@@ -52,48 +52,98 @@ public class SuperAdminController : ControllerBase
         var totalCustomers = await _dbContext.Users.CountAsync(u => u.Role == Roles.User, cancellationToken);
         var totalSalonAdmins = await _dbContext.Users.CountAsync(u => u.Role == Roles.Admin, cancellationToken);
 
-        var totalAppointments = await _dbContext.Appointments.CountAsync(cancellationToken);
-        var totalGrossRevenue = await _dbContext.Appointments
-            .Where(a => a.Status != "Cancelled")
-            .SumAsync(a => (decimal?)a.PriceAtBooking, cancellationToken) ?? 0m;
-
-        // Cross-Phase Platform Insights (Reviews, Client Dossiers, Escrow Holdings, SaaS MRR)
-        var totalVerifiedReviews = await _dbContext.Reviews.CountAsync(cancellationToken);
-        var totalConsultationCards = await _dbContext.ClientConsultationCards.CountAsync(cancellationToken);
-        var totalPendingEscrow = await _dbContext.VendorPayouts
-            .Where(p => p.Status == "Pending" || p.Status == "Processed")
-            .SumAsync(p => (decimal?)p.NetAmount, cancellationToken) ?? 0m;
-
-        var activeSalonsList = await _dbContext.Salons
-            .AsNoTracking()
-            .Where(s => s.IsActive && s.SubscriptionStatus == "Active")
-            .Select(s => new { s.SubscriptionBillingCycle, s.SubscriptionPrice })
-            .ToListAsync(cancellationToken);
-
-        decimal mrr = 0m;
-        foreach (var s in activeSalonsList)
+        int totalAppointments = 0;
+        decimal totalGrossRevenue = 0m;
+        try
         {
-            mrr += s.SubscriptionBillingCycle == "Annual" ? s.SubscriptionPrice / 12m : s.SubscriptionPrice;
+            totalAppointments = await _dbContext.Appointments.CountAsync(cancellationToken);
+            totalGrossRevenue = await _dbContext.Appointments
+                .Where(a => a.Status != "Cancelled")
+                .SumAsync(a => (decimal?)a.PriceAtBooking, cancellationToken) ?? 0m;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to calculate appointments summary in SuperAdmin overview.");
         }
 
-        var recentSalons = await _dbContext.Salons
-            .AsNoTracking()
-            .OrderByDescending(s => s.CreatedAtUtc)
-            .Take(5)
-            .Select(s => new SuperAdminRecentSalonItem
+        // Cross-Phase Platform Insights (Reviews, Client Dossiers, Escrow Holdings, SaaS MRR)
+        int totalVerifiedReviews = 0;
+        try
+        {
+            totalVerifiedReviews = await _dbContext.Reviews.CountAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Reviews table unavailable for SuperAdmin overview.");
+        }
+
+        int totalConsultationCards = 0;
+        try
+        {
+            totalConsultationCards = await _dbContext.ClientConsultationCards.CountAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "ClientConsultationCards table unavailable for SuperAdmin overview.");
+        }
+
+        decimal totalPendingEscrow = 0m;
+        try
+        {
+            totalPendingEscrow = await _dbContext.VendorPayouts
+                .Where(p => p.Status == "Pending" || p.Status == "Processed")
+                .SumAsync(p => (decimal?)p.NetAmount, cancellationToken) ?? 0m;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "VendorPayouts table unavailable for SuperAdmin overview.");
+        }
+
+        decimal mrr = 0m;
+        try
+        {
+            var activeSalonsList = await _dbContext.Salons
+                .AsNoTracking()
+                .Where(s => s.IsActive && s.SubscriptionStatus == "Active")
+                .Select(s => new { s.SubscriptionBillingCycle, s.SubscriptionPrice })
+                .ToListAsync(cancellationToken);
+
+            foreach (var s in activeSalonsList)
             {
-                Id = s.Id,
-                Name = s.Name,
-                Slug = s.Slug,
-                BusinessType = s.BusinessType,
-                City = s.City,
-                IsActive = s.IsActive,
-                IsVerified = s.IsVerified,
-                KycStatus = s.KycStatus,
-                SubscriptionTier = s.SubscriptionTier ?? "Starter",
-                CreatedAtUtc = s.CreatedAtUtc
-            })
-            .ToListAsync(cancellationToken);
+                mrr += s.SubscriptionBillingCycle == "Annual" ? s.SubscriptionPrice / 12m : s.SubscriptionPrice;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to calculate MRR for SuperAdmin overview.");
+        }
+
+        List<SuperAdminRecentSalonItem> recentSalons = new();
+        try
+        {
+            recentSalons = await _dbContext.Salons
+                .AsNoTracking()
+                .OrderByDescending(s => s.CreatedAtUtc)
+                .Take(5)
+                .Select(s => new SuperAdminRecentSalonItem
+                {
+                    Id = s.Id,
+                    Name = s.Name,
+                    Slug = s.Slug,
+                    BusinessType = s.BusinessType,
+                    City = s.City,
+                    IsActive = s.IsActive,
+                    IsVerified = s.IsVerified,
+                    KycStatus = s.KycStatus ?? "NotSubmitted",
+                    SubscriptionTier = s.SubscriptionTier ?? "Starter",
+                    CreatedAtUtc = s.CreatedAtUtc
+                })
+                .ToListAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to query recent salons for SuperAdmin overview.");
+        }
 
         var response = new SuperAdminOverviewResponse
         {
@@ -171,43 +221,86 @@ public class SuperAdminController : ControllerBase
 
         var totalCount = await query.CountAsync(cancellationToken);
 
-        var salons = await query
-            .OrderByDescending(s => s.CreatedAtUtc)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(s => new SuperAdminSalonResponse
-            {
-                Id = s.Id,
-                Name = s.Name,
-                Slug = s.Slug,
-                BusinessType = s.BusinessType,
-                City = s.City,
-                State = s.State,
-                ContactEmail = s.ContactEmail,
-                PhoneNumber = s.PhoneNumber,
-                IsActive = s.IsActive,
-                IsVerified = s.IsVerified,
-                KycStatus = s.KycStatus,
-                OnboardingState = s.OnboardingState,
-                AdminEmail = s.Users.Where(u => u.Role == Roles.Admin).Select(u => u.Email).FirstOrDefault(),
-                AdminFullName = s.Users.Where(u => u.Role == Roles.Admin).Select(u => u.FullName).FirstOrDefault(),
-                TotalStaff = s.StaffMembers.Count,
-                TotalServices = s.Services.Count,
-                TotalAppointments = s.Appointments.Count,
-                CreatedAtUtc = s.CreatedAtUtc,
+        List<SuperAdminSalonResponse> salons;
+        try
+        {
+            salons = await query
+                .OrderByDescending(s => s.CreatedAtUtc)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(s => new SuperAdminSalonResponse
+                {
+                    Id = s.Id,
+                    Name = s.Name,
+                    Slug = s.Slug,
+                    BusinessType = s.BusinessType,
+                    City = s.City,
+                    State = s.State,
+                    ContactEmail = s.ContactEmail,
+                    PhoneNumber = s.PhoneNumber,
+                    IsActive = s.IsActive,
+                    IsVerified = s.IsVerified,
+                    KycStatus = s.KycStatus ?? "NotSubmitted",
+                    OnboardingState = s.OnboardingState,
+                    AdminEmail = s.Users.Where(u => u.Role == Roles.Admin).Select(u => u.Email).FirstOrDefault(),
+                    AdminFullName = s.Users.Where(u => u.Role == Roles.Admin).Select(u => u.FullName).FirstOrDefault(),
+                    TotalStaff = s.StaffMembers.Count,
+                    TotalServices = s.Services.Count,
+                    TotalAppointments = s.Appointments.Count,
+                    CreatedAtUtc = s.CreatedAtUtc,
 
-                // Cross-Phase Data
-                SubscriptionTier = s.SubscriptionTier ?? "Starter",
-                SubscriptionStatus = s.SubscriptionStatus ?? "Active",
-                DeactivationReason = s.DeactivationReason,
-                IsSuspendedByAdmin = s.IsSuspendedByAdmin,
-                TrialEndsAtUtc = s.TrialEndsAtUtc,
-                AverageRating = s.Reviews.Any() ? Math.Round(s.Reviews.Average(r => r.Rating), 1) : 0,
-                TotalReviews = s.Reviews.Count,
-                TotalConsultationCards = _dbContext.ClientConsultationCards.Count(c => c.SalonId == s.Id),
-                TotalPendingEscrow = s.Payouts.Where(p => p.Status == "Pending" || p.Status == "Processed").Sum(p => p.NetAmount)
-            })
-            .ToListAsync(cancellationToken);
+                    // Cross-Phase Data
+                    SubscriptionTier = s.SubscriptionTier ?? "Starter",
+                    SubscriptionStatus = s.SubscriptionStatus ?? "Active",
+                    DeactivationReason = s.DeactivationReason,
+                    IsSuspendedByAdmin = s.IsSuspendedByAdmin,
+                    TrialEndsAtUtc = s.TrialEndsAtUtc,
+                    AverageRating = s.Reviews.Any() ? Math.Round(s.Reviews.Average(r => (double)r.Rating), 1) : 0,
+                    TotalReviews = s.Reviews.Count,
+                    TotalConsultationCards = _dbContext.ClientConsultationCards.Count(c => c.SalonId == s.Id),
+                    TotalPendingEscrow = s.Payouts.Where(p => p.Status == "Pending" || p.Status == "Processed").Sum(p => (decimal?)p.NetAmount) ?? 0m
+                })
+                .ToListAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to query comprehensive salon list. Falling back to resilient projection.");
+            salons = await query
+                .OrderByDescending(s => s.CreatedAtUtc)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(s => new SuperAdminSalonResponse
+                {
+                    Id = s.Id,
+                    Name = s.Name,
+                    Slug = s.Slug,
+                    BusinessType = s.BusinessType,
+                    City = s.City,
+                    State = s.State,
+                    ContactEmail = s.ContactEmail,
+                    PhoneNumber = s.PhoneNumber,
+                    IsActive = s.IsActive,
+                    IsVerified = s.IsVerified,
+                    KycStatus = s.KycStatus ?? "NotSubmitted",
+                    OnboardingState = s.OnboardingState,
+                    AdminEmail = s.Users.Where(u => u.Role == Roles.Admin).Select(u => u.Email).FirstOrDefault(),
+                    AdminFullName = s.Users.Where(u => u.Role == Roles.Admin).Select(u => u.FullName).FirstOrDefault(),
+                    TotalStaff = s.StaffMembers.Count,
+                    TotalServices = s.Services.Count,
+                    TotalAppointments = s.Appointments.Count,
+                    CreatedAtUtc = s.CreatedAtUtc,
+                    SubscriptionTier = s.SubscriptionTier ?? "Starter",
+                    SubscriptionStatus = s.SubscriptionStatus ?? "Active",
+                    DeactivationReason = s.DeactivationReason,
+                    IsSuspendedByAdmin = s.IsSuspendedByAdmin,
+                    TrialEndsAtUtc = s.TrialEndsAtUtc,
+                    AverageRating = 0,
+                    TotalReviews = 0,
+                    TotalConsultationCards = 0,
+                    TotalPendingEscrow = 0m
+                })
+                .ToListAsync(cancellationToken);
+        }
 
         return Ok(new PagedResult<SuperAdminSalonResponse>
         {
@@ -234,8 +327,6 @@ public class SuperAdminController : ControllerBase
             .Include(s => s.StaffMembers)
             .Include(s => s.Services)
             .Include(s => s.Appointments)
-            .Include(s => s.Reviews)
-            .Include(s => s.Payouts)
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
 
         if (salon == null)
@@ -248,11 +339,54 @@ public class SuperAdminController : ControllerBase
             .Where(a => a.Status != "Cancelled")
             .Sum(a => a.PriceAtBooking);
 
-        var totalConsultationCards = await _dbContext.ClientConsultationCards.CountAsync(c => c.SalonId == id, cancellationToken);
-        var totalFormulas = await _dbContext.ClientFormulaRecords.CountAsync(f => f.SalonId == id, cancellationToken);
-        var avgRating = salon.Reviews.Any() ? Math.Round(salon.Reviews.Average(r => r.Rating), 1) : 0;
-        var pendingEscrow = salon.Payouts.Where(p => p.Status == "Pending" || p.Status == "Processed").Sum(p => p.NetAmount);
-        var disbursedEscrow = salon.Payouts.Where(p => p.Status == "Disbursed").Sum(p => p.NetAmount);
+        int totalConsultationCards = 0;
+        try
+        {
+            totalConsultationCards = await _dbContext.ClientConsultationCards.CountAsync(c => c.SalonId == id, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "ClientConsultationCards unavailable for salon {Id}.", id);
+        }
+
+        int totalFormulas = 0;
+        try
+        {
+            totalFormulas = await _dbContext.ClientFormulaRecords.CountAsync(f => f.SalonId == id, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "ClientFormulaRecords unavailable for salon {Id}.", id);
+        }
+
+        double avgRating = 0;
+        int totalReviews = 0;
+        try
+        {
+            var reviews = await _dbContext.Reviews.AsNoTracking().Where(r => r.SalonId == id).ToListAsync(cancellationToken);
+            if (reviews.Any())
+            {
+                avgRating = Math.Round(reviews.Average(r => (double)r.Rating), 1);
+                totalReviews = reviews.Count;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Reviews table unavailable for salon {Id}.", id);
+        }
+
+        decimal pendingEscrow = 0m;
+        decimal disbursedEscrow = 0m;
+        try
+        {
+            var payouts = await _dbContext.VendorPayouts.AsNoTracking().Where(p => p.SalonId == id).ToListAsync(cancellationToken);
+            pendingEscrow = payouts.Where(p => p.Status == "Pending" || p.Status == "Processed").Sum(p => p.NetAmount);
+            disbursedEscrow = payouts.Where(p => p.Status == "Disbursed").Sum(p => p.NetAmount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "VendorPayouts unavailable for salon {Id}.", id);
+        }
 
         var response = new SuperAdminSalonDetailResponse
         {
@@ -273,7 +407,7 @@ public class SuperAdminController : ControllerBase
             LogoUrl = salon.LogoUrl,
             IsActive = salon.IsActive,
             IsVerified = salon.IsVerified,
-            KycStatus = salon.KycStatus,
+            KycStatus = salon.KycStatus ?? "NotSubmitted",
             OnboardingState = salon.OnboardingState,
             AdminEmail = adminUser?.Email,
             AdminFullName = adminUser?.FullName,
@@ -298,7 +432,7 @@ public class SuperAdminController : ControllerBase
             AdvancePaymentType = salon.AdvancePaymentType,
             AdvancePaymentValue = salon.AdvancePaymentValue,
             AverageRating = avgRating,
-            TotalReviews = salon.Reviews.Count,
+            TotalReviews = totalReviews,
             TotalConsultationCards = totalConsultationCards,
             TotalFormulaRecords = totalFormulas,
             TotalPendingEscrow = pendingEscrow,
@@ -517,66 +651,85 @@ public class SuperAdminController : ControllerBase
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var totalPending = await _dbContext.VendorPayouts
-            .Where(p => p.Status == "Pending")
-            .SumAsync(p => (decimal?)p.NetAmount, cancellationToken) ?? 0m;
-
-        var totalProcessed = await _dbContext.VendorPayouts
-            .Where(p => p.Status == "Processed")
-            .SumAsync(p => (decimal?)p.NetAmount, cancellationToken) ?? 0m;
-
-        var totalDisbursed = await _dbContext.VendorPayouts
-            .Where(p => p.Status == "Disbursed")
-            .SumAsync(p => (decimal?)p.NetAmount, cancellationToken) ?? 0m;
-
-        var query = _dbContext.VendorPayouts
-            .AsNoTracking()
-            .Include(p => p.Salon)
-            .AsQueryable();
-
-        if (salonId.HasValue)
+        decimal totalPending = 0m;
+        decimal totalProcessed = 0m;
+        decimal totalDisbursed = 0m;
+        try
         {
-            query = query.Where(p => p.SalonId == salonId.Value);
+            totalPending = await _dbContext.VendorPayouts
+                .Where(p => p.Status == "Pending")
+                .SumAsync(p => (decimal?)p.NetAmount, cancellationToken) ?? 0m;
+
+            totalProcessed = await _dbContext.VendorPayouts
+                .Where(p => p.Status == "Processed")
+                .SumAsync(p => (decimal?)p.NetAmount, cancellationToken) ?? 0m;
+
+            totalDisbursed = await _dbContext.VendorPayouts
+                .Where(p => p.Status == "Disbursed")
+                .SumAsync(p => (decimal?)p.NetAmount, cancellationToken) ?? 0m;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to aggregate VendorPayouts in GetSettlements.");
         }
 
-        if (!string.IsNullOrWhiteSpace(status) && !status.Equals("all", StringComparison.OrdinalIgnoreCase))
+        int totalCount = 0;
+        List<SuperAdminSettlementItem> items = new();
+        try
         {
-            var normalizedStatus = status.Trim().ToLower();
-            query = query.Where(p => p.Status.ToLower() == normalizedStatus);
-        }
+            var query = _dbContext.VendorPayouts
+                .AsNoTracking()
+                .Include(p => p.Salon)
+                .AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLower();
-            query = query.Where(p => (p.Salon != null && p.Salon.Name.ToLower().Contains(term)) ||
-                                     p.EscrowTransactionId.ToLower().Contains(term) ||
-                                     (p.UtrNumber != null && p.UtrNumber.ToLower().Contains(term)));
-        }
-
-        var totalCount = await query.CountAsync(cancellationToken);
-
-        var items = await query
-            .OrderByDescending(p => p.CreatedAtUtc)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(p => new SuperAdminSettlementItem
+            if (salonId.HasValue)
             {
-                Id = p.Id,
-                SalonId = p.SalonId,
-                SalonName = p.Salon != null ? p.Salon.Name : "Unknown Salon",
-                SalonCity = p.Salon != null && p.Salon.City != null ? p.Salon.City : "—",
-                EscrowTransactionId = p.EscrowTransactionId,
-                Amount = p.Amount,
-                CommissionAmount = p.CommissionAmount,
-                NetAmount = p.NetAmount,
-                CurrencyCode = p.CurrencyCode,
-                Status = p.Status,
-                UtrNumber = p.UtrNumber,
-                DisbursedAtUtc = p.DisbursedAtUtc,
-                Notes = p.Notes,
-                CreatedAtUtc = p.CreatedAtUtc
-            })
-            .ToListAsync(cancellationToken);
+                query = query.Where(p => p.SalonId == salonId.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(status) && !status.Equals("all", StringComparison.OrdinalIgnoreCase))
+            {
+                var normalizedStatus = status.Trim().ToLower();
+                query = query.Where(p => p.Status.ToLower() == normalizedStatus);
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLower();
+                query = query.Where(p => (p.Salon != null && p.Salon.Name.ToLower().Contains(term)) ||
+                                         p.EscrowTransactionId.ToLower().Contains(term) ||
+                                         (p.UtrNumber != null && p.UtrNumber.ToLower().Contains(term)));
+            }
+
+            totalCount = await query.CountAsync(cancellationToken);
+
+            items = await query
+                .OrderByDescending(p => p.CreatedAtUtc)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(p => new SuperAdminSettlementItem
+                {
+                    Id = p.Id,
+                    SalonId = p.SalonId,
+                    SalonName = p.Salon != null ? p.Salon.Name : "Unknown Salon",
+                    SalonCity = p.Salon != null && p.Salon.City != null ? p.Salon.City : "—",
+                    EscrowTransactionId = p.EscrowTransactionId,
+                    Amount = p.Amount,
+                    CommissionAmount = p.CommissionAmount,
+                    NetAmount = p.NetAmount,
+                    CurrencyCode = p.CurrencyCode,
+                    Status = p.Status,
+                    UtrNumber = p.UtrNumber,
+                    DisbursedAtUtc = p.DisbursedAtUtc,
+                    Notes = p.Notes,
+                    CreatedAtUtc = p.CreatedAtUtc
+                })
+                .ToListAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to query settlement items in GetSettlements.");
+        }
 
         return Ok(new SuperAdminSettlementsResponse
         {

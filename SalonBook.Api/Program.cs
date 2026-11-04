@@ -54,6 +54,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<ISlugService, SlugService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<ISuperAdminProvisioningService, SuperAdminProvisioningService>();
+builder.Services.AddScoped<IDatabaseSafetyInitializer, DatabaseSafetyInitializer>();
 builder.Services.AddScoped<IMediaStorageService, LocalMediaStorageService>();
 builder.Services.AddScoped<ISalonImageStorageService, LocalSalonImageStorageService>();
 builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
@@ -212,6 +213,21 @@ if (args.Length >= 4 && args[0] == "--seed-superadmin")
     provisioningService.ProvisionSuperAdminAsync(email, fullName, password).GetAwaiter().GetResult();
     Console.WriteLine("SuperAdmin account provisioning completed successfully.");
     return;
+}
+
+// Automatic Database Schema Safety Initializer
+using (var scope = app.Services.CreateScope())
+{
+    var dbSafety = scope.ServiceProvider.GetRequiredService<IDatabaseSafetyInitializer>();
+    try
+    {
+        await dbSafety.EnsureSchemaSafetyAsync();
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogWarning(ex, "Failed to run startup database schema safety checks.");
+    }
 }
 
 // Automatic SuperAdmin Provisioning on startup if configured in appsettings

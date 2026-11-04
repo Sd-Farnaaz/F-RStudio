@@ -353,7 +353,7 @@ export default function SuperAdminDashboard() {
                       Growth: <strong>{subData.growthCount}</strong>
                     </span>
                     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-deep-plum text-white flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-amber-300" /> Luxury Pro: <strong>{subData.luxuryProCount}</strong>
+                      <Sparkles className="w-3 h-3 text-amber-300" /> Luxury Pro: <strong>{subData.luxuryProCount ?? subData.proCount ?? 0}</strong>
                     </span>
                   </div>
                 </div>

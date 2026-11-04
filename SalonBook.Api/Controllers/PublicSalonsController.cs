@@ -11,10 +11,14 @@ namespace SalonBook.Api.Controllers;
 public class PublicSalonsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly ILogger<PublicSalonsController> _logger;
 
-    public PublicSalonsController(ApplicationDbContext dbContext)
+    public PublicSalonsController(
+        ApplicationDbContext dbContext,
+        ILogger<PublicSalonsController> logger)
     {
         _dbContext = dbContext;
+        _logger = logger;
     }
 
     /// <summary>
@@ -102,9 +106,18 @@ public class PublicSalonsController : ControllerBase
             return NotFound(new { message = $"Salon with identifier '{slug}' was not found or is currently inactive." });
         }
 
-        var reviewsQuery = _dbContext.Reviews.AsNoTracking().Where(r => r.SalonId == salon.Id);
-        var reviewCount = await reviewsQuery.CountAsync(cancellationToken);
-        var averageRating = reviewCount > 0 ? await reviewsQuery.AverageAsync(r => (double)r.Rating, cancellationToken) : 5.0;
+        int reviewCount = 0;
+        double averageRating = 5.0;
+        try
+        {
+            var reviewsQuery = _dbContext.Reviews.AsNoTracking().Where(r => r.SalonId == salon.Id);
+            reviewCount = await reviewsQuery.CountAsync(cancellationToken);
+            averageRating = reviewCount > 0 ? await reviewsQuery.AverageAsync(r => (double)r.Rating, cancellationToken) : 5.0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Reviews table unavailable for salon '{Slug}'. Defaulting to 0 reviews.", slug);
+        }
 
         var response = MapToPublicSalon(salon);
         response.ReviewCount = reviewCount;
