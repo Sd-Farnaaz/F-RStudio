@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Calendar, Users, Home, Settings, LogOut, Search, Menu, X, CreditCard, Compass, User as UserIcon, Store, ShieldCheck, Star, DollarSign, ShoppingBag, Zap } from 'lucide-react';
+import { Calendar, Users, Home, Settings, LogOut, Search, Menu, X, CreditCard, Compass, User as UserIcon, Store, ShieldCheck, Star, DollarSign, ShoppingBag, Zap, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import NotificationBell from './NotificationBell';
