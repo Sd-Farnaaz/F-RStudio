@@ -1,0 +1,6 @@
+# VITE_* variables are intentionally bundled into the client-side JavaScript.
+# Both values below are public (API base URL and the Razorpay publishable Key ID),
+# so they are excluded from Netlify's secrets scanning.
+# Never put a Razorpay Key Secret or any other private value in a VITE_* variable.
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "VITE_RAZORPAY_KEY_ID,VITE_API_BASE_URL"
