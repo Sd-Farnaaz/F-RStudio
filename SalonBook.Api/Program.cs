@@ -142,28 +142,35 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy(FrontendCorsPolicy, policy =>
     {
-        if (builder.Environment.IsDevelopment())
+        if (builder.Environment.IsDevelopment() || configuredOrigins.Contains("*"))
+        {
+            policy.SetIsOriginAllowed(_ => true)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        }
+        else
         {
             policy.SetIsOriginAllowed(origin =>
             {
                 if (string.IsNullOrWhiteSpace(origin)) return false;
+                if (allowedOrigins.Any(ao => string.Equals(ao, origin, StringComparison.OrdinalIgnoreCase)))
+                    return true;
+                // Allow vercel, netlify, onrender, and localhost preview deployments automatically
                 if (Uri.TryCreate(origin, UriKind.Absolute, out var uri))
                 {
                     return uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
-                        || uri.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase);
+                        || uri.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase)
+                        || uri.Host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase)
+                        || uri.Host.EndsWith(".netlify.app", StringComparison.OrdinalIgnoreCase)
+                        || uri.Host.EndsWith(".onrender.com", StringComparison.OrdinalIgnoreCase)
+                        || uri.Host.EndsWith(".railway.app", StringComparison.OrdinalIgnoreCase);
                 }
                 return false;
             })
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
-        }
-        else
-        {
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .AllowCredentials();
         }
     });
 });
