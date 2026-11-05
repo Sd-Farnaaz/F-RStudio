@@ -50,3 +50,7 @@ dist/
 # Deployment packages
 publish/
 *.zip
+
+# Local agent skills and configs
+.agents/
+
