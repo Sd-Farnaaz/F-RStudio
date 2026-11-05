@@ -253,16 +253,13 @@ if (!string.IsNullOrWhiteSpace(configSaEmail) && !string.IsNullOrWhiteSpace(conf
 // 12. Centralized Exception Handling Middleware
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-// 13. Swagger UI in Development
-if (app.Environment.IsDevelopment())
+// 13. Swagger UI (Enabled for Development & Staging/Testing)
+app.UseSwagger();
+app.UseSwaggerUI(options =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "SalonBook API v1");
-        options.RoutePrefix = "swagger";
-    });
-}
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "SalonBook API v1");
+    options.RoutePrefix = "swagger";
+});
 
 // 14. Middleware Pipeline
 app.UseStaticFiles();
