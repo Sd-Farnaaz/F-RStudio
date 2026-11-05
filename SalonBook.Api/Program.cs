@@ -215,9 +215,22 @@ if (args.Length >= 4 && args[0] == "--seed-superadmin")
     return;
 }
 
-// Automatic Database Schema Safety Initializer
+// Automatic Database Migration & Schema Safety Initializer
 using (var scope = app.Services.CreateScope())
 {
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        logger.LogInformation("Applying EF Core database migrations...");
+        await dbContext.Database.MigrateAsync();
+        logger.LogInformation("Database migrations applied successfully.");
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Failed to apply EF Core database migrations.");
+    }
+
     var dbSafety = scope.ServiceProvider.GetRequiredService<IDatabaseSafetyInitializer>();
     try
     {
@@ -225,7 +238,6 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         logger.LogWarning(ex, "Failed to run startup database schema safety checks.");
     }
 }
