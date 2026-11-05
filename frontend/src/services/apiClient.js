@@ -1,4 +1,4 @@
-const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5220';
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://f-rstudio-production.up.railway.app';
 const API_BASE_URL = rawBaseUrl.replace(/\/+$/, '').replace(/\/api$/, '');
 
 export class ApiError extends Error {
