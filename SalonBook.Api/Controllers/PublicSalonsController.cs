@@ -107,16 +107,18 @@ public class PublicSalonsController : ControllerBase
         }
 
         int reviewCount = 0;
-        double averageRating = 5.0;
+        double averageRating = 0.0;
         try
         {
             var reviewsQuery = _dbContext.Reviews.AsNoTracking().Where(r => r.SalonId == salon.Id);
             reviewCount = await reviewsQuery.CountAsync(cancellationToken);
-            averageRating = reviewCount > 0 ? await reviewsQuery.AverageAsync(r => (double)r.Rating, cancellationToken) : 5.0;
+            averageRating = reviewCount > 0 ? await reviewsQuery.AverageAsync(r => (double)r.Rating, cancellationToken) : 0.0;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (IsMissingTableException(ex, "Reviews"))
         {
-            _logger.LogWarning(ex, "Reviews table unavailable for salon '{Slug}'. Defaulting to 0 reviews.", slug);
+            _logger.LogWarning(ex, "Reviews table does not exist in database for salon '{Slug}'. Defaulting to 0 reviews.", slug);
+            reviewCount = 0;
+            averageRating = 0.0;
         }
 
         var response = MapToPublicSalon(salon);
@@ -270,112 +272,154 @@ public class PublicSalonsController : ControllerBase
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
 
-        var allReviewsQuery = _dbContext.Reviews
-            .AsNoTracking()
-            .Where(r => r.SalonId == salon.Id);
-
-        var totalReviews = await allReviewsQuery.CountAsync(cancellationToken);
-        var averageRating = totalReviews > 0
-            ? await allReviewsQuery.AverageAsync(r => (double)r.Rating, cancellationToken)
-            : 5.0;
-
-        var cleanRatings = await allReviewsQuery
-            .Where(r => r.CleanlinessRating.HasValue)
-            .Select(r => (double)r.CleanlinessRating!.Value)
-            .ToListAsync(cancellationToken);
-        var staffRatings = await allReviewsQuery
-            .Where(r => r.StaffRating.HasValue)
-            .Select(r => (double)r.StaffRating!.Value)
-            .ToListAsync(cancellationToken);
-        var valRatings = await allReviewsQuery
-            .Where(r => r.ValueRating.HasValue)
-            .Select(r => (double)r.ValueRating!.Value)
-            .ToListAsync(cancellationToken);
-
-        var breakdownList = await allReviewsQuery
-            .GroupBy(r => r.Rating)
-            .Select(g => new { Rating = g.Key, Count = g.Count() })
-            .ToListAsync(cancellationToken);
-
-        var breakdownDict = new Dictionary<int, int>
+        try
         {
-            { 5, 0 }, { 4, 0 }, { 3, 0 }, { 2, 0 }, { 1, 0 }
-        };
-        foreach (var item in breakdownList)
-        {
-            if (breakdownDict.ContainsKey(item.Rating))
+            var allReviewsQuery = _dbContext.Reviews
+                .AsNoTracking()
+                .Where(r => r.SalonId == salon.Id);
+
+            var totalReviews = await allReviewsQuery.CountAsync(cancellationToken);
+            var averageRating = totalReviews > 0
+                ? await allReviewsQuery.AverageAsync(r => (double)r.Rating, cancellationToken)
+                : 0.0;
+
+            var cleanRatings = await allReviewsQuery
+                .Where(r => r.CleanlinessRating.HasValue)
+                .Select(r => (double)r.CleanlinessRating!.Value)
+                .ToListAsync(cancellationToken);
+            var staffRatings = await allReviewsQuery
+                .Where(r => r.StaffRating.HasValue)
+                .Select(r => (double)r.StaffRating!.Value)
+                .ToListAsync(cancellationToken);
+            var valRatings = await allReviewsQuery
+                .Where(r => r.ValueRating.HasValue)
+                .Select(r => (double)r.ValueRating!.Value)
+                .ToListAsync(cancellationToken);
+
+            var breakdownList = await allReviewsQuery
+                .GroupBy(r => r.Rating)
+                .Select(g => new { Rating = g.Key, Count = g.Count() })
+                .ToListAsync(cancellationToken);
+
+            var breakdownDict = new Dictionary<int, int>
             {
-                breakdownDict[item.Rating] = item.Count;
-            }
-        }
-
-        var filteredQuery = allReviewsQuery;
-        if (minRating.HasValue && minRating.Value >= 1 && minRating.Value <= 5)
-        {
-            filteredQuery = filteredQuery.Where(r => r.Rating >= minRating.Value);
-        }
-
-        if (hasPhotos == true)
-        {
-            filteredQuery = filteredQuery.Where(r => !string.IsNullOrEmpty(r.PhotoUrlsJson) && r.PhotoUrlsJson != "[]");
-        }
-
-        var totalFiltered = await filteredQuery.CountAsync(cancellationToken);
-
-        var reviews = await filteredQuery
-            .Include(r => r.Customer)
-            .Include(r => r.Staff)
-            .Include(r => r.Appointment)
-            .OrderByDescending(r => r.CreatedAtUtc)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-
-        var reviewResponses = reviews.Select(r => new ReviewResponse
-        {
-            Id = r.Id,
-            SalonId = r.SalonId,
-            SalonName = salon.Name,
-            CustomerId = r.CustomerId,
-            CustomerName = r.Customer != null ? r.Customer.FullName : "Verified Client",
-            AppointmentId = r.AppointmentId,
-            StaffId = r.StaffId,
-            StaffName = r.Staff != null ? r.Staff.FullName : null,
-            ServiceName = r.Appointment != null ? r.Appointment.ServiceNameAtBooking : null,
-            Rating = r.Rating,
-            CleanlinessRating = r.CleanlinessRating,
-            StaffRating = r.StaffRating,
-            ValueRating = r.ValueRating,
-            Title = r.Title,
-            Comment = r.Comment,
-            PhotoUrls = !string.IsNullOrWhiteSpace(r.PhotoUrlsJson)
-                ? (System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.PhotoUrlsJson) ?? new List<string>())
-                : new List<string>(),
-            IsVerifiedVisit = r.IsVerifiedVisit,
-            OwnerReply = r.OwnerReply,
-            OwnerRepliedAtUtc = r.OwnerRepliedAtUtc,
-            CreatedAtUtc = r.CreatedAtUtc,
-            UpdatedAtUtc = r.UpdatedAtUtc
-        }).ToList();
-
-        var summary = new SalonReviewSummaryResponse
-        {
-            AverageRating = Math.Round(averageRating, 1),
-            TotalReviews = totalReviews,
-            AverageCleanliness = cleanRatings.Count > 0 ? Math.Round(cleanRatings.Average(), 1) : null,
-            AverageStaff = staffRatings.Count > 0 ? Math.Round(staffRatings.Average(), 1) : null,
-            AverageValue = valRatings.Count > 0 ? Math.Round(valRatings.Average(), 1) : null,
-            RatingBreakdown = breakdownDict,
-            Reviews = new PagedResult<ReviewResponse>
+                { 5, 0 }, { 4, 0 }, { 3, 0 }, { 2, 0 }, { 1, 0 }
+            };
+            foreach (var item in breakdownList)
             {
-                Items = reviewResponses,
-                Page = page,
-                PageSize = pageSize,
-                TotalCount = totalFiltered
+                if (breakdownDict.ContainsKey(item.Rating))
+                {
+                    breakdownDict[item.Rating] = item.Count;
+                }
             }
-        };
 
-        return Ok(summary);
+            var filteredQuery = allReviewsQuery;
+            if (minRating.HasValue && minRating.Value >= 1 && minRating.Value <= 5)
+            {
+                filteredQuery = filteredQuery.Where(r => r.Rating >= minRating.Value);
+            }
+
+            if (hasPhotos == true)
+            {
+                filteredQuery = filteredQuery.Where(r => !string.IsNullOrEmpty(r.PhotoUrlsJson) && r.PhotoUrlsJson != "[]");
+            }
+
+            var totalFiltered = await filteredQuery.CountAsync(cancellationToken);
+
+            var reviews = await filteredQuery
+                .Include(r => r.Customer)
+                .Include(r => r.Staff)
+                .Include(r => r.Appointment)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+            var reviewResponses = reviews.Select(r => new ReviewResponse
+            {
+                Id = r.Id,
+                SalonId = r.SalonId,
+                SalonName = salon.Name,
+                CustomerId = r.CustomerId,
+                CustomerName = r.Customer != null ? r.Customer.FullName : "Verified Client",
+                AppointmentId = r.AppointmentId,
+                StaffId = r.StaffId,
+                StaffName = r.Staff != null ? r.Staff.FullName : null,
+                ServiceName = r.Appointment != null ? r.Appointment.ServiceNameAtBooking : null,
+                Rating = r.Rating,
+                CleanlinessRating = r.CleanlinessRating,
+                StaffRating = r.StaffRating,
+                ValueRating = r.ValueRating,
+                Title = r.Title,
+                Comment = r.Comment,
+                PhotoUrls = !string.IsNullOrWhiteSpace(r.PhotoUrlsJson)
+                    ? (System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.PhotoUrlsJson) ?? new List<string>())
+                    : new List<string>(),
+                IsVerifiedVisit = r.IsVerifiedVisit,
+                OwnerReply = r.OwnerReply,
+                OwnerRepliedAtUtc = r.OwnerRepliedAtUtc,
+                CreatedAtUtc = r.CreatedAtUtc,
+                UpdatedAtUtc = r.UpdatedAtUtc
+            }).ToList();
+
+            var summary = new SalonReviewSummaryResponse
+            {
+                AverageRating = Math.Round(averageRating, 1),
+                TotalReviews = totalReviews,
+                AverageCleanliness = cleanRatings.Count > 0 ? Math.Round(cleanRatings.Average(), 1) : null,
+                AverageStaff = staffRatings.Count > 0 ? Math.Round(staffRatings.Average(), 1) : null,
+                AverageValue = valRatings.Count > 0 ? Math.Round(valRatings.Average(), 1) : null,
+                RatingBreakdown = breakdownDict,
+                Reviews = new PagedResult<ReviewResponse>
+                {
+                    Items = reviewResponses,
+                    Page = page,
+                    PageSize = pageSize,
+                    TotalCount = totalFiltered
+                }
+            };
+
+            return Ok(summary);
+        }
+        catch (Exception ex) when (IsMissingTableException(ex, "Reviews"))
+        {
+            _logger.LogWarning(ex, "Reviews table does not exist in database for salon '{Slug}'. Returning empty review summary.", slug);
+            return Ok(new SalonReviewSummaryResponse
+            {
+                AverageRating = 0.0,
+                TotalReviews = 0,
+                AverageCleanliness = null,
+                AverageStaff = null,
+                AverageValue = null,
+                RatingBreakdown = new Dictionary<int, int> { { 5, 0 }, { 4, 0 }, { 3, 0 }, { 2, 0 }, { 1, 0 } },
+                Reviews = new PagedResult<ReviewResponse>
+                {
+                    Items = new List<ReviewResponse>(),
+                    Page = page,
+                    PageSize = pageSize,
+                    TotalCount = 0
+                }
+            });
+        }
+    }
+
+    private static bool IsMissingTableException(Exception ex, string tableName)
+    {
+        Exception? current = ex;
+        while (current != null)
+        {
+            if (current is Microsoft.Data.SqlClient.SqlException sqlEx)
+            {
+                // SQL Server Error 208: Invalid object name '...'
+                if (sqlEx.Number == 208 && (sqlEx.Message.Contains(tableName, StringComparison.OrdinalIgnoreCase) ||
+                                            sqlEx.Message.Contains($"dbo.{tableName}", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return true;
+                }
+            }
+            current = current.InnerException;
+        }
+        return false;
     }
 
     private static PublicSalonResponse MapToPublicSalon(Salon salon)
@@ -401,4 +445,3 @@ public class PublicSalonsController : ControllerBase
         };
     }
 }
-

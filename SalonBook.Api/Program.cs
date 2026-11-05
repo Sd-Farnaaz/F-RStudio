@@ -54,7 +54,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<ISlugService, SlugService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<ISuperAdminProvisioningService, SuperAdminProvisioningService>();
-builder.Services.AddScoped<IDatabaseSafetyInitializer, DatabaseSafetyInitializer>();
+builder.Services.AddSingleton<IDatabaseSafetyInitializer, DatabaseSafetyInitializer>();
 builder.Services.AddScoped<IMediaStorageService, LocalMediaStorageService>();
 builder.Services.AddScoped<ISalonImageStorageService, LocalSalonImageStorageService>();
 builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();

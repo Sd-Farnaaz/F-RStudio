@@ -68,7 +68,7 @@ public class AdminReviewsController : ControllerBase
         var totalReviews = await baseQuery.CountAsync(cancellationToken);
         var averageRating = totalReviews > 0
             ? await baseQuery.AverageAsync(r => (double)r.Rating, cancellationToken)
-            : 5.0;
+            : 0.0;
 
         var cleanRatings = await baseQuery
             .Where(r => r.CleanlinessRating.HasValue)

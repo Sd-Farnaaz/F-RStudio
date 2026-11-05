@@ -112,7 +112,7 @@ export default function AdminReviewsPage() {
 
   const reviewsList = summary?.reviews?.items || [];
   const totalReviews = summary?.totalReviews || 0;
-  const avgRating = summary?.averageRating || 5.0;
+  const avgRating = totalReviews > 0 ? (summary?.averageRating || 0) : 0;
 
   return (
     <DashboardLayout>
@@ -152,14 +152,16 @@ export default function AdminReviewsPage() {
             <div className="bg-white p-5 rounded-2xl border border-border-color shadow-2xs space-y-2">
               <span className="text-xs font-semibold text-muted uppercase tracking-wider">Average Rating</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-serif font-bold text-deep-plum">{avgRating.toFixed(1)}</span>
-                <span className="text-xs text-muted">/ 5.0</span>
+                <span className="text-3xl font-serif font-bold text-deep-plum">
+                  {totalReviews > 0 ? avgRating.toFixed(1) : '—'}
+                </span>
+                {totalReviews > 0 && <span className="text-xs text-muted">/ 5.0</span>}
               </div>
               <div className="flex items-center gap-1 text-amber-500">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Star
                     key={star}
-                    className={`w-3.5 h-3.5 ${star <= Math.round(avgRating) ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`}
+                    className={`w-3.5 h-3.5 ${totalReviews > 0 && star <= Math.round(avgRating) ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`}
                   />
                 ))}
               </div>

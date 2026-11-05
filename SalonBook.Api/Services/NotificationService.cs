@@ -24,6 +24,9 @@ public class NotificationService : INotificationService
         _logger = logger;
     }
 
+    private static string TruncateMessage(string? message, int maxLength = 2000) =>
+        string.IsNullOrEmpty(message) ? string.Empty : (message.Length <= maxLength ? message : message[..maxLength]);
+
     public async Task DispatchAppointmentEventAsync(Appointment appointment, string eventType, CancellationToken cancellationToken = default)
     {
         // Load full appointment details with navigations if needed
@@ -119,7 +122,7 @@ public class NotificationService : INotificationService
                 Type = "AppointmentCreated",
                 Channel = "Email",
                 Subject = template.Subject,
-                Message = template.HtmlBody,
+                Message = TruncateMessage(template.PlainTextBody),
                 Status = emailResult.Success ? "Sent" : (emailResult.Skipped ? "Skipped" : "Failed"),
                 SentAtUtc = emailResult.Success ? DateTime.UtcNow : null,
                 ErrorMessage = emailResult.ErrorMessage,
@@ -162,7 +165,7 @@ public class NotificationService : INotificationService
                     Type = "AppointmentCreated",
                     Channel = "Email",
                     Subject = adminTemplate.Subject,
-                    Message = adminTemplate.HtmlBody,
+                    Message = TruncateMessage(adminTemplate.PlainTextBody),
                     Status = adminEmailResult.Success ? "Sent" : (adminEmailResult.Skipped ? "Skipped" : "Failed"),
                     SentAtUtc = adminEmailResult.Success ? DateTime.UtcNow : null,
                     ErrorMessage = adminEmailResult.ErrorMessage,
@@ -244,7 +247,7 @@ public class NotificationService : INotificationService
                 Type = "AppointmentCancelled",
                 Channel = "Email",
                 Subject = cancelTemplate.Subject,
-                Message = cancelTemplate.HtmlBody,
+                Message = TruncateMessage(cancelTemplate.PlainTextBody),
                 Status = emailResult.Success ? "Sent" : (emailResult.Skipped ? "Skipped" : "Failed"),
                 SentAtUtc = emailResult.Success ? DateTime.UtcNow : null,
                 ErrorMessage = emailResult.ErrorMessage,
@@ -283,7 +286,7 @@ public class NotificationService : INotificationService
                     Type = "AppointmentCancelled",
                     Channel = "Email",
                     Subject = adminCancelTemplate.Subject,
-                    Message = adminCancelTemplate.HtmlBody,
+                    Message = TruncateMessage(adminCancelTemplate.PlainTextBody),
                     Status = adminEmailResult.Success ? "Sent" : (adminEmailResult.Skipped ? "Skipped" : "Failed"),
                     SentAtUtc = adminEmailResult.Success ? DateTime.UtcNow : null,
                     ErrorMessage = adminEmailResult.ErrorMessage,
@@ -339,7 +342,7 @@ public class NotificationService : INotificationService
                 Type = "AppointmentRescheduled",
                 Channel = "Email",
                 Subject = reschedTemplate.Subject,
-                Message = reschedTemplate.HtmlBody,
+                Message = TruncateMessage(reschedTemplate.PlainTextBody),
                 Status = emailResult.Success ? "Sent" : (emailResult.Skipped ? "Skipped" : "Failed"),
                 SentAtUtc = emailResult.Success ? DateTime.UtcNow : null,
                 ErrorMessage = emailResult.ErrorMessage,
@@ -378,7 +381,7 @@ public class NotificationService : INotificationService
                     Type = "AppointmentRescheduled",
                     Channel = "Email",
                     Subject = adminReschedTemplate.Subject,
-                    Message = adminReschedTemplate.HtmlBody,
+                    Message = TruncateMessage(adminReschedTemplate.PlainTextBody),
                     Status = adminEmailResult.Success ? "Sent" : (adminEmailResult.Skipped ? "Skipped" : "Failed"),
                     SentAtUtc = adminEmailResult.Success ? DateTime.UtcNow : null,
                     ErrorMessage = adminEmailResult.ErrorMessage,
@@ -480,7 +483,7 @@ public class NotificationService : INotificationService
                     Type = "PaymentProofSubmitted",
                     Channel = "Email",
                     Subject = proofTemplate.Subject,
-                    Message = proofTemplate.HtmlBody,
+                    Message = TruncateMessage(proofTemplate.PlainTextBody),
                     Status = emailResult.Success ? "Sent" : (emailResult.Skipped ? "Skipped" : "Failed"),
                     SentAtUtc = emailResult.Success ? DateTime.UtcNow : null,
                     ErrorMessage = emailResult.ErrorMessage,
@@ -550,7 +553,7 @@ public class NotificationService : INotificationService
                 Type = eventType,
                 Channel = "Email",
                 Subject = paymentTemplate.Subject,
-                Message = paymentTemplate.HtmlBody,
+                Message = TruncateMessage(paymentTemplate.PlainTextBody),
                 Status = emailResult.Success ? "Sent" : (emailResult.Skipped ? "Skipped" : "Failed"),
                 SentAtUtc = emailResult.Success ? DateTime.UtcNow : null,
                 ErrorMessage = emailResult.ErrorMessage,
@@ -682,7 +685,7 @@ public class NotificationService : INotificationService
                 Type = reminderNotificationType,
                 Channel = "Email",
                 Subject = reminderTemplate.Subject,
-                Message = reminderTemplate.HtmlBody,
+                Message = TruncateMessage(reminderTemplate.PlainTextBody),
                 Status = emailResult.Success ? "Sent" : (emailResult.Skipped ? "Skipped" : "Failed"),
                 SentAtUtc = emailResult.Success ? DateTime.UtcNow : null,
                 ErrorMessage = emailResult.ErrorMessage,

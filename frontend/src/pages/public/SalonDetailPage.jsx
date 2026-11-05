@@ -883,7 +883,7 @@ export default function SalonDetailPage() {
                 </div>
 
                 {/* Overall Score Card + Rating Breakdown Bars */}
-                {reviewSummary && (
+                {reviewSummary && reviewSummary.totalReviews > 0 && (
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-6 bg-ivory/50 rounded-2xl p-6 border border-border-color">
                     
                     {/* Left: Overall Big Score */}
@@ -973,6 +973,7 @@ export default function SalonDetailPage() {
                 )}
 
                 {/* Filter Chips */}
+                {reviewSummary && reviewSummary.totalReviews > 0 && (
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <button
                     type="button"
@@ -1022,6 +1023,8 @@ export default function SalonDetailPage() {
                     </button>
                   )}
                 </div>
+
+                )}
 
                 {/* Reviews List */}
                 {reviewsLoading ? (
