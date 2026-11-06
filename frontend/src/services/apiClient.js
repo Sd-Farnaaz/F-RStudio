@@ -27,6 +27,7 @@ async function handleResponse(response) {
     let message = 'An unexpected error occurred';
     if (data && data.message) message = data.message;
     else if (data && data.Message) message = data.Message;
+    else if (data && data.error) message = data.error;
     else if (data && data.detail) message = data.detail;
     else if (data && data.title) message = data.title;
     else if (data && data.errors) {
@@ -35,9 +36,13 @@ async function handleResponse(response) {
     } else if (response.status === 401) {
       message = 'Invalid email or password.';
     } else if (response.status === 403) {
-      message = 'Forbidden';
+      message = 'Forbidden: You do not have permission to perform this action.';
+    } else if (response.status === 404) {
+      message = 'Requested resource not found.';
     } else if (response.status === 429) {
       message = 'Too many requests. Please try again later.';
+    } else if (response.status >= 500) {
+      message = (data && (data.message || data.Message)) || `Server error (${response.status}): ${response.statusText || 'Please try again later.'}`;
     }
 
     throw new ApiError(message, response.status, data);

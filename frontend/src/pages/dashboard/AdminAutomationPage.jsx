@@ -1182,6 +1182,33 @@ export default function AdminAutomationPage() {
                       </div>
                     </div>
 
+                    {/* Brevo Quick Setup Helper */}
+                    <div className="flex items-center justify-between p-3 bg-soft-blush/60 rounded-xl border border-dusty-rose/40">
+                      <div>
+                        <span className="text-xs font-semibold text-deep-plum block">F&R Platform Brevo Relay Helper</span>
+                        <span className="text-[11px] text-muted block">Pre-fill Brevo relay host, port, username, and verified sender.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSmtpConfig(prev => ({
+                            ...prev,
+                            smtpHost: 'smtp-relay.brevo.com',
+                            smtpPort: 587,
+                            smtpUsername: 'c165e2001@smtp-brevo.com',
+                            senderEmail: 'rufnixstudio@gmail.com',
+                            senderName: 'F&R Beauty Studio',
+                            smtpEnableSsl: true,
+                            isConfigured: true
+                          }));
+                          setFeedback({ type: 'success', text: 'Pre-filled Brevo relay details! Enter your Brevo SMTP Master Key in the password field.' });
+                        }}
+                        className="px-3 py-1.5 bg-primary-rose hover:bg-primary-rose/90 text-white text-xs font-medium rounded-lg transition-colors shrink-0 shadow-2xs"
+                      >
+                        Auto-Fill Brevo
+                      </button>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Username / Key */}
                       <div className="space-y-1">
@@ -1189,15 +1216,16 @@ export default function AdminAutomationPage() {
                           <label className="text-[11px] font-bold uppercase tracking-wider text-deep-plum block">
                             Email Key / Username
                           </label>
-                          <span className="text-[10px] text-muted">Optional for now</span>
+                          <span className="text-[10px] text-muted">For Brevo: SMTP login</span>
                         </div>
                         <input
                           type="text"
                           value={smtpConfig.smtpUsername}
                           onChange={(e) => setSmtpConfig(prev => ({ ...prev, smtpUsername: e.target.value }))}
-                          placeholder="API Key, Username, or Login Email"
+                          placeholder="e.g. c165e2001@smtp-brevo.com"
                           className="w-full px-3.5 py-2.5 bg-ivory border border-border-color rounded-xl text-xs text-deep-plum font-mono focus:bg-white focus:ring-1 focus:ring-primary-rose"
                         />
+                        <p className="text-[10px] text-muted">Use Brevo SMTP login (not your personal Gmail)</p>
                       </div>
 
                       {/* Password / Secret */}
@@ -1215,7 +1243,7 @@ export default function AdminAutomationPage() {
                             type={showSmtpPassword ? 'text' : 'password'}
                             value={smtpConfig.smtpPassword}
                             onChange={(e) => setSmtpConfig(prev => ({ ...prev, smtpPassword: e.target.value }))}
-                            placeholder={smtpConfig.hasPassword ? '•••••••• (leave blank to keep)' : 'API Key Secret or App Password'}
+                            placeholder={smtpConfig.hasPassword ? '•••••••• (leave blank to keep)' : 'Brevo key xsmtpsib-...'}
                             className="w-full px-3.5 py-2.5 pr-10 bg-ivory border border-border-color rounded-xl text-xs text-deep-plum font-mono focus:bg-white focus:ring-1 focus:ring-primary-rose"
                           />
                           <button
@@ -1226,6 +1254,7 @@ export default function AdminAutomationPage() {
                             {showSmtpPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                           </button>
                         </div>
+                        <p className="text-[10px] text-muted">Brevo SMTP Master API Key</p>
                       </div>
                     </div>
 

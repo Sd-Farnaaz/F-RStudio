@@ -38,6 +38,16 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // 3. JWT & Security Options
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.PostConfigure<EmailOptions>(options =>
+{
+    var envPass = Environment.GetEnvironmentVariable("Email__SmtpPassword") 
+        ?? Environment.GetEnvironmentVariable("EMAIL_SMTP_PASSWORD")
+        ?? Environment.GetEnvironmentVariable("BREVO_SMTP_KEY");
+    if (!string.IsNullOrWhiteSpace(envPass) && string.IsNullOrWhiteSpace(options.SmtpPassword))
+    {
+        options.SmtpPassword = envPass.Trim();
+    }
+});
 builder.Services.Configure<RazorpayOptions>(builder.Configuration.GetSection(RazorpayOptions.SectionName));
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 

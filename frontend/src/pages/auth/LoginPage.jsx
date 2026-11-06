@@ -25,6 +25,8 @@ export default function LoginPage() {
     
     try {
       const response = await authService.userLogin({ email: email.trim(), password });
+      setEmail('');
+      setPassword('');
       login(response);
       navigate(from, { replace: true });
     } catch (err) {

@@ -40,6 +40,7 @@ export default function SalonProfilePage() {
   const [isLocating, setIsLocating] = useState(false);
   const [locationMessage, setLocationMessage] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
   // Payment Settings State
   const [paymentSettings, setPaymentSettings] = useState({
@@ -97,6 +98,7 @@ export default function SalonProfilePage() {
       
       setInitialProfile(loadedProfile);
       setProfile(loadedProfile);
+      setLogoError(false);
       setIsDirty(false);
     } catch (err) {
       setError(err.message || 'Failed to load profile. Please try again.');
@@ -120,6 +122,7 @@ export default function SalonProfilePage() {
     }
 
     setUploadingLogo(true);
+    setLogoError(false);
     setError('');
     setSuccess('');
 
@@ -131,6 +134,7 @@ export default function SalonProfilePage() {
         setIsDirty(JSON.stringify(updated) !== JSON.stringify(initialProfile));
         return updated;
       });
+      setLogoError(false);
 
       try {
         const response = await adminService.uploadSalonLogo(file);
@@ -138,6 +142,7 @@ export default function SalonProfilePage() {
         setProfile(prev => ({ ...prev, logoUrl: newLogoUrl }));
         setInitialProfile(prev => ({ ...prev, logoUrl: newLogoUrl }));
         updateUser({ salonLogoUrl: newLogoUrl });
+        setLogoError(false);
         setSuccess('Salon photo updated successfully.');
       } catch (err) {
         // If upload endpoint had an issue, the base64 dataUrl is still preserved in profile state and will persist on save
@@ -147,6 +152,15 @@ export default function SalonProfilePage() {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = () => {
+    setProfile(prev => {
+      const updated = { ...prev, logoUrl: '' };
+      setIsDirty(JSON.stringify(updated) !== JSON.stringify(initialProfile));
+      return updated;
+    });
+    setLogoError(false);
   };
 
   const handleDetectLocation = async () => {
@@ -449,21 +463,24 @@ export default function SalonProfilePage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Salon Photo / Logo */}
                     <div className="col-span-2 p-4 bg-ivory/50 rounded-xl border border-border-color flex flex-col sm:flex-row items-center gap-4">
-                      {profile.logoUrl ? (
-                        <img 
-                          src={getImageUrl(profile.logoUrl)} 
-                          alt="Salon Logo" 
-                          className="w-20 h-20 rounded-xl object-cover border border-border-color shadow-2xs shrink-0"
-                        />
+                      {profile.logoUrl && !logoError ? (
+                        <div className="relative group shrink-0">
+                          <img 
+                            src={getImageUrl(profile.logoUrl)} 
+                            alt="Salon Logo" 
+                            onError={() => setLogoError(true)}
+                            className="w-20 h-20 rounded-xl object-cover border border-border-color shadow-2xs bg-white"
+                          />
+                        </div>
                       ) : (
-                        <div className="w-20 h-20 rounded-xl bg-white border border-dashed border-border-color flex items-center justify-center text-primary-rose/70 shrink-0">
-                          <Store className="w-8 h-8" />
+                        <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-soft-blush to-rose-tint border border-dusty-rose/40 flex items-center justify-center text-deep-plum font-serif text-2xl font-bold shrink-0 shadow-2xs">
+                          {profile.name?.charAt(0) || <Store className="w-8 h-8 text-primary-rose/70" />}
                         </div>
                       )}
                       <div className="flex-1 text-center sm:text-left">
                         <h4 className="text-sm font-semibold text-deep-plum">Salon or Owner Photo</h4>
                         <p className="text-xs text-muted mt-0.5">Upload a high-quality logo or studio image for your public storefront and booking page.</p>
-                        <div className="mt-2.5 flex items-center gap-2 justify-center sm:justify-start">
+                        <div className="mt-2.5 flex flex-wrap items-center gap-2 justify-center sm:justify-start">
                           <label className="px-3.5 py-1.5 bg-primary-rose text-white text-xs font-medium rounded-lg hover:bg-primary-rose/90 transition-all cursor-pointer shadow-2xs inline-flex items-center gap-1.5">
                             {uploadingLogo ? (
                               <>
@@ -484,11 +501,27 @@ export default function SalonProfilePage() {
                               disabled={uploadingLogo || saving}
                             />
                           </label>
+
                           {profile.logoUrl && (
+                            <button
+                              type="button"
+                              onClick={handleRemovePhoto}
+                              disabled={uploadingLogo || saving}
+                              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-medium rounded-lg transition-colors border border-rose-200"
+                            >
+                              Remove
+                            </button>
+                          )}
+
+                          {profile.logoUrl && !logoError ? (
                             <span className="text-[11px] text-emerald-600 flex items-center gap-1">
                               <CheckCircle2 className="w-3.5 h-3.5" /> Active photo
                             </span>
-                          )}
+                          ) : profile.logoUrl && logoError ? (
+                            <span className="text-[11px] text-amber-600 flex items-center gap-1">
+                              Please upload a new photo
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -707,14 +740,28 @@ export default function SalonProfilePage() {
                   <div className="absolute top-0 inset-x-0 h-1 bg-warning"></div>
                 )}
                 
-                {/* Header Block */}
-                <div className="h-24 bg-rose-tint flex items-end p-5">
+                {/* Header Block with Avatar / Logo */}
+                <div className="h-24 bg-gradient-to-r from-soft-blush to-rose-tint flex items-end justify-between p-5 relative">
+                  <div className="-mb-8">
+                    {profile.logoUrl && !logoError ? (
+                      <img 
+                        src={getImageUrl(profile.logoUrl)} 
+                        alt={profile.name || "Salon Logo"} 
+                        onError={() => setLogoError(true)}
+                        className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-md bg-white"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-2xl bg-white border-2 border-soft-blush shadow-md flex items-center justify-center font-serif text-2xl font-bold text-deep-plum">
+                        {profile.name?.charAt(0) || 'S'}
+                      </div>
+                    )}
+                  </div>
                   <span className="px-2.5 py-1 bg-primary-rose text-white text-[10px] font-bold rounded-full uppercase tracking-wider shadow-sm">
                     {profile.businessType || 'Salon'}
                   </span>
                 </div>
                 
-                <div className="p-6">
+                <div className="p-6 pt-10">
                   <h4 className="text-xl font-serif font-semibold text-deep-plum mb-1">
                     {profile.name || 'Your Salon Name'}
                   </h4>

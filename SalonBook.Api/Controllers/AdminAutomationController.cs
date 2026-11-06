@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using SalonBook.Api.Common;
+using SalonBook.Api.Configurations;
 using SalonBook.Api.Data;
 using SalonBook.Api.DTOs;
 using SalonBook.Api.Models;
@@ -17,17 +19,20 @@ public class AdminAutomationController : ControllerBase
     private readonly ApplicationDbContext _dbContext;
     private readonly ICurrentUserService _currentUserService;
     private readonly IEmailService _emailService;
+    private readonly EmailOptions _emailOptions;
     private readonly ILogger<AdminAutomationController> _logger;
 
     public AdminAutomationController(
         ApplicationDbContext dbContext,
         ICurrentUserService currentUserService,
         IEmailService emailService,
+        IOptions<EmailOptions> emailOptions,
         ILogger<AdminAutomationController> logger)
     {
         _dbContext = dbContext;
         _currentUserService = currentUserService;
         _emailService = emailService;
+        _emailOptions = emailOptions.Value;
         _logger = logger;
     }
 
@@ -276,15 +281,32 @@ public class AdminAutomationController : ControllerBase
                         tier.Equals(SubscriptionPlanCatalog.Pro, StringComparison.OrdinalIgnoreCase) ||
                         tier.Equals(SubscriptionPlanCatalog.LuxuryPro, StringComparison.OrdinalIgnoreCase);
 
+        var effectiveHost = !string.IsNullOrWhiteSpace(salon.SmtpHost) 
+            ? salon.SmtpHost 
+            : (!string.IsNullOrWhiteSpace(_emailOptions.SmtpHost) ? _emailOptions.SmtpHost : "smtp-relay.brevo.com");
+        var effectivePort = salon.SmtpPort > 0 
+            ? salon.SmtpPort 
+            : (_emailOptions.SmtpPort > 0 ? _emailOptions.SmtpPort : 587);
+        var effectiveUsername = !string.IsNullOrWhiteSpace(salon.SmtpUsername) 
+            ? salon.SmtpUsername 
+            : (_emailOptions.SmtpUsername ?? string.Empty);
+        var effectiveSender = !string.IsNullOrWhiteSpace(salon.SenderEmail) 
+            ? salon.SenderEmail 
+            : (!string.IsNullOrWhiteSpace(salon.ContactEmail) ? salon.ContactEmail : (_emailOptions.SenderEmail ?? string.Empty));
+        var effectiveSenderName = !string.IsNullOrWhiteSpace(salon.SenderName) 
+            ? salon.SenderName 
+            : (salon.Name ?? _emailOptions.SenderName ?? "F&R Beauty Studio");
+        var hasPassword = !string.IsNullOrWhiteSpace(salon.SmtpPassword) || !string.IsNullOrWhiteSpace(_emailOptions.SmtpPassword);
+
         return Ok(new SalonSmtpConfigResponse
         {
             IsConfigured = salon.IsEmailConfigured,
-            SmtpHost = salon.SmtpHost ?? string.Empty,
-            SmtpPort = salon.SmtpPort > 0 ? salon.SmtpPort : 587,
-            SmtpUsername = salon.SmtpUsername ?? string.Empty,
-            HasPassword = !string.IsNullOrWhiteSpace(salon.SmtpPassword),
-            SenderEmail = salon.SenderEmail ?? salon.ContactEmail ?? string.Empty,
-            SenderName = salon.SenderName ?? salon.Name,
+            SmtpHost = effectiveHost,
+            SmtpPort = effectivePort,
+            SmtpUsername = effectiveUsername,
+            HasPassword = hasPassword,
+            SenderEmail = effectiveSender,
+            SenderName = effectiveSenderName,
             SmtpEnableSsl = salon.SmtpEnableSsl,
             CurrentTier = tier,
             IsAutomationAllowed = isAllowed
@@ -347,16 +369,22 @@ public class AdminAutomationController : ControllerBase
         var (allowed, result, salon) = await CheckAutomationAccessAsync(cancellationToken);
         if (!allowed) return result!;
 
-        var host = !string.IsNullOrWhiteSpace(request.SmtpHost) ? request.SmtpHost.Trim() : salon!.SmtpHost;
-        var port = request.SmtpPort.HasValue && request.SmtpPort.Value > 0 ? request.SmtpPort.Value : salon!.SmtpPort;
-        var username = request.SmtpUsername != null ? request.SmtpUsername.Trim() : salon!.SmtpUsername;
-        var password = !string.IsNullOrWhiteSpace(request.SmtpPassword) ? request.SmtpPassword : salon!.SmtpPassword;
+        var host = !string.IsNullOrWhiteSpace(request.SmtpHost) ? request.SmtpHost.Trim() 
+            : (!string.IsNullOrWhiteSpace(salon!.SmtpHost) ? salon.SmtpHost : _emailOptions.SmtpHost);
+        var port = request.SmtpPort.HasValue && request.SmtpPort.Value > 0 ? request.SmtpPort.Value 
+            : (salon!.SmtpPort > 0 ? salon.SmtpPort : (_emailOptions.SmtpPort > 0 ? _emailOptions.SmtpPort : 587));
+        var username = !string.IsNullOrWhiteSpace(request.SmtpUsername) ? request.SmtpUsername.Trim() 
+            : (!string.IsNullOrWhiteSpace(salon!.SmtpUsername) ? salon.SmtpUsername : _emailOptions.SmtpUsername);
+        var password = !string.IsNullOrWhiteSpace(request.SmtpPassword) ? request.SmtpPassword 
+            : (!string.IsNullOrWhiteSpace(salon!.SmtpPassword) ? salon.SmtpPassword : _emailOptions.SmtpPassword);
         var senderEmail = !string.IsNullOrWhiteSpace(request.SenderEmail) ? request.SenderEmail.Trim() 
             : (!string.IsNullOrWhiteSpace(salon!.SenderEmail) ? salon.SenderEmail 
+            : (!string.IsNullOrWhiteSpace(_emailOptions.SenderEmail) ? _emailOptions.SenderEmail
             : (!string.IsNullOrWhiteSpace(username) && username.Contains('@') ? username 
-            : (salon.ContactEmail ?? _currentUserService.Email ?? "rufnixstudio@gmail.com")));
+            : (salon.ContactEmail ?? _currentUserService.Email ?? "rufnixstudio@gmail.com"))));
 
-        var senderName = !string.IsNullOrWhiteSpace(request.SenderName) ? request.SenderName.Trim() : (salon!.SenderName ?? salon.Name);
+        var senderName = !string.IsNullOrWhiteSpace(request.SenderName) ? request.SenderName.Trim() 
+            : (salon!.SenderName ?? salon.Name ?? _emailOptions.SenderName ?? "F&R Beauty Studio");
         var enableSsl = request.SmtpEnableSsl ?? salon!.SmtpEnableSsl;
 
         if (string.IsNullOrWhiteSpace(host))

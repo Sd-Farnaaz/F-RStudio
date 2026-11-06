@@ -134,6 +134,21 @@ export default function AdminRegisterPage() {
       };
 
       const response = await authService.adminRegister(payload);
+      setFormData({
+        salonName: '',
+        businessType: 'Hair Salon',
+        fullName: '',
+        email: '',
+        password: '',
+        addressLine: '',
+        city: '',
+        state: '',
+        postalCode: '',
+        country: 'India'
+      });
+      setPhotoBase64('');
+      setPhotoPreview(null);
+      setPhotoName('');
       login(response);
       navigate('/admin/dashboard', { replace: true });
     } catch (err) {

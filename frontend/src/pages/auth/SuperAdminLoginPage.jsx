@@ -24,6 +24,8 @@ export default function SuperAdminLoginPage() {
     
     try {
       const response = await authService.superAdminLogin({ email, password });
+      setEmail('');
+      setPassword('');
       login(response);
       navigate(from, { replace: true });
     } catch (err) {

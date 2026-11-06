@@ -25,6 +25,8 @@ export default function AdminLoginPage() {
     
     try {
       const response = await authService.adminLogin({ email: email.trim(), password });
+      setEmail('');
+      setPassword('');
       login(response);
       navigate(from, { replace: true });
     } catch (err) {

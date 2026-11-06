@@ -238,14 +238,19 @@ export default function ServicesPage() {
                               alt={svc.name} 
                               className="w-12 h-12 rounded-xl object-cover border border-border-color shrink-0 shadow-2xs"
                               onError={(e) => {
-                                e.target.style.display = 'none';
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.style.display = 'none';
+                                const fallback = e.currentTarget.nextElementSibling;
+                                if (fallback) fallback.style.display = 'flex';
                               }}
                             />
-                          ) : (
-                            <div className="w-12 h-12 rounded-xl bg-ivory border border-border-color flex items-center justify-center text-primary-rose/70 shrink-0">
-                              <ImageIcon className="w-5 h-5" />
-                            </div>
-                          )}
+                          ) : null}
+                          <div 
+                            style={{ display: svc.imageUrl ? 'none' : 'flex' }}
+                            className="w-12 h-12 rounded-xl bg-ivory border border-border-color items-center justify-center text-primary-rose/70 shrink-0"
+                          >
+                            <ImageIcon className="w-5 h-5" />
+                          </div>
                           <div className="min-w-0">
                             <div className="font-semibold text-sm text-deep-plum">{svc.name}</div>
                             {svc.description && (

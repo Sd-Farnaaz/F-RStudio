@@ -37,6 +37,7 @@ export default function SignupPage() {
         email: formData.email.trim(),
         password: formData.password
       });
+      setFormData({ fullName: '', email: '', password: '', confirmPassword: '' });
       login(response);
       navigate('/my-bookings', { replace: true });
     } catch (err) {

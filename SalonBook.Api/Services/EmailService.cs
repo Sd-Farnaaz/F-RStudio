@@ -141,9 +141,10 @@ public class EmailService : IEmailService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send email via {Host}:{Port} to {ToEmail} with subject '{Subject}'. Error: {Message}", host, port, toEmail, subject, ex.Message);
+            var detailedMsg = ex.InnerException != null ? $"{ex.Message} -> {ex.InnerException.Message}" : ex.Message;
             return new EmailSendResult(
                 Success: false,
-                ErrorMessage: ex.Message,
+                ErrorMessage: detailedMsg,
                 ErrorCode: "SMTP_SEND_FAILURE",
                 Skipped: false
             );
