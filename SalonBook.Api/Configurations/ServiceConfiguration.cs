@@ -34,7 +34,7 @@ public class ServiceConfiguration : IEntityTypeConfiguration<Service>
             .IsRequired();
 
         builder.Property(s => s.ImageUrl)
-            .HasMaxLength(500);
+            .IsRequired(false);
 
         builder.Property(s => s.IsActive)
             .IsRequired()

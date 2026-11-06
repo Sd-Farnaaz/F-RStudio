@@ -676,9 +676,19 @@ BEGIN
     ALTER TABLE [dbo].[Salons] ALTER COLUMN [LogoUrl] NVARCHAR(MAX) NULL;
 END
 
+IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Salons' AND COLUMN_NAME = 'QrCodeImageUrl' AND (CHARACTER_MAXIMUM_LENGTH != -1 OR CHARACTER_MAXIMUM_LENGTH IS NULL))
+BEGIN
+    ALTER TABLE [dbo].[Salons] ALTER COLUMN [QrCodeImageUrl] NVARCHAR(MAX) NULL;
+END
+
 IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Services' AND COLUMN_NAME = 'ImageUrl' AND (CHARACTER_MAXIMUM_LENGTH != -1 OR CHARACTER_MAXIMUM_LENGTH IS NULL))
 BEGIN
     ALTER TABLE [dbo].[Services] ALTER COLUMN [ImageUrl] NVARCHAR(MAX) NULL;
+END
+
+IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Appointments' AND COLUMN_NAME = 'PaymentProofUrl' AND (CHARACTER_MAXIMUM_LENGTH != -1 OR CHARACTER_MAXIMUM_LENGTH IS NULL))
+BEGIN
+    ALTER TABLE [dbo].[Appointments] ALTER COLUMN [PaymentProofUrl] NVARCHAR(MAX) NULL;
 END
 
 -- Clean up orphaned dead local upload file references that no longer exist on disk
@@ -690,12 +700,26 @@ WHERE [LogoUrl] IS NOT NULL
   AND [LogoUrl] NOT LIKE 'http://%' 
   AND [LogoUrl] NOT LIKE 'https://%';
 
+UPDATE [dbo].[Salons]
+SET [QrCodeImageUrl] = NULL
+WHERE [QrCodeImageUrl] IS NOT NULL 
+  AND [QrCodeImageUrl] NOT LIKE 'data:%' 
+  AND [QrCodeImageUrl] NOT LIKE 'http://%' 
+  AND [QrCodeImageUrl] NOT LIKE 'https://%';
+
 UPDATE [dbo].[Services]
 SET [ImageUrl] = NULL
 WHERE [ImageUrl] IS NOT NULL 
   AND [ImageUrl] NOT LIKE 'data:%' 
   AND [ImageUrl] NOT LIKE 'http://%' 
-  AND [ImageUrl] NOT LIKE 'https://%';";
+  AND [ImageUrl] NOT LIKE 'https://%';
+
+UPDATE [dbo].[Appointments]
+SET [PaymentProofUrl] = NULL
+WHERE [PaymentProofUrl] IS NOT NULL 
+  AND [PaymentProofUrl] NOT LIKE 'data:%' 
+  AND [PaymentProofUrl] NOT LIKE 'http://%' 
+  AND [PaymentProofUrl] NOT LIKE 'https://%';";
             await ExecuteStepAsync(dbContext, "Salons Lifecycle & Subscription Columns", salonColumnsSql, cancellationToken);
 
             // 10. Audit Table, Column, Index, and Foreign Key existence to confirm health

@@ -220,7 +220,7 @@ export default function DashboardLayout({ children }) {
                 </span>
                 {user?.salonSlug && (
                   <a
-                    href={`/salon/${user.salonSlug}`}
+                    href={`/salons/${user.salonSlug}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-muted hover:text-primary-rose transition-colors flex items-center gap-1 ml-1 pl-2.5 border-l border-border-color font-medium"

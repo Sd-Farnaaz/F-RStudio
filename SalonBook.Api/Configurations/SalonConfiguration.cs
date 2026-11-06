@@ -96,10 +96,10 @@ public class SalonConfiguration : IEntityTypeConfiguration<Salon>
             .HasMaxLength(100);
 
         builder.Property(s => s.QrCodeImageUrl)
-            .HasMaxLength(500);
+            .IsRequired(false);
 
         builder.Property(s => s.LogoUrl)
-            .HasMaxLength(500);
+            .IsRequired(false);
 
         builder.Property(s => s.SubscriptionTier)
             .IsRequired()

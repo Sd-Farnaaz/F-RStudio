@@ -3,6 +3,7 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import { adminService } from '../../services/adminService';
 import TierUpgradePromptModal from '../../components/common/TierUpgradePromptModal';
 import { getImageUrl } from '../../utils/imageUrl';
+import { compressImageFile } from '../../utils/imageCompressor';
 import { 
   Plus, Edit2, Trash2, AlertCircle, CheckCircle2, 
   UploadCloud, X, Image as ImageIcon, Sparkles, Clock, DollarSign 
@@ -94,7 +95,7 @@ export default function ServicesPage() {
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const handleImageSelect = (e) => {
+  const handleImageSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -104,18 +105,23 @@ export default function ServicesPage() {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setImageError('Photo size exceeds 5MB limit. Please choose a smaller file.');
+    if (file.size > 10 * 1024 * 1024) {
+      setImageError('Photo size exceeds 10MB limit. Please choose a smaller file.');
       return;
     }
 
     setImageName(file.name);
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImagePreview(reader.result);
-      setImageBase64(reader.result);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const { dataUrl } = await compressImageFile(file, {
+        maxWidth: 1000,
+        maxHeight: 1000,
+        quality: 0.82
+      });
+      setImagePreview(dataUrl);
+      setImageBase64(dataUrl);
+    } catch {
+      setImageError('Failed to process image. Please try a different photo.');
+    }
   };
 
   const handleRemoveImage = () => {

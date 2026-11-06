@@ -4,6 +4,7 @@ import AuthLayout from '../../components/layout/AuthLayout';
 import { authService } from '../../services/authService';
 import { useAuth } from '../../context/AuthContext';
 import { detectCurrentLocation } from '../../utils/geolocation';
+import { compressImageFile } from '../../utils/imageCompressor';
 import { 
   Eye, EyeOff, AlertCircle, Loader2, ArrowRight, Camera, 
   MapPin, CheckCircle2, X, UploadCloud, Compass, ChevronDown, ChevronUp 
@@ -47,7 +48,7 @@ export default function AdminRegisterPage() {
   };
 
   // Photo Upload Handler (Salon Logo or Owner Photo)
-  const handlePhotoSelect = (e) => {
+  const handlePhotoSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -56,19 +57,24 @@ export default function AdminRegisterPage() {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Photo size exceeds 5MB limit. Please choose a smaller file.');
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Photo size exceeds 10MB limit. Please choose a smaller file.');
       return;
     }
 
     setPhotoName(file.name);
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPhotoPreview(reader.result);
-      setPhotoBase64(reader.result);
+    try {
+      const { dataUrl } = await compressImageFile(file, {
+        maxWidth: 1000,
+        maxHeight: 1000,
+        quality: 0.82
+      });
+      setPhotoPreview(dataUrl);
+      setPhotoBase64(dataUrl);
       if (error) setError('');
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      setError('Failed to process image. Please try a different photo.');
+    }
   };
 
   const handleRemovePhoto = () => {

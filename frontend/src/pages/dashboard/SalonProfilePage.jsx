@@ -6,6 +6,7 @@ import { adminService } from '../../services/adminService';
 import { paymentService } from '../../services/paymentService';
 import { detectCurrentLocation } from '../../utils/geolocation';
 import { getImageUrl } from '../../utils/imageUrl';
+import { compressImageFile } from '../../utils/imageCompressor';
 import { 
   AlertCircle, CheckCircle2, Save, MapPin, Store, RotateCcw, ExternalLink, 
   RefreshCw, CreditCard, QrCode, DollarSign, Info, Camera, UploadCloud, Compass, Loader2
@@ -116,8 +117,8 @@ export default function SalonProfilePage() {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Photo exceeds 5MB. Please choose a smaller file.');
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Photo exceeds 10MB limit. Please choose a smaller file.');
       return;
     }
 
@@ -126,9 +127,14 @@ export default function SalonProfilePage() {
     setError('');
     setSuccess('');
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const dataUrl = reader.result;
+    try {
+      // Compress and optimize client-side to ensure rapid upload and lightweight persistence
+      const { dataUrl, file: compressedFile } = await compressImageFile(file, {
+        maxWidth: 1000,
+        maxHeight: 1000,
+        quality: 0.82
+      });
+
       setProfile(prev => {
         const updated = { ...prev, logoUrl: dataUrl };
         setIsDirty(JSON.stringify(updated) !== JSON.stringify(initialProfile));
@@ -137,21 +143,22 @@ export default function SalonProfilePage() {
       setLogoError(false);
 
       try {
-        const response = await adminService.uploadSalonLogo(file);
+        const response = await adminService.uploadSalonLogo(compressedFile);
         const newLogoUrl = response?.logoUrl || dataUrl;
         setProfile(prev => ({ ...prev, logoUrl: newLogoUrl }));
         setInitialProfile(prev => ({ ...prev, logoUrl: newLogoUrl }));
         updateUser({ salonLogoUrl: newLogoUrl });
         setLogoError(false);
         setSuccess('Salon photo updated successfully.');
-      } catch (err) {
-        // If upload endpoint had an issue, the base64 dataUrl is still preserved in profile state and will persist on save
+      } catch (uploadErr) {
+        // High-fidelity fallback: compressed base64 is in profile state and will be stored on profile save
         setSuccess('Salon photo selected. Click "Save Changes" below to save your profile.');
-      } finally {
-        setUploadingLogo(false);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (compressionErr) {
+      setError('Failed to process the photo. Please try a different image.');
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   const handleRemovePhoto = () => {

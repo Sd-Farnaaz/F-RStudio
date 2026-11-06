@@ -52,7 +52,6 @@ public class RegisterAdminRequest
     /// </summary>
     public string? PhotoBase64 { get; set; }
 
-    [StringLength(500)]
     public string? LogoUrl { get; set; }
 }
 

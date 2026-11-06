@@ -99,6 +99,7 @@ function App() {
 
           <Route path="/salons" element={<SalonsListPage />} />
           <Route path="/salons/:slug" element={<SalonDetailPage />} />
+          <Route path="/salon/:slug" element={<SalonDetailPage />} />
 
           {/* User Auth */}
           <Route path="/login" element={<PublicAuthRoute><LoginPage /></PublicAuthRoute>} />

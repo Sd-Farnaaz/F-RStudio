@@ -242,32 +242,42 @@ using (var scope = app.Services.CreateScope())
         logger.LogInformation("Applying EF Core database migrations...");
         await dbContext.Database.MigrateAsync();
         logger.LogInformation("Database migrations applied successfully.");
-
-        // Upgrade LogoUrl and ImageUrl columns to NVARCHAR(MAX) to support high-fidelity persistent data URLs
-        try
-        {
-            await dbContext.Database.ExecuteSqlRawAsync(@"
-                IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Salons' AND COLUMN_NAME = 'LogoUrl')
-                BEGIN
-                    ALTER TABLE [Salons] ALTER COLUMN [LogoUrl] nvarchar(max) NULL;
-                    UPDATE [Salons] SET [LogoUrl] = NULL WHERE [LogoUrl] IS NOT NULL AND [LogoUrl] NOT LIKE 'data:%' AND [LogoUrl] NOT LIKE 'http://%' AND [LogoUrl] NOT LIKE 'https://%';
-                END
-                IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Services' AND COLUMN_NAME = 'ImageUrl')
-                BEGIN
-                    ALTER TABLE [Services] ALTER COLUMN [ImageUrl] nvarchar(max) NULL;
-                    UPDATE [Services] SET [ImageUrl] = NULL WHERE [ImageUrl] IS NOT NULL AND [ImageUrl] NOT LIKE 'data:%' AND [ImageUrl] NOT LIKE 'http://%' AND [ImageUrl] NOT LIKE 'https://%';
-                END
-            ");
-            logger.LogInformation("Database columns Salons.LogoUrl and Services.ImageUrl verified as NVARCHAR(MAX) and dead paths cleaned.");
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Note: Non-critical alter for LogoUrl/ImageUrl columns.");
-        }
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Failed to apply EF Core database migrations.");
+        logger.LogWarning(ex, "Note: EF Core migrations reported an issue or are partially applied; proceeding with schema safety checks.");
+    }
+
+    // Upgrade LogoUrl, QrCodeImageUrl, ImageUrl, and PaymentProofUrl columns to NVARCHAR(MAX) and clean legacy dead paths
+    try
+    {
+        await dbContext.Database.ExecuteSqlRawAsync(@"
+            IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Salons' AND COLUMN_NAME = 'LogoUrl')
+            BEGIN
+                ALTER TABLE [Salons] ALTER COLUMN [LogoUrl] nvarchar(max) NULL;
+                UPDATE [Salons] SET [LogoUrl] = NULL WHERE [LogoUrl] IS NOT NULL AND [LogoUrl] NOT LIKE 'data:%' AND [LogoUrl] NOT LIKE 'http://%' AND [LogoUrl] NOT LIKE 'https://%';
+            END
+            IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Salons' AND COLUMN_NAME = 'QrCodeImageUrl')
+            BEGIN
+                ALTER TABLE [Salons] ALTER COLUMN [QrCodeImageUrl] nvarchar(max) NULL;
+                UPDATE [Salons] SET [QrCodeImageUrl] = NULL WHERE [QrCodeImageUrl] IS NOT NULL AND [QrCodeImageUrl] NOT LIKE 'data:%' AND [QrCodeImageUrl] NOT LIKE 'http://%' AND [QrCodeImageUrl] NOT LIKE 'https://%';
+            END
+            IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Services' AND COLUMN_NAME = 'ImageUrl')
+            BEGIN
+                ALTER TABLE [Services] ALTER COLUMN [ImageUrl] nvarchar(max) NULL;
+                UPDATE [Services] SET [ImageUrl] = NULL WHERE [ImageUrl] IS NOT NULL AND [ImageUrl] NOT LIKE 'data:%' AND [ImageUrl] NOT LIKE 'http://%' AND [ImageUrl] NOT LIKE 'https://%';
+            END
+            IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Appointments' AND COLUMN_NAME = 'PaymentProofUrl')
+            BEGIN
+                ALTER TABLE [Appointments] ALTER COLUMN [PaymentProofUrl] nvarchar(max) NULL;
+                UPDATE [Appointments] SET [PaymentProofUrl] = NULL WHERE [PaymentProofUrl] IS NOT NULL AND [PaymentProofUrl] NOT LIKE 'data:%' AND [PaymentProofUrl] NOT LIKE 'http://%' AND [PaymentProofUrl] NOT LIKE 'https://%';
+            END
+        ");
+        logger.LogInformation("Database image columns verified as NVARCHAR(MAX) and dead local paths cleaned.");
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "Note: Non-critical alter for LogoUrl/ImageUrl columns.");
     }
 
     var dbSafety = scope.ServiceProvider.GetRequiredService<IDatabaseSafetyInitializer>();
@@ -313,21 +323,32 @@ app.UseSwaggerUI(options =>
 });
 
 // 14. Middleware Pipeline
-app.UseStaticFiles();
-
 // Gracefully intercept missing legacy uploaded images under /uploads/ and serve transparent fallback PNG instead of 404
 app.Use(async (context, next) =>
 {
-    await next();
-    if (context.Response.StatusCode == 404 && context.Request.Path.Value?.StartsWith("/uploads", StringComparison.OrdinalIgnoreCase) == true)
+    var path = context.Request.Path.Value;
+    if (!string.IsNullOrEmpty(path) && path.StartsWith("/uploads/", StringComparison.OrdinalIgnoreCase))
     {
-        context.Response.StatusCode = 200;
-        context.Response.ContentType = "image/png";
-        context.Response.Headers.CacheControl = "public, max-age=86400";
-        var transparentPng = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=");
-        await context.Response.Body.WriteAsync(transparentPng);
+        var env = context.RequestServices.GetRequiredService<IWebHostEnvironment>();
+        var webRoot = env.WebRootPath ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
+        var relativeFilePath = path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        var physicalPath = Path.Combine(webRoot, relativeFilePath);
+
+        if (!File.Exists(physicalPath))
+        {
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            context.Response.ContentType = "image/png";
+            context.Response.Headers.CacheControl = "public, max-age=86400";
+            var transparentPng = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=");
+            await context.Response.Body.WriteAsync(transparentPng);
+            return;
+        }
     }
+
+    await next();
 });
+
+app.UseStaticFiles();
 
 app.UseCors(FrontendCorsPolicy);
 app.UseRateLimiter();

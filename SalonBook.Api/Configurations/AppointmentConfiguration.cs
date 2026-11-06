@@ -72,7 +72,7 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
             .HasMaxLength(100);
 
         builder.Property(a => a.PaymentProofUrl)
-            .HasMaxLength(500);
+            .IsRequired(false);
 
         builder.Property(a => a.PaymentSubmittedAtUtc)
             .IsRequired(false);

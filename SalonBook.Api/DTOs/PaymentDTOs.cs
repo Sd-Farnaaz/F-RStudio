@@ -21,7 +21,6 @@ public class UpdateSalonPaymentSettingsRequest : IValidatableObject
     [StringLength(100, ErrorMessage = "UPI ID cannot exceed 100 characters.")]
     public string? UpiId { get; set; }
 
-    [StringLength(500, ErrorMessage = "QR code image URL cannot exceed 500 characters.")]
     public string? QrCodeImageUrl { get; set; }
 
     public bool IsAdvancePaymentRequired { get; set; }
@@ -69,7 +68,6 @@ public class SubmitPaymentProofRequest
     [StringLength(50, ErrorMessage = "Payment method cannot exceed 50 characters.")]
     public string? PaymentMethod { get; set; } = "UPI";
 
-    [StringLength(500, ErrorMessage = "Payment proof URL cannot exceed 500 characters.")]
     public string? PaymentProofUrl { get; set; }
 
     [Range(0.01, 1000000, ErrorMessage = "Amount paid must be greater than 0.")]
