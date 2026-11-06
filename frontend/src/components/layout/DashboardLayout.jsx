@@ -10,6 +10,9 @@ import NotificationBell from './NotificationBell';
 import { getImageUrl } from '../../utils/imageUrl';
 
 export default function DashboardLayout({ children }) {
+  const { user, logout } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [sidebarLogoError, setSidebarLogoError] = useState(false);
@@ -19,9 +22,6 @@ export default function DashboardLayout({ children }) {
     setSidebarLogoError(false);
     setTopbarLogoError(false);
   }, [user?.salonLogoUrl]);
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { user, logout } = useAuth();
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -166,6 +166,7 @@ export default function DashboardLayout({ children }) {
               <img 
                 src={getImageUrl(user.salonLogoUrl)} 
                 alt={user?.salonName || user?.fullName || 'Salon'} 
+                onError={() => setSidebarLogoError(true)}
                 className="w-10 h-10 rounded-full object-cover border border-border-color shadow-sm shrink-0 bg-white"
               />
             ) : (
