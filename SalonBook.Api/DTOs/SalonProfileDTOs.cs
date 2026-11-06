@@ -45,6 +45,10 @@ public class UpdateSalonProfileRequest
 
     [StringLength(3, MinimumLength = 3, ErrorMessage = "Currency code must be exactly 3 characters.")]
     public string? CurrencyCode { get; set; }
+
+    public string? LogoUrl { get; set; }
+
+    public string? PhotoBase64 { get; set; }
 }
 
 public class SalonProfileResponse

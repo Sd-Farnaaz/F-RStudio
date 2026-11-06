@@ -100,21 +100,8 @@ public class AdminServicesController : ControllerBase
         // Optional Service photo uploaded as Base64 Data URL during creation
         if (!string.IsNullOrWhiteSpace(request.ImageBase64))
         {
-            try
-            {
-                var storedImageUrl = await _salonImageStorageService.SaveBase64ImageAsync(
-                    Path.Combine("salons", salonId.Value.ToString(), "services", service.Id.ToString()),
-                    $"/uploads/salons/{salonId.Value}/services/{service.Id}/",
-                    request.ImageBase64,
-                    cancellationToken);
-
-                service.ImageUrl = storedImageUrl;
-                await _dbContext.SaveChangesAsync(cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to persist base64 service image during creation for service {ServiceId}", service.Id);
-            }
+            service.ImageUrl = request.ImageBase64;
+            await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
         _logger.LogInformation("Service '{ServiceName}' (ID: {ServiceId}) created for Salon ID {SalonId} by {Email}",
@@ -293,24 +280,7 @@ public class AdminServicesController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(request.ImageBase64))
         {
-            try
-            {
-                var storedImageUrl = await _salonImageStorageService.SaveBase64ImageAsync(
-                    Path.Combine("salons", salonId.Value.ToString(), "services", service.Id.ToString()),
-                    $"/uploads/salons/{salonId.Value}/services/{service.Id}/",
-                    request.ImageBase64,
-                    cancellationToken);
-
-                if (!string.IsNullOrWhiteSpace(service.ImageUrl) && !service.ImageUrl.Equals(storedImageUrl, StringComparison.OrdinalIgnoreCase))
-                {
-                    await _salonImageStorageService.DeleteServiceImageAsync(salonId.Value, service.Id, service.ImageUrl, cancellationToken);
-                }
-                service.ImageUrl = storedImageUrl;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to persist base64 service image during update for service {ServiceId}", service.Id);
-            }
+            service.ImageUrl = request.ImageBase64;
         }
         else if (request.ImageUrl != null)
         {
@@ -393,7 +363,7 @@ public class AdminServicesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UploadServiceImage(int id, IFormFile file, CancellationToken cancellationToken)
+    public async Task<IActionResult> UploadServiceImage(int id, [FromForm(Name = "file")] IFormFile file, CancellationToken cancellationToken)
     {
         var salonId = _currentUserService.SalonId;
         if (!salonId.HasValue)
@@ -414,33 +384,39 @@ public class AdminServicesController : ControllerBase
             return BadRequest(new { message = "Please select a valid image file to upload." });
         }
 
+        if (file.Length > 5 * 1024 * 1024)
+        {
+            return BadRequest(new { message = "Image file size exceeds the 5MB limit." });
+        }
+
         try
         {
-            var oldImageUrl = service.ImageUrl;
-            var newImageUrl = await _salonImageStorageService.SaveServiceImageAsync(salonId.Value, service.Id, file, cancellationToken);
-
-            // Clean up old image if replacing
-            if (!string.IsNullOrWhiteSpace(oldImageUrl) && !oldImageUrl.Equals(newImageUrl, StringComparison.OrdinalIgnoreCase))
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms, cancellationToken);
+            var bytes = ms.ToArray();
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var mime = ext switch
             {
-                await _salonImageStorageService.DeleteServiceImageAsync(salonId.Value, service.Id, oldImageUrl, cancellationToken);
-            }
+                ".png" => "image/png",
+                ".webp" => "image/webp",
+                ".gif" => "image/gif",
+                _ => "image/jpeg"
+            };
 
-            service.ImageUrl = newImageUrl;
+            var base64DataUrl = $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+
+            service.ImageUrl = base64DataUrl;
             service.UpdatedAtUtc = DateTime.UtcNow;
 
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Service ID {ServiceId} image updated for Salon ID {SalonId}: {ImageUrl}",
-                service.Id, salonId.Value, newImageUrl);
+            _logger.LogInformation("Service ID {ServiceId} image updated for Salon ID {SalonId}", service.Id, salonId.Value);
 
             return Ok(MapToServiceResponse(service));
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex)
         {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (ArgumentException ex)
-        {
+            _logger.LogError(ex, "Error uploading service image for service ID {ServiceId}", service.Id);
             return BadRequest(new { message = ex.Message });
         }
     }

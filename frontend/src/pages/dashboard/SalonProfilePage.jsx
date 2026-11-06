@@ -120,17 +120,30 @@ export default function SalonProfilePage() {
     setUploadingLogo(true);
     setError('');
     setSuccess('');
-    try {
-      const response = await adminService.uploadSalonLogo(file);
-      const newLogoUrl = response.logoUrl || '';
-      setProfile(prev => ({ ...prev, logoUrl: newLogoUrl }));
-      setInitialProfile(prev => ({ ...prev, logoUrl: newLogoUrl }));
-      setSuccess('Salon photo updated successfully.');
-    } catch (err) {
-      setError(err.message || 'Failed to upload photo.');
-    } finally {
-      setUploadingLogo(false);
-    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result;
+      setProfile(prev => {
+        const updated = { ...prev, logoUrl: dataUrl };
+        setIsDirty(JSON.stringify(updated) !== JSON.stringify(initialProfile));
+        return updated;
+      });
+
+      try {
+        const response = await adminService.uploadSalonLogo(file);
+        const newLogoUrl = response?.logoUrl || dataUrl;
+        setProfile(prev => ({ ...prev, logoUrl: newLogoUrl }));
+        setInitialProfile(prev => ({ ...prev, logoUrl: newLogoUrl }));
+        setSuccess('Salon photo updated successfully.');
+      } catch (err) {
+        // If upload endpoint had an issue, the base64 dataUrl is still preserved in profile state and will persist on save
+        setSuccess('Salon photo selected. Click "Save Changes" below to save your profile.');
+      } finally {
+        setUploadingLogo(false);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDetectLocation = async () => {
@@ -156,7 +169,7 @@ export default function SalonProfilePage() {
         .filter(Boolean)
         .join(', ');
       setLocationMessage(summary || 'Location detected.');
-      setSuccess('Location coordinates detected and address auto-filled!');
+      setSuccess('Location coordinates detected and address auto-filled! Click "Save Changes" to apply.');
     } catch (err) {
       setError(err.message || 'Unable to detect location. Please type your address manually.');
     } finally {
@@ -208,6 +221,8 @@ export default function SalonProfilePage() {
         contactEmail: profile.contactEmail,
         timeZone: profile.timeZone,
         currencyCode: profile.currencyCode,
+        logoUrl: profile.logoUrl || null,
+        photoBase64: profile.logoUrl?.startsWith('data:') ? profile.logoUrl : null,
         openingHoursJson: initialProfile?.openingHoursJson // Preserve existing if not editable here
       });
       

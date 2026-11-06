@@ -153,21 +153,8 @@ public class AuthController : ControllerBase
                 // Optional Salon / Owner photo uploaded as Base64 Data URL
                 if (!string.IsNullOrWhiteSpace(request.PhotoBase64))
                 {
-                    try
-                    {
-                        var savedLogoUrl = await _salonImageStorageService.SaveBase64ImageAsync(
-                            Path.Combine("salons", salon.Id.ToString()),
-                            $"/uploads/salons/{salon.Id}/",
-                            request.PhotoBase64,
-                            cancellationToken);
-
-                        salon.LogoUrl = savedLogoUrl;
-                        await _dbContext.SaveChangesAsync(cancellationToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to persist optional salon photo during registration for salon ID {SalonId}", salon.Id);
-                    }
+                    salon.LogoUrl = request.PhotoBase64;
+                    await _dbContext.SaveChangesAsync(cancellationToken);
                 }
 
                 var adminUser = new User

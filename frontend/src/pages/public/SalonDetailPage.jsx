@@ -38,6 +38,7 @@ import {
   CornerDownRight,
   Image as ImageIcon,
   Zap,
+  ExternalLink,
   X 
 } from 'lucide-react';
 
@@ -48,6 +49,7 @@ export default function SalonDetailPage() {
   const { slug } = useParams();
 
   const [salon, setSalon] = useState(null);
+  const [logoError, setLogoError] = useState(false);
   const [services, setServices] = useState([]);
   const [staffMembers, setStaffMembers] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -418,7 +420,7 @@ export default function SalonDetailPage() {
     );
   }
 
-  const salonLocation = [salon.addressLine, salon.city, salon.state, salon.country].filter(Boolean).join(', ');
+  const salonLocation = [salon.addressLine, salon.city, salon.state, salon.postalCode, salon.country].filter(Boolean).join(', ');
   const todayDateStr = new Date().toISOString().split('T')[0];
 
   return (
@@ -451,10 +453,11 @@ export default function SalonDetailPage() {
                 <div className="flex flex-col sm:flex-row items-start gap-5 sm:gap-6 max-w-3xl">
                   {/* Salon Logo or Monogram */}
                   <div className="shrink-0">
-                    {salon.logoUrl ? (
+                    {salon.logoUrl && !logoError ? (
                       <img 
                         src={getImageUrl(salon.logoUrl)} 
                         alt={salon.name} 
+                        onError={() => setLogoError(true)}
                         className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-soft-blush shadow-xs bg-white"
                       />
                     ) : (
@@ -504,10 +507,26 @@ export default function SalonDetailPage() {
 
                     {/* Address & Meta */}
                     <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs text-muted">
-                      {salonLocation && (
-                        <div className="flex items-center gap-1.5">
+                      {salonLocation ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex items-center gap-1.5 text-deep-plum font-medium">
+                            <MapPin className="w-4 h-4 text-primary-rose shrink-0" />
+                            <span>{salonLocation}</span>
+                          </div>
+                          <a 
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([salon.name, salonLocation].join(', '))}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary-rose hover:underline bg-soft-blush/60 px-2.5 py-0.5 rounded-full border border-dusty-rose/30"
+                          >
+                            <span>Open in Maps</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-muted">
                           <MapPin className="w-3.5 h-3.5 text-primary-rose shrink-0" />
-                          <span>{salonLocation}</span>
+                          <span>Location details available upon booking</span>
                         </div>
                       )}
                       {salon.timeZone && (
@@ -614,6 +633,84 @@ export default function SalonDetailPage() {
                   </div>
                 </section>
               )}
+
+              {/* Studio Location & Contact Card */}
+              <section className="bg-white rounded-3xl p-6 sm:p-8 border border-border-color shadow-xs">
+                <div className="flex items-center gap-2 mb-4">
+                  <MapPin className="w-5 h-5 text-primary-rose" />
+                  <h2 className="text-xl sm:text-2xl font-serif font-medium text-deep-plum">
+                    Studio Location & Contact
+                  </h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                  <div className="space-y-3 bg-ivory/50 p-4 rounded-2xl border border-border-color">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted block">
+                      Physical Location
+                    </span>
+                    <p className="text-deep-plum font-semibold text-base">
+                      {salon.addressLine || 'Address details registered with salon'}
+                    </p>
+                    {(salon.city || salon.state || salon.postalCode) && (
+                      <p className="text-muted text-xs">
+                        {[salon.city, salon.state, salon.postalCode].filter(Boolean).join(', ')}
+                      </p>
+                    )}
+                    <p className="text-muted text-xs font-medium">{salon.country || 'India'}</p>
+
+                    <div className="pt-2">
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([salon.name, salon.addressLine, salon.city, salon.state, salon.postalCode, salon.country].filter(Boolean).join(', '))}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-rose text-white font-medium text-xs rounded-xl shadow-2xs hover:bg-primary-rose/90 transition-all"
+                      >
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span>Get Directions on Google Maps</span>
+                        <ExternalLink className="w-3 h-3 ml-0.5" />
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 bg-ivory/50 p-4 rounded-2xl border border-border-color">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted block">
+                      Direct Communication
+                    </span>
+                    {salon.phoneNumber ? (
+                      <a 
+                        href={`tel:${salon.phoneNumber}`} 
+                        className="flex items-center gap-2.5 text-deep-plum hover:text-primary-rose transition-colors py-1.5 font-medium"
+                      >
+                        <Phone className="w-4 h-4 text-primary-rose shrink-0" />
+                        <span>{salon.phoneNumber}</span>
+                      </a>
+                    ) : (
+                      <p className="text-xs text-muted py-1 flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-muted shrink-0" />
+                        <span>Phone booking available upon request</span>
+                      </p>
+                    )}
+                    {salon.contactEmail ? (
+                      <a 
+                        href={`mailto:${salon.contactEmail}`} 
+                        className="flex items-center gap-2.5 text-deep-plum hover:text-primary-rose transition-colors py-1.5 text-xs truncate"
+                      >
+                        <Mail className="w-4 h-4 text-primary-rose shrink-0" />
+                        <span className="truncate">{salon.contactEmail}</span>
+                      </a>
+                    ) : (
+                      <p className="text-xs text-muted py-1 flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-muted shrink-0" />
+                        <span>Instant in-app notifications enabled</span>
+                      </p>
+                    )}
+                    <div className="pt-2 text-xs text-muted flex items-center gap-2">
+                      <Globe className="w-3.5 h-3.5 text-primary-rose shrink-0" />
+                      <span>Timezone: <strong>{salon.timeZone || 'Asia/Kolkata'}</strong></span>
+                    </div>
+                  </div>
+                </div>
+              </section>
 
               {/* Service Menu */}
               <section id="services-menu" className="space-y-6">

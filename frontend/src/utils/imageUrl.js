@@ -16,3 +16,4 @@ export function getImageUrl(path, fallback = '') {
   }
   return `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
 }
+

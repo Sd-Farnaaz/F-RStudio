@@ -232,6 +232,26 @@ using (var scope = app.Services.CreateScope())
         logger.LogInformation("Applying EF Core database migrations...");
         await dbContext.Database.MigrateAsync();
         logger.LogInformation("Database migrations applied successfully.");
+
+        // Upgrade LogoUrl and ImageUrl columns to NVARCHAR(MAX) to support high-fidelity persistent data URLs
+        try
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(@"
+                IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Salons' AND COLUMN_NAME = 'LogoUrl')
+                BEGIN
+                    ALTER TABLE [Salons] ALTER COLUMN [LogoUrl] nvarchar(max) NULL;
+                END
+                IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Services' AND COLUMN_NAME = 'ImageUrl')
+                BEGIN
+                    ALTER TABLE [Services] ALTER COLUMN [ImageUrl] nvarchar(max) NULL;
+                END
+            ");
+            logger.LogInformation("Database columns Salons.LogoUrl and Services.ImageUrl verified as NVARCHAR(MAX).");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Note: Non-critical alter for LogoUrl/ImageUrl columns.");
+        }
     }
     catch (Exception ex)
     {

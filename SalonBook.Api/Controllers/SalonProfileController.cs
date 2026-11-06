@@ -107,6 +107,15 @@ public class SalonProfileController : ControllerBase
             salon.CurrencyCode = request.CurrencyCode.Trim().ToUpperInvariant();
         }
 
+        if (!string.IsNullOrWhiteSpace(request.PhotoBase64))
+        {
+            salon.LogoUrl = request.PhotoBase64;
+        }
+        else if (request.LogoUrl != null)
+        {
+            salon.LogoUrl = string.IsNullOrWhiteSpace(request.LogoUrl) ? null : request.LogoUrl.Trim();
+        }
+
         salon.UpdatedAtUtc = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -119,7 +128,7 @@ public class SalonProfileController : ControllerBase
 
     /// <summary>
     /// Upload or replace the salon's logo/profile image.
-    /// Validates file type, size (max 5MB), and actual image binary magic bytes.
+    /// Validates file type, size (max 5MB), and stores as high-fidelity persistent data URL.
     /// </summary>
     [HttpPost("logo")]
     [HttpPost("image")]
@@ -129,7 +138,7 @@ public class SalonProfileController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UploadLogo(IFormFile file, CancellationToken cancellationToken)
+    public async Task<IActionResult> UploadLogo([FromForm(Name = "file")] IFormFile file, CancellationToken cancellationToken)
     {
         var salonId = _currentUserService.SalonId;
         if (!salonId.HasValue)
@@ -150,34 +159,42 @@ public class SalonProfileController : ControllerBase
             return BadRequest(new { message = "Please select a valid image file to upload." });
         }
 
+        if (file.Length > 5 * 1024 * 1024)
+        {
+            return BadRequest(new { message = "Image file size exceeds the 5MB limit." });
+        }
+
         try
         {
-            var oldLogoUrl = salon.LogoUrl;
-            var newLogoUrl = await _salonImageStorageService.SaveSalonLogoAsync(salon.Id, file, cancellationToken);
-
-            // If replacing an existing logo, remove the old file
-            if (!string.IsNullOrWhiteSpace(oldLogoUrl) && !oldLogoUrl.Equals(newLogoUrl, StringComparison.OrdinalIgnoreCase))
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms, cancellationToken);
+            var bytes = ms.ToArray();
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var mime = ext switch
             {
-                await _salonImageStorageService.DeleteSalonLogoAsync(salon.Id, oldLogoUrl, cancellationToken);
-            }
+                ".png" => "image/png",
+                ".webp" => "image/webp",
+                ".gif" => "image/gif",
+                _ => "image/jpeg"
+            };
 
-            salon.LogoUrl = newLogoUrl;
+            var base64DataUrl = $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+
+            salon.LogoUrl = base64DataUrl;
             salon.UpdatedAtUtc = DateTime.UtcNow;
 
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Salon logo updated successfully for Salon ID {SalonId}: {LogoUrl}", salon.Id, newLogoUrl);
+            _logger.LogInformation("Salon logo updated successfully for Salon ID {SalonId}", salon.Id);
 
             return Ok(MapToProfileResponse(salon));
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Error uploading salon logo for Salon ID {SalonId}", salon.Id);
             return BadRequest(new { message = ex.Message });
         }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+    }
     }
 
     /// <summary>
