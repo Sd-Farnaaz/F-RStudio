@@ -63,6 +63,14 @@ public class DatabaseSafetyInitializer : IDatabaseSafetyInitializer
         ("Salons", "SubscriptionStartedAtUtc"),
         ("Salons", "SubscriptionStatus"),
         ("Salons", "SubscriptionTier"),
+        ("Salons", "IsEmailConfigured"),
+        ("Salons", "SmtpHost"),
+        ("Salons", "SmtpPort"),
+        ("Salons", "SmtpUsername"),
+        ("Salons", "SmtpPassword"),
+        ("Salons", "SenderEmail"),
+        ("Salons", "SenderName"),
+        ("Salons", "SmtpEnableSsl"),
         ("Reviews", "SalonId"),
         ("Reviews", "CustomerId"),
         ("Reviews", "AppointmentId"),
@@ -621,6 +629,46 @@ END
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Salons]') AND name = 'SubscriptionTier')
 BEGIN
     ALTER TABLE [dbo].[Salons] ADD [SubscriptionTier] NVARCHAR(50) NOT NULL CONSTRAINT [DF_Salons_SubscriptionTier] DEFAULT ('Starter');
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Salons]') AND name = 'IsEmailConfigured')
+BEGIN
+    ALTER TABLE [dbo].[Salons] ADD [IsEmailConfigured] BIT NOT NULL CONSTRAINT [DF_Salons_IsEmailConfigured] DEFAULT (0);
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Salons]') AND name = 'SmtpHost')
+BEGIN
+    ALTER TABLE [dbo].[Salons] ADD [SmtpHost] NVARCHAR(255) NULL;
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Salons]') AND name = 'SmtpPort')
+BEGIN
+    ALTER TABLE [dbo].[Salons] ADD [SmtpPort] INT NOT NULL CONSTRAINT [DF_Salons_SmtpPort] DEFAULT (587);
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Salons]') AND name = 'SmtpUsername')
+BEGIN
+    ALTER TABLE [dbo].[Salons] ADD [SmtpUsername] NVARCHAR(255) NULL;
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Salons]') AND name = 'SmtpPassword')
+BEGIN
+    ALTER TABLE [dbo].[Salons] ADD [SmtpPassword] NVARCHAR(500) NULL;
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Salons]') AND name = 'SenderEmail')
+BEGIN
+    ALTER TABLE [dbo].[Salons] ADD [SenderEmail] NVARCHAR(255) NULL;
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Salons]') AND name = 'SenderName')
+BEGIN
+    ALTER TABLE [dbo].[Salons] ADD [SenderName] NVARCHAR(255) NULL;
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Salons]') AND name = 'SmtpEnableSsl')
+BEGIN
+    ALTER TABLE [dbo].[Salons] ADD [SmtpEnableSsl] BIT NOT NULL CONSTRAINT [DF_Salons_SmtpEnableSsl] DEFAULT (1);
 END";
             await ExecuteStepAsync(dbContext, "Salons Lifecycle & Subscription Columns", salonColumnsSql, cancellationToken);
 

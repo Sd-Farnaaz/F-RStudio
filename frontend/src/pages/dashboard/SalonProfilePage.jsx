@@ -235,7 +235,9 @@ export default function SalonProfilePage() {
         isAdvancePaymentRequired: !!data.isAdvancePaymentRequired,
         advancePaymentType: data.advancePaymentType || 'Fixed',
         advancePaymentValue: data.advancePaymentValue !== null && data.advancePaymentValue !== undefined ? data.advancePaymentValue : '',
-        currencyCode: data.currencyCode || 'INR'
+        currencyCode: data.currencyCode || 'INR',
+        hasAdvanceDepositEngine: data.hasAdvanceDepositEngine ?? true,
+        currentTier: data.currentTier || 'Starter'
       });
       setQrImgError(false);
     } catch (err) {
@@ -770,22 +772,40 @@ export default function SalonProfilePage() {
               <div className="p-6 sm:p-8 space-y-8">
                 {/* Section 1: Advance Deposit Requirement */}
                 <section className="space-y-4">
-                  <div className="flex items-start gap-3 p-4 bg-ivory/60 rounded-xl border border-border-color">
-                    <input
-                      type="checkbox"
-                      id="isAdvancePaymentRequired"
-                      name="isAdvancePaymentRequired"
-                      checked={paymentSettings.isAdvancePaymentRequired}
-                      onChange={handlePaymentChange}
-                      className="mt-1 h-4 w-4 rounded border-border-color text-primary-rose focus:ring-primary-rose/50"
-                    />
-                    <label htmlFor="isAdvancePaymentRequired" className="text-sm cursor-pointer select-none">
-                      <span className="font-semibold text-deep-plum block">Require Advance Deposit for Bookings</span>
-                      <span className="text-xs text-muted leading-relaxed block mt-0.5">
-                        When enabled, newly created appointments will require customers to transfer an advance deposit and submit their payment transaction reference (UTR) for verification.
-                      </span>
-                    </label>
-                  </div>
+                  {!paymentSettings.hasAdvanceDepositEngine ? (
+                    <div className="p-4 bg-amber-50/80 border border-amber-200/80 rounded-xl flex items-start gap-3">
+                      <ShieldCheck className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-xs text-amber-950">Automated Advance Deposits & No-Show Shield</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/70 text-amber-900">Growth & Pro Feature</span>
+                        </div>
+                        <p className="text-xs text-amber-900 leading-relaxed">
+                          Your current Starter plan includes direct UPI & QR code payments. Automated advance booking deposits and no-show shields are unlocked on the Growth Studio and Pro plans.
+                        </p>
+                        <Link to="/admin/billing" className="text-xs text-primary-rose font-bold hover:underline inline-block pt-1">
+                          Upgrade to Growth Studio →
+                        </Link>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-3 p-4 bg-ivory/60 rounded-xl border border-border-color">
+                      <input
+                        type="checkbox"
+                        id="isAdvancePaymentRequired"
+                        name="isAdvancePaymentRequired"
+                        checked={paymentSettings.isAdvancePaymentRequired}
+                        onChange={handlePaymentChange}
+                        className="mt-1 h-4 w-4 rounded border-border-color text-primary-rose focus:ring-primary-rose/50"
+                      />
+                      <label htmlFor="isAdvancePaymentRequired" className="text-sm cursor-pointer select-none">
+                        <span className="font-semibold text-deep-plum block">Require Advance Deposit for Bookings</span>
+                        <span className="text-xs text-muted leading-relaxed block mt-0.5">
+                          When enabled, newly created appointments will require customers to transfer an advance deposit and submit their payment transaction reference (UTR) for verification.
+                        </span>
+                      </label>
+                    </div>
+                  )}
 
                   {paymentSettings.isAdvancePaymentRequired && (
                     <div className="p-5 bg-white rounded-xl border border-border-color shadow-sm space-y-5 animate-in fade-in slide-in-from-top-2">

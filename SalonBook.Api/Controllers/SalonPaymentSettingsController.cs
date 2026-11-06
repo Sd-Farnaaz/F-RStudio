@@ -51,6 +51,9 @@ public class SalonPaymentSettingsController : ControllerBase
             return NotFound(new { message = "Salon profile was not found." });
         }
 
+        var tier = salon.SubscriptionTier ?? Common.SubscriptionPlanCatalog.Starter;
+        var hasAdvance = !tier.Equals(Common.SubscriptionPlanCatalog.Starter, StringComparison.OrdinalIgnoreCase);
+
         var response = new SalonPaymentSettingsResponse
         {
             SalonId = salon.Id,
@@ -59,7 +62,9 @@ public class SalonPaymentSettingsController : ControllerBase
             IsAdvancePaymentRequired = salon.IsAdvancePaymentRequired,
             AdvancePaymentType = salon.AdvancePaymentType,
             AdvancePaymentValue = salon.AdvancePaymentValue,
-            CurrencyCode = salon.CurrencyCode
+            CurrencyCode = salon.CurrencyCode,
+            CurrentTier = tier,
+            HasAdvanceDepositEngine = hasAdvance
         };
 
         return Ok(response);
@@ -92,6 +97,19 @@ public class SalonPaymentSettingsController : ControllerBase
             return NotFound(new { message = "Salon profile was not found." });
         }
 
+        var tier = salon.SubscriptionTier ?? Common.SubscriptionPlanCatalog.Starter;
+        var hasAdvance = !tier.Equals(Common.SubscriptionPlanCatalog.Starter, StringComparison.OrdinalIgnoreCase);
+
+        if (request.IsAdvancePaymentRequired && !hasAdvance)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                message = "Automated Advance Deposits & No-Show Shield requires Growth Studio or Pro plan. Please upgrade your subscription on the Plan & Billing page to enable online advance deposits.",
+                upgradeRequired = true,
+                currentTier = tier
+            });
+        }
+
         salon.UpiId = request.UpiId?.Trim();
         salon.QrCodeImageUrl = request.QrCodeImageUrl?.Trim();
         salon.IsAdvancePaymentRequired = request.IsAdvancePaymentRequired;
@@ -121,7 +139,9 @@ public class SalonPaymentSettingsController : ControllerBase
             IsAdvancePaymentRequired = salon.IsAdvancePaymentRequired,
             AdvancePaymentType = salon.AdvancePaymentType,
             AdvancePaymentValue = salon.AdvancePaymentValue,
-            CurrencyCode = salon.CurrencyCode
+            CurrencyCode = salon.CurrencyCode,
+            CurrentTier = tier,
+            HasAdvanceDepositEngine = hasAdvance
         };
 
         return Ok(response);

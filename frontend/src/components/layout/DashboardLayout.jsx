@@ -43,7 +43,7 @@ export default function DashboardLayout({ children }) {
       { name: 'Services', href: '/admin/services', icon: Settings },
       { name: 'Staff', href: '/admin/staff', icon: Users },
       { name: 'Customers', href: '/admin/customers', icon: Users },
-      { name: 'Automations & Retention', href: '/admin/automation', icon: Zap },
+      { name: 'Automations & Retention', href: '/admin/automation', icon: Zap, badge: 'Growth+' },
       { name: 'Reviews', href: '/admin/reviews', icon: Star },
       { name: 'Plan & Billing', href: '/admin/billing', icon: CreditCard },
       { name: 'Payouts & Escrow', href: '/admin/payouts', icon: DollarSign },

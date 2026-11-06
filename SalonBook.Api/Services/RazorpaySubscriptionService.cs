@@ -36,10 +36,10 @@ public class RazorpaySubscriptionService : IRazorpaySubscriptionService
         CreateSubscriptionOrderRequest request, 
         CancellationToken cancellationToken = default)
     {
+        // If KeySecret is not configured, we allow simulated test orders so administrators can test plans without crashing
         if (!_options.IsSecretConfigured)
         {
-            _logger.LogError("Razorpay KeySecret is not configured in backend settings.");
-            throw new InvalidOperationException("Razorpay KeySecret is not configured on the server. Please configure 'Razorpay:KeySecret' via user-secrets or environment variables.");
+            _logger.LogWarning("Razorpay KeySecret is not configured in backend settings. Operating in simulated test order mode.");
         }
 
         var targetPlan = SubscriptionPlanCatalog.GetPlanByTier(request.Tier);

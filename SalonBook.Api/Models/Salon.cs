@@ -58,6 +58,23 @@ public class Salon
 
     public decimal? AdvancePaymentValue { get; set; }
 
+    // Salon Custom Email SMTP Configuration (Automations & Retention)
+    public bool IsEmailConfigured { get; set; } = false;
+
+    public string? SmtpHost { get; set; }
+
+    public int SmtpPort { get; set; } = 587;
+
+    public string? SmtpUsername { get; set; } // Email Key / Username
+
+    public string? SmtpPassword { get; set; } // Email Secret / Password
+
+    public string? SenderEmail { get; set; }
+
+    public string? SenderName { get; set; }
+
+    public bool SmtpEnableSsl { get; set; } = true;
+
     // Salon Branding & Media
     public string? LogoUrl { get; set; }
 

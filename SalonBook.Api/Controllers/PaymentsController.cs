@@ -200,7 +200,7 @@ public class PaymentsController : ControllerBase
 
         // Step 3.3: Automated Split Payout & Escrow Ledger Entry based on Salon SaaS Subscription Tier
         var salonTier = appointment.Salon?.SubscriptionTier ?? "Starter";
-        decimal commissionPercent = salonTier.Equals("LuxuryPro", StringComparison.OrdinalIgnoreCase) ? 0.0m
+        decimal commissionPercent = (salonTier.Equals("Pro", StringComparison.OrdinalIgnoreCase) || salonTier.Equals("LuxuryPro", StringComparison.OrdinalIgnoreCase)) ? 0.0m
                                   : salonTier.Equals("Growth", StringComparison.OrdinalIgnoreCase) ? 0.025m
                                   : 0.05m;
 

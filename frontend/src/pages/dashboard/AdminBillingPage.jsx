@@ -92,6 +92,33 @@ export default function AdminBillingPage() {
     });
   };
 
+  // Direct Test Mode Plan Activation (Allows instantly testing all 3 plans: Starter, Growth, Pro)
+  const handleDirectTestUpgrade = async (plan) => {
+    try {
+      setInitiatingPlan(plan.tier);
+      setCheckoutState('verifying');
+      setCheckoutError('');
+      const res = await subscriptionService.upgradeSubscription({
+        tier: plan.tier,
+        billingCycle: billingCycle
+      });
+      setVerificationResult({
+        tier: res.currentTier,
+        billingCycle: res.billingCycle,
+        transactionReference: res.transactionReference,
+        renewsAtUtc: res.renewsAtUtc
+      });
+      setCheckoutState('success');
+      await fetchSubscription();
+      await fetchTransactions();
+    } catch (err) {
+      setCheckoutState('failed');
+      setCheckoutError(err.message || 'Direct plan change failed.');
+    } finally {
+      setInitiatingPlan(null);
+    }
+  };
+
   // Launch official Razorpay Checkout modal
   const handleLaunchCheckout = async (plan) => {
     if (!plan || plan.tier === 'Starter') return;
@@ -645,10 +672,23 @@ export default function AdminBillingPage() {
                           )}
                         </div>
                       ) : isStarter ? (
-                        <div className="w-full py-3 bg-ivory text-muted text-center text-xs font-semibold rounded-xl border border-border-color cursor-default">
-                          Trial Plan (Initial Signup Only)
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDirectTestUpgrade(plan)}
+                          disabled={isUpgradingThis || checkoutState === 'initiating' || checkoutState === 'verifying'}
+                          className="w-full py-3 bg-ivory text-deep-plum hover:bg-soft-blush text-center text-xs font-semibold rounded-xl border border-border-color transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        >
+                          {isUpgradingThis ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Switching to Starter...</span>
+                            </>
+                          ) : (
+                            <span>Switch to Starter Trial (Test Mode)</span>
+                          )}
+                        </button>
                       ) : (
+                        <>
                         <button
                           type="button"
                           onClick={() => handleLaunchCheckout(plan)}
@@ -671,6 +711,15 @@ export default function AdminBillingPage() {
                             </>
                           )}
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDirectTestUpgrade(plan)}
+                          disabled={isUpgradingThis || checkoutState === 'initiating' || checkoutState === 'verifying'}
+                          className="w-full mt-2 py-2 text-[11px] font-medium text-muted hover:text-primary-rose underline transition-colors cursor-pointer text-center"
+                        >
+                          ⚡ Instant Test Switch to {plan.name}
+                        </button>
+                      </>
                       )}
                     </div>
                   </div>

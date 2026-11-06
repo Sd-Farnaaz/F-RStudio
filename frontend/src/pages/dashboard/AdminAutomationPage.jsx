@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { automationService } from '../../services/automationService';
+import { subscriptionService } from '../../services/subscriptionService';
+import { useAuth } from '../../context/AuthContext';
 import { 
   Zap, 
-  MessageSquare, 
   Clock, 
   Send, 
   Gift, 
-  Tag, 
   CheckCircle2, 
   AlertCircle, 
   Calendar, 
@@ -18,11 +19,18 @@ import {
   Trash2, 
   RefreshCw, 
   Check, 
-  Smartphone, 
   Sparkles,
   Percent,
   X,
-  ExternalLink
+  Mail,
+  Lock,
+  Server,
+  Key,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  ShieldCheck,
+  HelpCircle
 } from 'lucide-react';
 
 const DAYS = [
@@ -35,10 +43,49 @@ const DAYS = [
   { key: 'Sunday', label: 'Sun' }
 ];
 
-export default function AdminAutomationPage() {
-  const [activeTab, setActiveTab] = useState('reminders'); // 'reminders' | 'reengagement' | 'discounts'
+const PRESETS = [
+  {
+    name: 'Brevo (Recommended)',
+    host: 'smtp-relay.brevo.com',
+    port: 587,
+    ssl: true,
+    help: 'Default transactional relay for F&R Studio. Supports Brevo API Key as password.'
+  },
+  {
+    name: 'Google Gmail SMTP',
+    host: 'smtp.gmail.com',
+    port: 587,
+    ssl: true,
+    help: 'Requires Google Account 2-Step Verification and a 16-character App Password.'
+  },
+  {
+    name: 'SendGrid',
+    host: 'smtp.sendgrid.net',
+    port: 587,
+    ssl: true,
+    help: 'Username is "apikey" and password is your SendGrid Secret API Key.'
+  },
+  {
+    name: 'Amazon SES',
+    host: 'email-smtp.us-east-1.amazonaws.com',
+    port: 587,
+    ssl: true,
+    help: 'Amazon Simple Email Service SMTP credentials.'
+  }
+];
 
-  // Tab 1: WhatsApp & SMS Reminders State
+export default function AdminAutomationPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Subscription Entitlement & Gating
+  const [subscription, setSubscription] = useState(null);
+  const [loadingSubscription, setLoadingSubscription] = useState(true);
+
+  // Active Tab: 'reminders' | 'reengagement' | 'discounts' | 'smtp'
+  const [activeTab, setActiveTab] = useState('reminders');
+
+  // Tab 1: Automated Email Reminders Cadence State
   const [messageLogs, setMessageLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
@@ -48,7 +95,6 @@ export default function AdminAutomationPage() {
   const [selectedCandidates, setSelectedCandidates] = useState([]);
   const [couponCode, setCouponCode] = useState('MISSYOU10');
   const [discountPercent, setDiscountPercent] = useState(10);
-  const [channel, setChannel] = useState('WhatsApp');
   const [customMsg, setCustomMsg] = useState('');
   const [dispatching, setDispatching] = useState(false);
   const [dispatchSuccess, setDispatchSuccess] = useState(null);
@@ -64,13 +110,54 @@ export default function AdminAutomationPage() {
   const [ruleDiscount, setRuleDiscount] = useState(20);
   const [savingRule, setSavingRule] = useState(false);
 
+  // Tab 4: Email SMTP Configuration State
+  const [smtpConfig, setSmtpConfig] = useState({
+    isConfigured: false,
+    smtpHost: '',
+    smtpPort: 587,
+    smtpUsername: '',
+    smtpPassword: '',
+    senderEmail: '',
+    senderName: '',
+    smtpEnableSsl: true,
+    hasPassword: false
+  });
+  const [showSmtpPassword, setShowSmtpPassword] = useState(false);
+  const [loadingSmtp, setLoadingSmtp] = useState(false);
+  const [savingSmtp, setSavingSmtp] = useState(false);
+  const [testRecipient, setTestRecipient] = useState(user?.email || '');
+  const [testingSmtp, setTestingSmtp] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+
   const [feedback, setFeedback] = useState(null);
 
+  // Check subscription entitlement
+  const checkSubscription = useCallback(async () => {
+    try {
+      setLoadingSubscription(true);
+      const sub = await subscriptionService.getSalonSubscription();
+      setSubscription(sub);
+    } catch (err) {
+      console.warn('Could not verify subscription limits:', err);
+    } finally {
+      setLoadingSubscription(false);
+    }
+  }, []);
+
   useEffect(() => {
+    checkSubscription();
+  }, [checkSubscription]);
+
+  const isStarterTier = subscription && (subscription.currentTier || '').toLowerCase() === 'starter';
+
+  useEffect(() => {
+    if (isStarterTier) return; // Do not fetch sub-data if gated
+
     if (activeTab === 'reminders') loadLogs();
     if (activeTab === 'reengagement') loadCandidates();
     if (activeTab === 'discounts') loadRules();
-  }, [activeTab]);
+    if (activeTab === 'smtp') loadSmtp();
+  }, [activeTab, isStarterTier]);
 
   const loadLogs = async () => {
     try {
@@ -78,7 +165,11 @@ export default function AdminAutomationPage() {
       const data = await automationService.getMessageLogs(40);
       setMessageLogs(data || []);
     } catch (err) {
-      setFeedback({ type: 'error', text: err.message || 'Failed to fetch automation message logs.' });
+      if (err.upgradeRequired) {
+        checkSubscription();
+      } else {
+        setFeedback({ type: 'error', text: err.message || 'Failed to fetch automation message logs.' });
+      }
     } finally {
       setLoadingLogs(false);
     }
@@ -89,10 +180,13 @@ export default function AdminAutomationPage() {
       setLoadingCandidates(true);
       const data = await automationService.getReEngagementCandidates(6);
       setCandidates(data || []);
-      // Pre-select all candidates
       setSelectedCandidates((data || []).map(c => c.customerId));
     } catch (err) {
-      setFeedback({ type: 'error', text: err.message || 'Failed to fetch lapsed client candidates.' });
+      if (err.upgradeRequired) {
+        checkSubscription();
+      } else {
+        setFeedback({ type: 'error', text: err.message || 'Failed to fetch lapsed client candidates.' });
+      }
     } finally {
       setLoadingCandidates(false);
     }
@@ -104,9 +198,45 @@ export default function AdminAutomationPage() {
       const data = await automationService.getOffPeakRules();
       setRules(data || []);
     } catch (err) {
-      setFeedback({ type: 'error', text: err.message || 'Failed to fetch off-peak pricing rules.' });
+      if (err.upgradeRequired) {
+        checkSubscription();
+      } else {
+        setFeedback({ type: 'error', text: err.message || 'Failed to fetch off-peak pricing rules.' });
+      }
     } finally {
       setLoadingRules(false);
+    }
+  };
+
+  const loadSmtp = async () => {
+    try {
+      setLoadingSmtp(true);
+      const data = await automationService.getSmtpConfig();
+      if (data) {
+        setSmtpConfig(prev => ({
+          ...prev,
+          isConfigured: data.isConfigured,
+          smtpHost: data.smtpHost || '',
+          smtpPort: data.smtpPort || 587,
+          smtpUsername: data.smtpUsername || '',
+          smtpPassword: '', // Don't wipe masked server secret unless typed
+          senderEmail: data.senderEmail || '',
+          senderName: data.senderName || '',
+          smtpEnableSsl: data.smtpEnableSsl ?? true,
+          hasPassword: data.hasPassword
+        }));
+        if (!testRecipient && user?.email) {
+          setTestRecipient(user.email);
+        }
+      }
+    } catch (err) {
+      if (err.upgradeRequired) {
+        checkSubscription();
+      } else {
+        setFeedback({ type: 'error', text: err.message || 'Failed to fetch SMTP configuration.' });
+      }
+    } finally {
+      setLoadingSmtp(false);
     }
   };
 
@@ -135,7 +265,7 @@ export default function AdminAutomationPage() {
       setFeedback(null);
       const res = await automationService.dispatchReEngagement({
         customerIds: selectedCandidates,
-        channel,
+        channel: 'Email', // Automated Email dispatch
         couponCode: couponCode || 'MISSYOU10',
         discountPercentage: Number(discountPercent),
         customMessage: customMsg
@@ -144,7 +274,7 @@ export default function AdminAutomationPage() {
       setDispatchSuccess(res);
       setFeedback({
         type: 'success',
-        text: `Successfully queued ${res.successfullySent} retention messages with coupon ${res.couponCode}!`
+        text: `Successfully queued ${res.successfullySent} automated retention emails with coupon ${res.couponCode}!`
       });
       loadCandidates();
     } catch (err) {
@@ -220,22 +350,200 @@ export default function AdminAutomationPage() {
     }
   };
 
+  // SMTP Actions
+  const handleApplyPreset = (preset) => {
+    setSmtpConfig(prev => ({
+      ...prev,
+      smtpHost: preset.host,
+      smtpPort: preset.port,
+      smtpEnableSsl: preset.ssl
+    }));
+    setFeedback({
+      type: 'success',
+      text: `Applied preset for ${preset.name}. ${preset.help}`
+    });
+  };
+
+  const handleSaveSmtp = async (e) => {
+    e.preventDefault();
+    if (!smtpConfig.smtpHost.trim()) {
+      setFeedback({ type: 'error', text: 'SMTP Server / Host is required.' });
+      return;
+    }
+
+    try {
+      setSavingSmtp(true);
+      setFeedback(null);
+      const res = await automationService.updateSmtpConfig({
+        smtpHost: smtpConfig.smtpHost.trim(),
+        smtpPort: Number(smtpConfig.smtpPort) || 587,
+        smtpUsername: smtpConfig.smtpUsername?.trim() || null,
+        smtpPassword: smtpConfig.smtpPassword || null, // Will preserve existing secret if blank
+        senderEmail: smtpConfig.senderEmail?.trim() || null,
+        senderName: smtpConfig.senderName?.trim() || null,
+        smtpEnableSsl: Boolean(smtpConfig.smtpEnableSsl),
+        isConfigured: Boolean(smtpConfig.isConfigured)
+      });
+
+      setSmtpConfig(prev => ({
+        ...prev,
+        isConfigured: res.isConfigured,
+        hasPassword: res.hasPassword,
+        smtpPassword: '' // Clear input field for security
+      }));
+
+      setFeedback({
+        type: 'success',
+        text: 'Email SMTP configuration saved successfully! You can verify connectivity below.'
+      });
+    } catch (err) {
+      setFeedback({ type: 'error', text: err.message || 'Failed to save SMTP configuration.' });
+    } finally {
+      setSavingSmtp(false);
+    }
+  };
+
+  const handleTestSmtp = async (e) => {
+    e.preventDefault();
+    if (!testRecipient.trim()) {
+      setFeedback({ type: 'error', text: 'Please enter a recipient email address for the test.' });
+      return;
+    }
+
+    try {
+      setTestingSmtp(true);
+      setTestResult(null);
+      const res = await automationService.testSmtpConfig({
+        recipientEmail: testRecipient.trim(),
+        smtpHost: smtpConfig.smtpHost?.trim() || null,
+        smtpPort: Number(smtpConfig.smtpPort) || null,
+        smtpUsername: smtpConfig.smtpUsername?.trim() || null,
+        smtpPassword: smtpConfig.smtpPassword || null,
+        senderEmail: smtpConfig.senderEmail?.trim() || null,
+        senderName: smtpConfig.senderName?.trim() || null,
+        smtpEnableSsl: smtpConfig.smtpEnableSsl
+      });
+
+      setTestResult({ success: true, message: res.message });
+      setFeedback({ type: 'success', text: res.message });
+    } catch (err) {
+      const msg = err.message || 'SMTP Connection test failed.';
+      setTestResult({ success: false, message: msg });
+      setFeedback({ type: 'error', text: msg });
+    } finally {
+      setTestingSmtp(false);
+    }
+  };
+
+  // =========================================================================
+  // GATING VIEW: FOR SALONS ON STARTER TRIAL (Plan Access Enforcement)
+  // =========================================================================
+  if (!loadingSubscription && isStarterTier) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-4xl mx-auto py-8 px-4 space-y-8 animate-in fade-in">
+          
+          {/* Locked Hero Card */}
+          <div className="bg-white rounded-3xl p-8 sm:p-10 border border-border-color shadow-sm text-center relative overflow-hidden">
+            <div className="w-16 h-16 rounded-2xl bg-primary-rose/10 flex items-center justify-center text-primary-rose mx-auto mb-4">
+              <Lock className="w-8 h-8" />
+            </div>
+
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-soft-blush border border-dusty-rose/40 text-primary-rose text-xs font-semibold mb-3">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Available in Growth Studio & Pro Plans</span>
+            </div>
+
+            <h1 className="text-3xl font-serif font-bold text-deep-plum mb-3">
+              Unlock Automations & Client Retention
+            </h1>
+
+            <p className="text-sm text-muted max-w-xl mx-auto leading-relaxed mb-6">
+              Automated 24-hour and 2-hour appointment emails, 1-tap review invitations, 6-week lapsed client re-engagement, dynamic off-peak discounts, and custom Email SMTP relay are available on the <strong>Growth Studio</strong> and <strong>Pro</strong> plans.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <button
+                type="button"
+                onClick={() => navigate('/admin/billing')}
+                className="w-full sm:w-auto px-7 py-3 bg-primary-rose hover:bg-primary-rose/90 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                <span>Upgrade to Growth Studio (₹1,499/mo)</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+              <Link
+                to="/admin/billing"
+                className="w-full sm:w-auto px-5 py-3 bg-ivory text-deep-plum hover:bg-soft-blush border border-border-color text-xs font-semibold rounded-xl transition-colors text-center"
+              >
+                Compare All Plans
+              </Link>
+            </div>
+          </div>
+
+          {/* Feature Highlights Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white p-6 rounded-2xl border border-border-color space-y-2">
+              <div className="flex items-center gap-2 text-primary-rose font-bold text-sm">
+                <Mail className="w-4 h-4" />
+                <span>Automated Email Reminders (24H & 2H)</span>
+              </div>
+              <p className="text-xs text-muted leading-relaxed">
+                Slash no-shows by up to 85% with rich HTML emails including interactive calendar links, directions, and specialist notes.
+              </p>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl border border-border-color space-y-2">
+              <div className="flex items-center gap-2 text-primary-rose font-bold text-sm">
+                <Gift className="w-4 h-4" />
+                <span>"We Miss You" 6-Week Retention Engine</span>
+              </div>
+              <p className="text-xs text-muted leading-relaxed">
+                Automatically identify clients who haven't re-booked in 6+ weeks and dispatch tailored promotional loyalty rewards.
+              </p>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl border border-border-color space-y-2">
+              <div className="flex items-center gap-2 text-primary-rose font-bold text-sm">
+                <Percent className="w-4 h-4" />
+                <span>Dynamic Flash Discounts & Off-Peak Yield</span>
+              </div>
+              <p className="text-xs text-muted leading-relaxed">
+                Fill slow weekday salon hours with automated dynamic pricing rules to maximize chair occupancy and revenue.
+              </p>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl border border-border-color space-y-2">
+              <div className="flex items-center gap-2 text-primary-rose font-bold text-sm">
+                <Server className="w-4 h-4" />
+                <span>Custom Email SMTP Configuration</span>
+              </div>
+              <p className="text-xs text-muted leading-relaxed">
+                Connect your salon's own SMTP provider (Brevo, Gmail, SendGrid, Amazon SES) for dedicated branded email dispatch.
+              </p>
+            </div>
+          </div>
+
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
-      <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-in fade-in">
         
         {/* Header */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-border-color shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-soft-blush border border-dusty-rose/40 text-primary-rose text-xs font-semibold">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Retention Engine & Dynamic Yield</span>
+              <span>Retention Engine & Automated Email Suite</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-serif font-bold text-deep-plum">
               Automations & Client Retention
             </h1>
             <p className="text-xs sm:text-sm text-muted max-w-2xl">
-              Deliver automated multi-channel reminders (24h, 2h, 1h review link), re-engage 6-week lapsed clients, and maximize seat occupancy with dynamic flash discounts.
+              Deliver automated multi-step email reminders (24h, 2h, post-visit review link), re-engage 6-week lapsed clients, configure custom Email SMTP, and maximize seat occupancy with dynamic flash discounts.
             </p>
           </div>
 
@@ -245,8 +553,9 @@ export default function AdminAutomationPage() {
                 if (activeTab === 'reminders') loadLogs();
                 if (activeTab === 'reengagement') loadCandidates();
                 if (activeTab === 'discounts') loadRules();
+                if (activeTab === 'smtp') loadSmtp();
               }}
-              className="px-4 py-2 bg-ivory hover:bg-soft-blush text-deep-plum border border-border-color rounded-2xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+              className="px-4 py-2 bg-ivory hover:bg-soft-blush text-deep-plum border border-border-color rounded-2xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Refresh</span>
@@ -265,7 +574,7 @@ export default function AdminAutomationPage() {
               {feedback.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
               <span>{feedback.text}</span>
             </div>
-            <button onClick={() => setFeedback(null)} className="p-1 hover:opacity-70">
+            <button onClick={() => setFeedback(null)} className="p-1 hover:opacity-70 cursor-pointer">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -275,19 +584,19 @@ export default function AdminAutomationPage() {
         <div className="flex flex-wrap items-center gap-2 border-b border-border-color pb-3">
           <button
             onClick={() => setActiveTab('reminders')}
-            className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'reminders'
                 ? 'bg-deep-plum text-white shadow-xs'
                 : 'bg-white text-muted hover:text-deep-plum border border-border-color'
             }`}
           >
-            <Smartphone className="w-4 h-4 text-emerald-400" />
-            <span>WhatsApp & SMS Cadence</span>
+            <Mail className="w-4 h-4 text-rose-300" />
+            <span>Automated Email Cadence</span>
           </button>
 
           <button
             onClick={() => setActiveTab('reengagement')}
-            className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'reengagement'
                 ? 'bg-deep-plum text-white shadow-xs'
                 : 'bg-white text-muted hover:text-deep-plum border border-border-color'
@@ -304,7 +613,7 @@ export default function AdminAutomationPage() {
 
           <button
             onClick={() => setActiveTab('discounts')}
-            className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'discounts'
                 ? 'bg-deep-plum text-white shadow-xs'
                 : 'bg-white text-muted hover:text-deep-plum border border-border-color'
@@ -313,10 +622,25 @@ export default function AdminAutomationPage() {
             <Percent className="w-4 h-4 text-accent-gold" />
             <span>Off-Peak / Flash Discounts</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('smtp')}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'smtp'
+                ? 'bg-deep-plum text-white shadow-xs'
+                : 'bg-white text-muted hover:text-deep-plum border border-border-color'
+            }`}
+          >
+            <Server className="w-4 h-4 text-emerald-500" />
+            <span>Email SMTP Configuration</span>
+            {smtpConfig.isConfigured && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            )}
+          </button>
         </div>
 
         {/* ========================================================================= */}
-        {/* TAB 1: WHATSAPP & SMS CADENCE                                             */}
+        {/* TAB 1: AUTOMATED EMAIL CADENCE                                            */}
         {/* ========================================================================= */}
         {activeTab === 'reminders' && (
           <div className="space-y-6 animate-fade-in">
@@ -324,10 +648,10 @@ export default function AdminAutomationPage() {
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-border-color shadow-xs">
               <div className="mb-6">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-primary-rose">
-                  Multi-Channel Notification Cadence
+                  Automated Email Notification Cadence
                 </span>
                 <h3 className="text-lg font-serif font-bold text-deep-plum mt-0.5">
-                  High-Conversion Appointment Touchpoints (98% Open Rate)
+                  High-Touch Appointment Reminders & Review Touchpoints
                 </h3>
               </div>
 
@@ -338,18 +662,18 @@ export default function AdminAutomationPage() {
                     <span className="px-2.5 py-1 rounded-full bg-soft-blush text-primary-rose text-[10px] font-bold uppercase tracking-wider">
                       Step 1 • 24H Before
                     </span>
-                    <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      WhatsApp & SMS
+                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                      <Mail className="w-3 h-3" /> Automated Email
                     </span>
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-deep-plum">Confirmation & Address Link</h4>
+                    <h4 className="text-sm font-bold text-deep-plum">Confirmation & Salon Directions</h4>
                     <p className="text-xs text-muted mt-1 leading-relaxed">
-                      Sends interactive calendar reminder with salon location, assigned specialist, and 1-tap confirmation button.
+                      Sends rich HTML email reminder with interactive calendar confirmation, Google Maps directions, and assigned specialist details.
                     </p>
                   </div>
                   <div className="p-2.5 rounded-xl bg-white border border-border-color/80 text-[11px] font-mono text-muted/90">
-                    "Reminder: Your appointment at [Salon] is tomorrow at 2:00 PM. Tap to confirm: [Link]"
+                    "Subject: Reminder: Upcoming Appointment Tomorrow at [SalonName]"
                   </div>
                 </div>
 
@@ -359,18 +683,18 @@ export default function AdminAutomationPage() {
                     <span className="px-2.5 py-1 rounded-full bg-soft-blush text-primary-rose text-[10px] font-bold uppercase tracking-wider">
                       Step 2 • 2H Before
                     </span>
-                    <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      SMS & WhatsApp
+                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                      <Mail className="w-3 h-3" /> Automated Email
                     </span>
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-deep-plum">Live Directions & Arrival Alert</h4>
                     <p className="text-xs text-muted mt-1 leading-relaxed">
-                      Instant reminder with one-click Google Maps navigation and salon entrance/parking details.
+                      Timely arrival email reminder with one-click Google Maps navigation, parking notes, and salon entrance details.
                     </p>
                   </div>
                   <div className="p-2.5 rounded-xl bg-white border border-border-color/80 text-[11px] font-mono text-muted/90">
-                    "See you in 2 hours! Get live directions: https://maps.google.com/?q=[SalonAddress]"
+                    "Subject: See you in 2 hours! Live directions to [SalonName]"
                   </div>
                 </div>
 
@@ -380,18 +704,18 @@ export default function AdminAutomationPage() {
                     <span className="px-2.5 py-1 rounded-full bg-soft-blush text-primary-rose text-[10px] font-bold uppercase tracking-wider">
                       Step 3 • 1H After Visit
                     </span>
-                    <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      WhatsApp Review
+                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                      <Mail className="w-3 h-3" /> Automated Email
                     </span>
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-deep-plum">Thank You & 1-Tap Review</h4>
+                    <h4 className="text-sm font-bold text-deep-plum">Post-Visit Thank You & Review Invite</h4>
                     <p className="text-xs text-muted mt-1 leading-relaxed">
-                      Warm thank-you message inviting 5-star Google & F&R Beauty Studio reviews while satisfaction is at its peak.
+                      Luxury email inviting 5-star Google & F&R Beauty Studio verified reviews right while client satisfaction is at its peak.
                     </p>
                   </div>
                   <div className="p-2.5 rounded-xl bg-white border border-border-color/80 text-[11px] font-mono text-muted/90">
-                    "Thank you for visiting today! How was your service? Leave a quick review: [ReviewLink]"
+                    "Subject: Thank you for visiting [SalonName]! Leave a 1-tap review"
                   </div>
                 </div>
               </div>
@@ -401,8 +725,8 @@ export default function AdminAutomationPage() {
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-border-color shadow-xs">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-base font-bold text-deep-plum">Recent Automated Message Logs</h3>
-                  <p className="text-xs text-muted">Audited messages dispatched via WhatsApp, SMS, and Email.</p>
+                  <h3 className="text-base font-bold text-deep-plum">Recent Automated Notification Logs</h3>
+                  <p className="text-xs text-muted">Audited automated emails and in-app notifications dispatched to clients.</p>
                 </div>
                 <span className="text-xs text-muted font-medium">Showing latest {messageLogs.length} logs</span>
               </div>
@@ -423,8 +747,7 @@ export default function AdminAutomationPage() {
                       <tr className="border-b border-border-color text-muted font-semibold">
                         <th className="pb-3 pr-4">Recipient</th>
                         <th className="pb-3 px-4">Channel</th>
-                        <th className="pb-3 px-4">Trigger / Subject</th>
-                        <th className="pb-3 px-4">Message Snippet</th>
+                        <th className="pb-3 px-4">Subject</th>
                         <th className="pb-3 px-4">Status</th>
                         <th className="pb-3 pl-4">Timestamp</th>
                       </tr>
@@ -438,8 +761,8 @@ export default function AdminAutomationPage() {
                           </td>
                           <td className="py-3 px-4">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                              log.channel === 'WhatsApp' ? 'bg-emerald-100 text-emerald-800' :
-                              log.channel === 'SMS' ? 'bg-sky-100 text-sky-800' : 'bg-purple-100 text-purple-800'
+                              log.channel === 'Email' ? 'bg-purple-100 text-purple-800' :
+                              log.channel === 'InApp' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
                             }`}>
                               {log.channel}
                             </span>
@@ -447,16 +770,16 @@ export default function AdminAutomationPage() {
                           <td className="py-3 px-4">
                             <span className="font-medium text-deep-plum">{log.subject || log.type}</span>
                           </td>
-                          <td className="py-3 px-4 max-w-xs truncate text-muted font-mono text-[11px]">
-                            {log.message}
-                          </td>
                           <td className="py-3 px-4">
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-semibold border border-emerald-200">
-                              {log.status || 'Sent'}
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              log.status === 'Sent' ? 'bg-emerald-100 text-emerald-800' :
+                              log.status === 'Skipped' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              {log.status}
                             </span>
                           </td>
-                          <td className="py-3 pl-4 text-muted whitespace-nowrap text-[11px]">
-                            {new Date(log.createdAtUtc).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                          <td className="py-3 pl-4 text-muted font-mono text-[11px]">
+                            {log.sentAtUtc ? new Date(log.sentAtUtc).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Pending'}
                           </td>
                         </tr>
                       ))}
@@ -477,13 +800,13 @@ export default function AdminAutomationPage() {
             <div className="bg-gradient-to-r from-deep-plum via-deep-plum/95 to-primary-rose text-white p-6 sm:p-8 rounded-3xl shadow-sm relative overflow-hidden">
               <div className="max-w-2xl space-y-2">
                 <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold uppercase tracking-wider text-rose-tint">
-                  6-Week Hair Cycle Retention
+                  6-Week Hair & Skin Cycle Retention
                 </span>
                 <h3 className="text-xl sm:text-2xl font-serif font-bold">
-                  Automated "We Miss You" Campaigns
+                  Automated Email "We Miss You" Campaigns
                 </h3>
                 <p className="text-xs sm:text-sm text-soft-blush/90 leading-relaxed">
-                  Acquiring a new client costs 5x more than retaining an existing one. We monitor your client roster and flag any customer who hasn't re-booked in 6+ weeks (average hair regrowth cycle).
+                  Acquiring a new client costs 5x more than retaining an existing one. We identify customers who haven't visited in 6+ weeks and dispatch tailored email promotions directly to their inbox.
                 </p>
               </div>
             </div>
@@ -506,7 +829,7 @@ export default function AdminAutomationPage() {
                   <button
                     type="button"
                     onClick={handleSelectAllCandidates}
-                    className="text-xs text-primary-rose font-bold hover:underline self-start sm:self-auto"
+                    className="text-xs text-primary-rose font-bold hover:underline self-start sm:self-auto cursor-pointer"
                   >
                     {selectedCandidates.length === candidates.length ? 'Deselect All' : 'Select All'}
                   </button>
@@ -555,7 +878,7 @@ export default function AdminAutomationPage() {
                               </td>
                               <td className="py-3 px-3">
                                 <p className="font-bold text-deep-plum">{cand.customerName}</p>
-                                <p className="text-[10px] text-muted">{cand.customerPhone || cand.customerEmail}</p>
+                                <p className="text-[10px] text-muted">{cand.customerEmail || cand.customerPhone}</p>
                               </td>
                               <td className="py-3 px-3 text-muted">
                                 {new Date(cand.lastVisitDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -606,7 +929,7 @@ export default function AdminAutomationPage() {
                         key={pct}
                         type="button"
                         onClick={() => setDiscountPercent(pct)}
-                        className={`flex-1 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                        className={`flex-1 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                           discountPercent === pct
                             ? 'bg-primary-rose text-white border-primary-rose'
                             : 'bg-ivory border-border-color text-deep-plum'
@@ -622,24 +945,18 @@ export default function AdminAutomationPage() {
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-deep-plum mb-1">
                     Delivery Channel
                   </label>
-                  <select
-                    value={channel}
-                    onChange={(e) => setChannel(e.target.value)}
-                    className="w-full px-3 py-2 bg-ivory border border-border-color rounded-xl text-xs font-medium text-deep-plum"
-                  >
-                    <option value="WhatsApp">WhatsApp (Recommended • 98% Open Rate)</option>
-                    <option value="SMS">SMS Text Message</option>
-                    <option value="Email">Email Newsletter</option>
-                    <option value="MultiChannel">Multi-Channel (WhatsApp + SMS)</option>
-                  </select>
+                  <div className="flex items-center gap-2.5 p-3 bg-ivory rounded-xl border border-border-color text-xs text-deep-plum font-semibold">
+                    <Mail className="w-4 h-4 text-primary-rose shrink-0" />
+                    <span>Automated Email Dispatch (Direct to Inbox)</span>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-deep-plum mb-1">
-                    Message Copy Preview
+                    Email Message Preview
                   </label>
                   <div className="p-3 rounded-2xl bg-ivory border border-border-color/80 text-[11px] text-muted space-y-1 font-mono">
-                    <p>✨ "We miss having you in our chair! It's been over 6 weeks since your last visit. Enjoy <strong>{discountPercent}% OFF</strong> your next reservation with code <strong>{couponCode}</strong>."</p>
+                    <p>❤️ "We miss you! It's been a while since your last visit. Treat yourself with <strong>{discountPercent}% OFF</strong> your next reservation using code <strong>'{couponCode}'</strong>."</p>
                   </div>
                 </div>
 
@@ -647,16 +964,16 @@ export default function AdminAutomationPage() {
                   type="button"
                   onClick={handleDispatchReEngagement}
                   disabled={dispatching || selectedCandidates.length === 0}
-                  className="w-full py-3 bg-gradient-to-r from-deep-plum to-primary-rose text-white text-xs font-bold rounded-2xl shadow-sm hover:opacity-95 transition-all flex items-center justify-center gap-2 disabled:opacity-40"
+                  className="w-full py-3 bg-gradient-to-r from-deep-plum to-primary-rose text-white text-xs font-bold rounded-2xl shadow-sm hover:opacity-95 transition-all flex items-center justify-center gap-2 disabled:opacity-40 cursor-pointer"
                 >
                   {dispatching ? (
                     <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Dispatching Campaign...</span>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Sending Campaign Emails...</span>
                     </>
                   ) : (
                     <>
-                      <Send className="w-3.5 h-3.5" />
+                      <Send className="w-4 h-4" />
                       <span>Dispatch to {selectedCandidates.length} Selected Clients</span>
                     </>
                   )}
@@ -668,243 +985,511 @@ export default function AdminAutomationPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 3: OFF-PEAK / FLASH DISCOUNTS                                         */}
+        {/* TAB 3: OFF-PEAK DYNAMIC FLASH DISCOUNTS                                   */}
         {/* ========================================================================= */}
         {activeTab === 'discounts' && (
           <div className="space-y-6 animate-fade-in">
-            {/* Yield Management Banner */}
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-border-color shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-accent-gold">
-                  Seat Occupancy Optimizer
-                </span>
-                <h3 className="text-lg font-serif font-bold text-deep-plum">
-                  Dynamic Off-Peak Pricing Rules
-                </h3>
-                <p className="text-xs text-muted max-w-xl">
-                  Salons typically sit at 25-35% occupancy on Tuesday and Wednesday mornings. Configure automated discounts during slow periods to drive bookings and maximize seat utilization.
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-border-color shadow-xs">
+              <div>
+                <h3 className="text-base font-bold text-deep-plum">Off-Peak Dynamic Yield Rules</h3>
+                <p className="text-xs text-muted">
+                  Automatically apply percentage discounts to client bookings scheduled during slow hours.
                 </p>
               </div>
-
               <button
                 type="button"
                 onClick={() => setShowRuleModal(true)}
-                className="px-4 py-2.5 bg-deep-plum text-white text-xs font-bold rounded-2xl hover:bg-deep-plum/90 shadow-sm transition-all flex items-center gap-1.5 self-start sm:self-auto shrink-0"
+                className="px-4 py-2 bg-primary-rose text-white text-xs font-bold rounded-2xl hover:bg-primary-rose/90 transition-colors flex items-center gap-1.5 self-start sm:self-auto cursor-pointer shadow-xs"
               >
                 <Plus className="w-4 h-4" />
-                <span>Create Flash Discount Rule</span>
+                <span>Create Discount Rule</span>
               </button>
             </div>
 
-            {/* Rules Grid */}
             {loadingRules ? (
               <div className="p-8 text-center text-xs text-muted flex items-center justify-center gap-2">
                 <RefreshCw className="w-4 h-4 animate-spin text-primary-rose" />
-                <span>Loading active dynamic pricing rules...</span>
+                <span>Loading discount rules...</span>
               </div>
             ) : rules.length === 0 ? (
-              <div className="p-8 text-center bg-white rounded-3xl border border-border-color text-xs text-muted space-y-2">
-                <Tag className="w-8 h-8 text-muted mx-auto opacity-50" />
-                <p className="font-bold text-deep-plum text-sm">No Off-Peak Rules Configured</p>
-                <p className="max-w-md mx-auto">
-                  Add your first dynamic pricing rule (e.g. 20% off all Tuesday & Wednesday slots between 10:00 AM - 1:00 PM).
+              <div className="p-12 text-center bg-white rounded-3xl border border-border-color shadow-xs space-y-2">
+                <Percent className="w-8 h-8 text-muted mx-auto mb-2" />
+                <h4 className="font-serif font-bold text-deep-plum text-base">No Off-Peak Rules Defined</h4>
+                <p className="text-xs text-muted max-w-md mx-auto">
+                  Create rules to incentivize bookings during slow weekday mornings (e.g., Tuesday & Wednesday 10 AM - 1 PM with 20% off).
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setShowRuleModal(true)}
-                  className="mt-3 px-4 py-2 bg-primary-rose text-white rounded-xl text-xs font-semibold"
-                >
-                  Create First Rule
-                </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {rules.map(rule => (
-                  <div 
-                    key={rule.id}
-                    className="bg-white rounded-3xl p-5 border border-border-color shadow-2xs hover:shadow-xs transition-all space-y-4 flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          rule.isActive 
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
-                            : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {rule.isActive ? 'Active Rule' : 'Paused'}
-                        </span>
-
-                        <span className="text-sm font-bold text-primary-rose">
-                          {rule.discountPercentage}% OFF
-                        </span>
-                      </div>
-
-                      <h4 className="text-base font-bold text-deep-plum mt-2">
-                        {rule.name}
-                      </h4>
-
-                      <div className="mt-3 space-y-1.5 text-xs text-muted">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-primary-rose" />
-                          <span>{rule.daysOfWeek.split(',').join(', ')}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-primary-rose" />
-                          <span>{rule.startTime} - {rule.endTime}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-3 border-t border-border-color/60">
+                  <div key={rule.id} className="bg-white p-6 rounded-3xl border border-border-color shadow-xs space-y-4 relative">
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl font-serif font-bold text-primary-rose">
+                        {rule.discountPercentage}% OFF
+                      </span>
                       <button
                         type="button"
                         onClick={() => handleToggleRuleStatus(rule)}
-                        className={`text-xs font-semibold transition-colors ${
-                          rule.isActive ? 'text-amber-600 hover:text-amber-700' : 'text-emerald-600 hover:text-emerald-700'
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold cursor-pointer transition-all ${
+                          rule.isActive 
+                            ? 'bg-emerald-100 text-emerald-800' 
+                            : 'bg-gray-100 text-gray-600'
                         }`}
                       >
-                        {rule.isActive ? 'Pause Rule' : 'Activate Rule'}
+                        {rule.isActive ? 'Active' : 'Inactive'}
                       </button>
+                    </div>
 
+                    <div>
+                      <h4 className="font-bold text-sm text-deep-plum">{rule.name}</h4>
+                      <p className="text-xs text-muted flex items-center gap-1 mt-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>{rule.startTime} - {rule.endTime}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1">
+                      {rule.daysOfWeek.split(',').map((day, idx) => (
+                        <span key={idx} className="px-2 py-0.5 rounded-md bg-ivory border border-border-color text-[10px] text-deep-plum">
+                          {day.trim().slice(0, 3)}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="pt-2 border-t border-border-color/60 flex justify-end">
                       <button
                         type="button"
                         onClick={() => handleDeleteRule(rule.id)}
-                        className="p-1.5 text-muted hover:text-rose-600 rounded-lg transition-colors"
-                        title="Delete Rule"
+                        className="text-xs text-muted hover:text-danger flex items-center gap-1 transition-colors cursor-pointer"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Rule</span>
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
+          </div>
+        )}
 
-            {/* Create Rule Modal */}
-            {showRuleModal && (
-              <div className="fixed inset-0 z-50 bg-deep-plum/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-                <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-border-color shadow-2xl relative">
+        {/* ========================================================================= */}
+        {/* TAB 4: EMAIL SMTP CONFIGURATION                                           */}
+        {/* ========================================================================= */}
+        {activeTab === 'smtp' && (
+          <div className="space-y-6 animate-fade-in">
+            {/* Explainer Banner */}
+            <div className="bg-gradient-to-r from-deep-plum via-deep-plum/95 to-primary-rose text-white p-6 sm:p-8 rounded-3xl shadow-sm relative overflow-hidden">
+              <div className="max-w-2xl space-y-2">
+                <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-semibold uppercase tracking-wider text-rose-tint">
+                  Custom Salon Email Relay
+                </span>
+                <h3 className="text-xl sm:text-2xl font-serif font-bold">
+                  Email SMTP Relay Settings
+                </h3>
+                <p className="text-xs sm:text-sm text-soft-blush/90 leading-relaxed">
+                  Configure your salon's dedicated SMTP provider to deliver booking confirmations, 24h & 2h reminders, and re-engagement campaigns directly through your trusted email domain.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Provider Presets */}
+            <div className="bg-white rounded-3xl p-6 border border-border-color shadow-xs space-y-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted block">
+                Quick Setup Presets (Click to Auto-Fill)
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {PRESETS.map((preset, idx) => (
                   <button
-                    onClick={() => setShowRuleModal(false)}
-                    className="absolute top-5 right-5 p-2 rounded-full hover:bg-soft-blush text-muted transition-colors"
+                    key={idx}
+                    type="button"
+                    onClick={() => handleApplyPreset(preset)}
+                    className="p-3 rounded-2xl bg-ivory hover:bg-soft-blush/70 border border-border-color text-left transition-all cursor-pointer group"
                   >
-                    <X className="w-5 h-5" />
-                  </button>
-
-                  <div className="mb-5">
-                    <span className="px-3 py-1 rounded-full bg-soft-blush text-primary-rose text-[10px] font-bold uppercase tracking-wider">
-                      Dynamic Pricing Rule
+                    <span className="text-xs font-bold text-deep-plum block group-hover:text-primary-rose">
+                      {preset.name}
                     </span>
-                    <h3 className="text-xl font-serif font-bold text-deep-plum mt-1">
-                      New Off-Peak Discount Rule
-                    </h3>
+                    <span className="text-[10px] text-muted font-mono block truncate mt-0.5">
+                      {preset.host}:{preset.port}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* SMTP Settings Form & Live Test Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* Form (8 cols) */}
+              <form onSubmit={handleSaveSmtp} className="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-8 border border-border-color shadow-xs space-y-5">
+                <div className="flex items-center justify-between border-b border-border-color pb-4">
+                  <div>
+                    <h4 className="text-base font-bold text-deep-plum">SMTP Relay Credentials</h4>
+                    <p className="text-xs text-muted">You can provide the email key and secret now or whenever you are ready.</p>
                   </div>
+                  
+                  {/* Active Toggle */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span className="text-xs font-semibold text-deep-plum">Enable Custom SMTP</span>
+                    <input
+                      type="checkbox"
+                      checked={smtpConfig.isConfigured}
+                      onChange={(e) => setSmtpConfig(prev => ({ ...prev, isConfigured: e.target.checked }))}
+                      className="w-4 h-4 rounded text-primary-rose border-border-color focus:ring-primary-rose"
+                    />
+                  </label>
+                </div>
 
-                  <form onSubmit={handleCreateRule} className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-deep-plum mb-1">
-                        Rule Name
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g., Weekday Midday Flash Sale"
-                        value={ruleName}
-                        onChange={(e) => setRuleName(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-ivory border border-border-color rounded-2xl text-xs text-deep-plum"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-deep-plum mb-1.5">
-                        Active Days of Week
-                      </label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {DAYS.map(d => {
-                          const isSelected = ruleDays.includes(d.key);
-                          return (
-                            <button
-                              key={d.key}
-                              type="button"
-                              onClick={() => handleToggleDay(d.key)}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                                isSelected 
-                                  ? 'bg-deep-plum text-white border-deep-plum' 
-                                  : 'bg-ivory text-muted border-border-color hover:border-dusty-rose'
-                              }`}
-                            >
-                              {d.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-deep-plum mb-1">
-                          Start Time
+                {loadingSmtp ? (
+                  <div className="py-8 text-center text-xs text-muted flex items-center justify-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin text-primary-rose" />
+                    <span>Loading SMTP settings...</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* Host */}
+                      <div className="sm:col-span-2 space-y-1">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-deep-plum block">
+                          SMTP Server / Host <span className="text-danger">*</span>
                         </label>
                         <input
-                          type="time"
-                          value={ruleStartTime}
-                          onChange={(e) => setRuleStartTime(e.target.value)}
-                          className="w-full px-3 py-2 bg-ivory border border-border-color rounded-2xl text-xs font-mono text-deep-plum"
+                          type="text"
+                          required
+                          value={smtpConfig.smtpHost}
+                          onChange={(e) => setSmtpConfig(prev => ({ ...prev, smtpHost: e.target.value }))}
+                          placeholder="e.g. smtp-relay.brevo.com or smtp.gmail.com"
+                          className="w-full px-3.5 py-2.5 bg-ivory border border-border-color rounded-xl text-xs text-deep-plum font-mono focus:bg-white focus:ring-1 focus:ring-primary-rose"
                         />
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-deep-plum mb-1">
-                          End Time
+
+                      {/* Port */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-deep-plum block">
+                          Port <span className="text-danger">*</span>
                         </label>
                         <input
-                          type="time"
-                          value={ruleEndTime}
-                          onChange={(e) => setRuleEndTime(e.target.value)}
-                          className="w-full px-3 py-2 bg-ivory border border-border-color rounded-2xl text-xs font-mono text-deep-plum"
+                          type="number"
+                          required
+                          value={smtpConfig.smtpPort}
+                          onChange={(e) => setSmtpConfig(prev => ({ ...prev, smtpPort: Number(e.target.value) }))}
+                          placeholder="587"
+                          className="w-full px-3.5 py-2.5 bg-ivory border border-border-color rounded-xl text-xs text-deep-plum font-mono focus:bg-white focus:ring-1 focus:ring-primary-rose"
                         />
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-deep-plum mb-1">
-                        Discount Percentage (% OFF)
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="80"
-                        value={ruleDiscount}
-                        onChange={(e) => setRuleDiscount(Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-ivory border border-border-color rounded-2xl text-xs font-bold text-deep-plum"
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Username / Key */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold uppercase tracking-wider text-deep-plum block">
+                            Email Key / Username
+                          </label>
+                          <span className="text-[10px] text-muted">Optional for now</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={smtpConfig.smtpUsername}
+                          onChange={(e) => setSmtpConfig(prev => ({ ...prev, smtpUsername: e.target.value }))}
+                          placeholder="API Key, Username, or Login Email"
+                          className="w-full px-3.5 py-2.5 bg-ivory border border-border-color rounded-xl text-xs text-deep-plum font-mono focus:bg-white focus:ring-1 focus:ring-primary-rose"
+                        />
+                      </div>
+
+                      {/* Password / Secret */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold uppercase tracking-wider text-deep-plum block">
+                            Email Secret / Password
+                          </label>
+                          {smtpConfig.hasPassword && !smtpConfig.smtpPassword && (
+                            <span className="text-[10px] text-emerald-700 font-semibold">Secret configured</span>
+                          )}
+                        </div>
+                        <div className="relative">
+                          <input
+                            type={showSmtpPassword ? 'text' : 'password'}
+                            value={smtpConfig.smtpPassword}
+                            onChange={(e) => setSmtpConfig(prev => ({ ...prev, smtpPassword: e.target.value }))}
+                            placeholder={smtpConfig.hasPassword ? '•••••••• (leave blank to keep)' : 'API Key Secret or App Password'}
+                            className="w-full px-3.5 py-2.5 pr-10 bg-ivory border border-border-color rounded-xl text-xs text-deep-plum font-mono focus:bg-white focus:ring-1 focus:ring-primary-rose"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowSmtpPassword(!showSmtpPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-deep-plum p-1"
+                          >
+                            {showSmtpPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-3 pt-3">
-                      <button
-                        type="button"
-                        onClick={() => setShowRuleModal(false)}
-                        className="px-4 py-2 rounded-xl text-xs font-semibold text-muted hover:text-deep-plum"
-                      >
-                        Cancel
-                      </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Sender Email */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-deep-plum block">
+                          Sender Email Address
+                        </label>
+                        <input
+                          type="email"
+                          value={smtpConfig.senderEmail}
+                          onChange={(e) => setSmtpConfig(prev => ({ ...prev, senderEmail: e.target.value }))}
+                          placeholder="notifications@yourdomain.com"
+                          className="w-full px-3.5 py-2.5 bg-ivory border border-border-color rounded-xl text-xs text-deep-plum focus:bg-white focus:ring-1 focus:ring-primary-rose"
+                        />
+                      </div>
+
+                      {/* Sender Display Name */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-deep-plum block">
+                          Sender Display Name
+                        </label>
+                        <input
+                          type="text"
+                          value={smtpConfig.senderName}
+                          onChange={(e) => setSmtpConfig(prev => ({ ...prev, senderName: e.target.value }))}
+                          placeholder="F&R Beauty Studio"
+                          className="w-full px-3.5 py-2.5 bg-ivory border border-border-color rounded-xl text-xs text-deep-plum focus:bg-white focus:ring-1 focus:ring-primary-rose"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Enable SSL / TLS Checkbox */}
+                    <div className="pt-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={smtpConfig.smtpEnableSsl}
+                          onChange={(e) => setSmtpConfig(prev => ({ ...prev, smtpEnableSsl: e.target.checked }))}
+                          className="w-4 h-4 rounded text-primary-rose border-border-color focus:ring-primary-rose"
+                        />
+                        <span className="text-xs font-semibold text-deep-plum">Enable SSL / TLS Security (Recommended for Port 587/465)</span>
+                      </label>
+                    </div>
+
+                    <div className="pt-4 border-t border-border-color flex justify-end">
                       <button
                         type="submit"
-                        disabled={savingRule}
-                        className="px-6 py-2.5 bg-primary-rose text-white text-xs font-bold rounded-2xl shadow-xs hover:bg-primary-rose/90 transition-all flex items-center gap-1.5"
+                        disabled={savingSmtp}
+                        className="px-6 py-2.5 bg-primary-rose text-white text-xs font-bold rounded-xl hover:bg-primary-rose/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                       >
-                        {savingRule && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                        <span>Save Discount Rule</span>
+                        {savingSmtp ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Saving Settings...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Save SMTP Settings</span>
+                          </>
+                        )}
                       </button>
                     </div>
+                  </>
+                )}
+              </form>
+
+              {/* Live Test Panel & Information (4 cols) */}
+              <div className="lg:col-span-4 space-y-4">
+                
+                {/* Send Test Email Card */}
+                <div className="bg-white rounded-3xl p-6 border border-border-color shadow-xs space-y-4">
+                  <div className="flex items-center gap-2 text-deep-plum">
+                    <Mail className="w-4 h-4 text-primary-rose" />
+                    <h4 className="text-sm font-bold">Verify Connection</h4>
+                  </div>
+                  <p className="text-xs text-muted leading-relaxed">
+                    Send a test confirmation email to verify that your host and credentials can authenticate and deliver successfully.
+                  </p>
+
+                  <form onSubmit={handleTestSmtp} className="space-y-3">
+                    <div>
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-deep-plum block mb-1">
+                        Test Recipient Email
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={testRecipient}
+                        onChange={(e) => setTestRecipient(e.target.value)}
+                        placeholder="you@example.com"
+                        className="w-full px-3 py-2 bg-ivory border border-border-color rounded-xl text-xs text-deep-plum focus:bg-white"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={testingSmtp || !smtpConfig.smtpHost}
+                      className="w-full py-2.5 bg-deep-plum hover:bg-deep-plum/90 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40"
+                    >
+                      {testingSmtp ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Testing SMTP Relay...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Send Test Email</span>
+                        </>
+                      )}
+                    </button>
                   </form>
+
+                  {testResult && (
+                    <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
+                      testResult.success 
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-900' 
+                        : 'bg-rose-50 border-rose-200 text-rose-900'
+                    }`}>
+                      <div className="flex items-start gap-2">
+                        {testResult.success ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        )}
+                        <span>{testResult.message}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
+
+                {/* Information Card */}
+                <div className="bg-ivory rounded-3xl p-6 border border-border-color/80 space-y-2.5 text-xs text-muted">
+                  <div className="flex items-center gap-1.5 font-bold text-deep-plum">
+                    <HelpCircle className="w-4 h-4 text-primary-rose" />
+                    <span>Providing Keys Later</span>
+                  </div>
+                  <p className="leading-relaxed">
+                    You can save your host and sender details right now. When you obtain your Email API key and secret, simply paste them into this panel and click Save.
+                  </p>
+                  <p className="leading-relaxed text-[11px] text-muted/90 pt-1 border-t border-border-color/50">
+                    If custom SMTP is disabled, the platform will automatically use standard fallback notification queues.
+                  </p>
+                </div>
+
               </div>
-            )}
+
+            </div>
           </div>
         )}
 
       </div>
+
+      {/* Modal: Create Dynamic Discount Rule */}
+      {showRuleModal && (
+        <div className="fixed inset-0 z-50 bg-deep-plum/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-border-color shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-border-color pb-3">
+              <h3 className="font-serif font-bold text-deep-plum text-lg">New Dynamic Yield Rule</h3>
+              <button onClick={() => setShowRuleModal(false)} className="p-1 text-muted hover:text-deep-plum">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateRule} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-deep-plum mb-1">
+                  Rule Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Tuesday Morning Flash 20%"
+                  value={ruleName}
+                  onChange={(e) => setRuleName(e.target.value)}
+                  className="w-full px-3 py-2 bg-ivory border border-border-color rounded-xl text-xs font-semibold text-deep-plum"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-deep-plum mb-1">
+                  Active Days of Week
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {DAYS.map(day => {
+                    const active = ruleDays.includes(day.key);
+                    return (
+                      <button
+                        key={day.key}
+                        type="button"
+                        onClick={() => handleToggleDay(day.key)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                          active 
+                            ? 'bg-deep-plum text-white border-deep-plum' 
+                            : 'bg-ivory border-border-color text-muted hover:text-deep-plum'
+                        }`}
+                      >
+                        {day.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-deep-plum mb-1">
+                    Start Time
+                  </label>
+                  <input
+                    type="time"
+                    value={ruleStartTime}
+                    onChange={(e) => setRuleStartTime(e.target.value)}
+                    className="w-full px-3 py-2 bg-ivory border border-border-color rounded-xl text-xs font-mono font-bold text-deep-plum"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-deep-plum mb-1">
+                    End Time
+                  </label>
+                  <input
+                    type="time"
+                    value={ruleEndTime}
+                    onChange={(e) => setRuleEndTime(e.target.value)}
+                    className="w-full px-3 py-2 bg-ivory border border-border-color rounded-xl text-xs font-mono font-bold text-deep-plum"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-deep-plum mb-1">
+                  Discount Percentage ({ruleDiscount}%)
+                </label>
+                <input
+                  type="range"
+                  min="5"
+                  max="50"
+                  step="5"
+                  value={ruleDiscount}
+                  onChange={(e) => setRuleDiscount(Number(e.target.value))}
+                  className="w-full accent-primary-rose cursor-pointer"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowRuleModal(false)}
+                  className="px-4 py-2 text-xs text-muted hover:text-deep-plum"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingRule}
+                  className="px-5 py-2 bg-primary-rose text-white text-xs font-bold rounded-xl hover:bg-primary-rose/90 transition-all shadow-xs disabled:opacity-50"
+                >
+                  {savingRule ? 'Saving...' : 'Create Rule'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }
-

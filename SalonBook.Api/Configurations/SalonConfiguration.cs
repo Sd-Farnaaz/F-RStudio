@@ -151,6 +151,34 @@ public class SalonConfiguration : IEntityTypeConfiguration<Salon>
         builder.Property(s => s.AdvancePaymentValue)
             .HasPrecision(18, 2);
 
+        // Salon Custom Email SMTP Configuration (Automations & Retention)
+        builder.Property(s => s.IsEmailConfigured)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(s => s.SmtpHost)
+            .HasMaxLength(255);
+
+        builder.Property(s => s.SmtpPort)
+            .IsRequired()
+            .HasDefaultValue(587);
+
+        builder.Property(s => s.SmtpUsername)
+            .HasMaxLength(255);
+
+        builder.Property(s => s.SmtpPassword)
+            .HasMaxLength(500);
+
+        builder.Property(s => s.SenderEmail)
+            .HasMaxLength(255);
+
+        builder.Property(s => s.SenderName)
+            .HasMaxLength(255);
+
+        builder.Property(s => s.SmtpEnableSsl)
+            .IsRequired()
+            .HasDefaultValue(true);
+
         builder.Property(s => s.CreatedAtUtc)
             .IsRequired();
 

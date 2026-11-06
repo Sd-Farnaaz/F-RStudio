@@ -242,11 +242,53 @@ public class AdminServicesController : ControllerBase
             return NotFound(new { message = "Service not found in your salon catalog." });
         }
 
+        if (request.IsActive && !service.IsActive)
+        {
+            var salon = await _dbContext.Salons.AsNoTracking().FirstOrDefaultAsync(s => s.Id == salonId.Value, cancellationToken);
+            var tier = salon?.SubscriptionTier ?? "Starter";
+            var planConfig = SubscriptionPlanCatalog.GetPlanByTier(tier) ?? SubscriptionPlanCatalog.StarterPlan;
+            if (planConfig.MaxServices.HasValue)
+            {
+                var activeServicesCount = await _dbContext.Services.AsNoTracking().CountAsync(s => s.SalonId == salonId.Value && s.IsActive && s.Id != id, cancellationToken);
+                if (activeServicesCount >= planConfig.MaxServices.Value)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new
+                    {
+                        message = $"Your {planConfig.Name} allows a maximum of {planConfig.MaxServices.Value} active catalog services. Please upgrade your subscription to add more services.",
+                        upgradeRequired = true,
+                        currentTier = tier,
+                        servicesLimit = planConfig.MaxServices.Value
+                    });
+                }
+            }
+        }
+
         service.Name = request.Name.Trim();
         service.Description = request.Description?.Trim();
         service.Category = request.Category.Trim();
         service.Price = request.Price;
         service.DurationMinutes = request.DurationMinutes;
+        if (request.IsActive && !service.IsActive)
+        {
+            var salon = await _dbContext.Salons.AsNoTracking().FirstOrDefaultAsync(s => s.Id == salonId.Value, cancellationToken);
+            var tier = salon?.SubscriptionTier ?? "Starter";
+            var planConfig = SubscriptionPlanCatalog.GetPlanByTier(tier) ?? SubscriptionPlanCatalog.StarterPlan;
+            if (planConfig.MaxServices.HasValue)
+            {
+                var activeServicesCount = await _dbContext.Services.AsNoTracking().CountAsync(s => s.SalonId == salonId.Value && s.IsActive && s.Id != id, cancellationToken);
+                if (activeServicesCount >= planConfig.MaxServices.Value)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new
+                    {
+                        message = $"Your {planConfig.Name} allows a maximum of {planConfig.MaxServices.Value} active catalog services. Please upgrade your subscription to add more services.",
+                        upgradeRequired = true,
+                        currentTier = tier,
+                        servicesLimit = planConfig.MaxServices.Value
+                    });
+                }
+            }
+        }
+
         service.IsActive = request.IsActive;
 
         if (!string.IsNullOrWhiteSpace(request.ImageBase64))
@@ -307,6 +349,27 @@ public class AdminServicesController : ControllerBase
         if (service == null)
         {
             return NotFound(new { message = "Service not found in your salon catalog." });
+        }
+
+        if (request.IsActive && !service.IsActive)
+        {
+            var salon = await _dbContext.Salons.AsNoTracking().FirstOrDefaultAsync(s => s.Id == salonId.Value, cancellationToken);
+            var tier = salon?.SubscriptionTier ?? "Starter";
+            var planConfig = SubscriptionPlanCatalog.GetPlanByTier(tier) ?? SubscriptionPlanCatalog.StarterPlan;
+            if (planConfig.MaxServices.HasValue)
+            {
+                var activeServicesCount = await _dbContext.Services.AsNoTracking().CountAsync(s => s.SalonId == salonId.Value && s.IsActive && s.Id != id, cancellationToken);
+                if (activeServicesCount >= planConfig.MaxServices.Value)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new
+                    {
+                        message = $"Your {planConfig.Name} allows a maximum of {planConfig.MaxServices.Value} active catalog services. Please upgrade your subscription to add more services.",
+                        upgradeRequired = true,
+                        currentTier = tier,
+                        servicesLimit = planConfig.MaxServices.Value
+                    });
+                }
+            }
         }
 
         service.IsActive = request.IsActive;

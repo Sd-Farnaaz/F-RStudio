@@ -12,6 +12,8 @@ public class SalonPaymentSettingsResponse
     public string? AdvancePaymentType { get; set; }
     public decimal? AdvancePaymentValue { get; set; }
     public string CurrencyCode { get; set; } = "INR";
+    public string CurrentTier { get; set; } = "Starter";
+    public bool HasAdvanceDepositEngine { get; set; } = false;
 }
 
 public class UpdateSalonPaymentSettingsRequest : IValidatableObject

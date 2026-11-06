@@ -112,7 +112,7 @@ public class NotificationService : INotificationService
             var template = _templateBuilder.BuildBookingConfirmationEmail(appt);
 
 
-            var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, template.Subject, template.HtmlBody, template.PlainTextBody, cancellationToken);
+            var emailResult = await _emailService.SendSalonEmailAsync(appt.Salon, appt.Customer.Email, template.Subject, template.HtmlBody, template.PlainTextBody, cancellationToken);
 
             var customerEmail = new Notification
             {
@@ -155,7 +155,7 @@ public class NotificationService : INotificationService
                 var adminTemplate = _templateBuilder.BuildOwnerNewBookingEmail(appt, admin.FullName);
 
 
-                var adminEmailResult = await _emailService.SendEmailAsync(admin.Email, adminTemplate.Subject, adminTemplate.HtmlBody, adminTemplate.PlainTextBody, cancellationToken);
+                var adminEmailResult = await _emailService.SendSalonEmailAsync(appt.Salon, admin.Email, adminTemplate.Subject, adminTemplate.HtmlBody, adminTemplate.PlainTextBody, cancellationToken);
 
                 var adminEmail = new Notification
                 {
@@ -237,7 +237,7 @@ public class NotificationService : INotificationService
         if (!string.IsNullOrWhiteSpace(appt.Customer.Email))
         {
             var cancelTemplate = _templateBuilder.BuildAppointmentCancelledEmail(appt, isForCustomer: true);
-            var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, cancelTemplate.Subject, cancelTemplate.HtmlBody, cancelTemplate.PlainTextBody, cancellationToken);
+            var emailResult = await _emailService.SendSalonEmailAsync(appt.Salon, appt.Customer.Email, cancelTemplate.Subject, cancelTemplate.HtmlBody, cancelTemplate.PlainTextBody, cancellationToken);
 
             _dbContext.Notifications.Add(new Notification
             {
@@ -276,7 +276,7 @@ public class NotificationService : INotificationService
             if (!string.IsNullOrWhiteSpace(admin.Email))
             {
                 var adminCancelTemplate = _templateBuilder.BuildAppointmentCancelledEmail(appt, isForCustomer: false, adminName: admin.FullName);
-                var adminEmailResult = await _emailService.SendEmailAsync(admin.Email, adminCancelTemplate.Subject, adminCancelTemplate.HtmlBody, adminCancelTemplate.PlainTextBody, cancellationToken);
+                var adminEmailResult = await _emailService.SendSalonEmailAsync(appt.Salon, admin.Email, adminCancelTemplate.Subject, adminCancelTemplate.HtmlBody, adminCancelTemplate.PlainTextBody, cancellationToken);
 
                 _dbContext.Notifications.Add(new Notification
                 {
@@ -332,7 +332,7 @@ public class NotificationService : INotificationService
         if (!string.IsNullOrWhiteSpace(appt.Customer.Email))
         {
             var reschedTemplate = _templateBuilder.BuildAppointmentRescheduledEmail(appt, isForCustomer: true);
-            var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, reschedTemplate.Subject, reschedTemplate.HtmlBody, reschedTemplate.PlainTextBody, cancellationToken);
+            var emailResult = await _emailService.SendSalonEmailAsync(appt.Salon, appt.Customer.Email, reschedTemplate.Subject, reschedTemplate.HtmlBody, reschedTemplate.PlainTextBody, cancellationToken);
 
             _dbContext.Notifications.Add(new Notification
             {
@@ -371,7 +371,7 @@ public class NotificationService : INotificationService
             if (!string.IsNullOrWhiteSpace(admin.Email))
             {
                 var adminReschedTemplate = _templateBuilder.BuildAppointmentRescheduledEmail(appt, isForCustomer: false, adminName: admin.FullName);
-                var adminEmailResult = await _emailService.SendEmailAsync(admin.Email, adminReschedTemplate.Subject, adminReschedTemplate.HtmlBody, adminReschedTemplate.PlainTextBody, cancellationToken);
+                var adminEmailResult = await _emailService.SendSalonEmailAsync(appt.Salon, admin.Email, adminReschedTemplate.Subject, adminReschedTemplate.HtmlBody, adminReschedTemplate.PlainTextBody, cancellationToken);
 
                 _dbContext.Notifications.Add(new Notification
                 {
@@ -473,7 +473,7 @@ public class NotificationService : INotificationService
             if (!string.IsNullOrWhiteSpace(admin.Email))
             {
                 var proofTemplate = _templateBuilder.BuildPaymentProofSubmittedEmail(appt, admin.FullName);
-                var emailResult = await _emailService.SendEmailAsync(admin.Email, proofTemplate.Subject, proofTemplate.HtmlBody, proofTemplate.PlainTextBody, cancellationToken);
+                var emailResult = await _emailService.SendSalonEmailAsync(appt.Salon, admin.Email, proofTemplate.Subject, proofTemplate.HtmlBody, proofTemplate.PlainTextBody, cancellationToken);
 
                 _dbContext.Notifications.Add(new Notification
                 {
@@ -543,7 +543,7 @@ public class NotificationService : INotificationService
         if (!string.IsNullOrWhiteSpace(appt.Customer.Email))
         {
             var paymentTemplate = _templateBuilder.BuildPaymentStatusEmail(appt, eventType);
-            var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, paymentTemplate.Subject, paymentTemplate.HtmlBody, paymentTemplate.PlainTextBody, cancellationToken);
+            var emailResult = await _emailService.SendSalonEmailAsync(appt.Salon, appt.Customer.Email, paymentTemplate.Subject, paymentTemplate.HtmlBody, paymentTemplate.PlainTextBody, cancellationToken);
 
             _dbContext.Notifications.Add(new Notification
             {
@@ -638,35 +638,7 @@ public class NotificationService : INotificationService
             CreatedAtUtc = DateTime.UtcNow
         });
 
-        // 2. Automated WhatsApp Notification
-        _dbContext.Notifications.Add(new Notification
-        {
-            RecipientUserId = appt.CustomerId,
-            SalonId = appt.SalonId,
-            AppointmentId = appt.Id,
-            Type = reminderNotificationType,
-            Channel = "WhatsApp",
-            Subject = inAppSubject,
-            Message = whatsappSmsMessage,
-            Status = "Sent",
-            SentAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow
-        });
 
-        // 3. Automated SMS Notification
-        _dbContext.Notifications.Add(new Notification
-        {
-            RecipientUserId = appt.CustomerId,
-            SalonId = appt.SalonId,
-            AppointmentId = appt.Id,
-            Type = reminderNotificationType,
-            Channel = "SMS",
-            Subject = inAppSubject,
-            Message = whatsappSmsMessage,
-            Status = "Sent",
-            SentAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow
-        });
 
         // 4. Email Notification
         if (!string.IsNullOrWhiteSpace(appt.Customer.Email))
@@ -675,7 +647,7 @@ public class NotificationService : INotificationService
                 ? _templateBuilder.BuildPostVisitReviewEmail(appt)
                 : _templateBuilder.BuildAppointmentReminderEmail(appt, reminder.ReminderType);
 
-            var emailResult = await _emailService.SendEmailAsync(appt.Customer.Email, reminderTemplate.Subject, reminderTemplate.HtmlBody, reminderTemplate.PlainTextBody, cancellationToken);
+            var emailResult = await _emailService.SendSalonEmailAsync(appt.Salon, appt.Customer.Email, reminderTemplate.Subject, reminderTemplate.HtmlBody, reminderTemplate.PlainTextBody, cancellationToken);
 
             _dbContext.Notifications.Add(new Notification
             {

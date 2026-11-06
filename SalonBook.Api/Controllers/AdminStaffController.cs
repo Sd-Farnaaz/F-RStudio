@@ -232,10 +232,54 @@ public class AdminStaffController : ControllerBase
             return NotFound(new { message = "Staff member not found in your salon." });
         }
 
+        if (request.IsActive && !staff.IsActive)
+        {
+            var salon = await _dbContext.Salons.AsNoTracking().FirstOrDefaultAsync(s => s.Id == salonId.Value, cancellationToken);
+            var tier = salon?.SubscriptionTier ?? "Starter";
+            var planConfig = SubscriptionPlanCatalog.GetPlanByTier(tier) ?? SubscriptionPlanCatalog.StarterPlan;
+            int? staffLimit = planConfig.MaxStaff;
+            if (staffLimit.HasValue)
+            {
+                var activeStaffCount = await _dbContext.Staff.AsNoTracking().CountAsync(s => s.SalonId == salonId.Value && s.IsActive && s.Id != id, cancellationToken);
+                if (activeStaffCount >= staffLimit.Value)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new
+                    {
+                        message = $"Your {planConfig.Name} allows a maximum of {staffLimit.Value} active specialist{(staffLimit.Value > 1 ? "s" : "")}. Please upgrade your salon subscription to add more specialists.",
+                        upgradeRequired = true,
+                        currentTier = tier,
+                        staffLimit = staffLimit.Value
+                    });
+                }
+            }
+        }
+
         staff.FullName = request.FullName.Trim();
         staff.Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim().ToLowerInvariant();
         staff.PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim();
         staff.Title = string.IsNullOrWhiteSpace(request.Title) ? null : request.Title.Trim();
+        if (request.IsActive && !staff.IsActive)
+        {
+            var salon = await _dbContext.Salons.AsNoTracking().FirstOrDefaultAsync(s => s.Id == salonId.Value, cancellationToken);
+            var tier = salon?.SubscriptionTier ?? "Starter";
+            var planConfig = SubscriptionPlanCatalog.GetPlanByTier(tier) ?? SubscriptionPlanCatalog.StarterPlan;
+            int? staffLimit = planConfig.MaxStaff;
+            if (staffLimit.HasValue)
+            {
+                var activeStaffCount = await _dbContext.Staff.AsNoTracking().CountAsync(s => s.SalonId == salonId.Value && s.IsActive && s.Id != id, cancellationToken);
+                if (activeStaffCount >= staffLimit.Value)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new
+                    {
+                        message = $"Your {planConfig.Name} allows a maximum of {staffLimit.Value} active specialist{(staffLimit.Value > 1 ? "s" : "")}. Please upgrade your salon subscription to add more specialists.",
+                        upgradeRequired = true,
+                        currentTier = tier,
+                        staffLimit = staffLimit.Value
+                    });
+                }
+            }
+        }
+
         staff.IsActive = request.IsActive;
         staff.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -270,6 +314,28 @@ public class AdminStaffController : ControllerBase
         if (staff == null)
         {
             return NotFound(new { message = "Staff member not found in your salon." });
+        }
+
+        if (request.IsActive && !staff.IsActive)
+        {
+            var salon = await _dbContext.Salons.AsNoTracking().FirstOrDefaultAsync(s => s.Id == salonId.Value, cancellationToken);
+            var tier = salon?.SubscriptionTier ?? "Starter";
+            var planConfig = SubscriptionPlanCatalog.GetPlanByTier(tier) ?? SubscriptionPlanCatalog.StarterPlan;
+            int? staffLimit = planConfig.MaxStaff;
+            if (staffLimit.HasValue)
+            {
+                var activeStaffCount = await _dbContext.Staff.AsNoTracking().CountAsync(s => s.SalonId == salonId.Value && s.IsActive && s.Id != id, cancellationToken);
+                if (activeStaffCount >= staffLimit.Value)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new
+                    {
+                        message = $"Your {planConfig.Name} allows a maximum of {staffLimit.Value} active specialist{(staffLimit.Value > 1 ? "s" : "")}. Please upgrade your salon subscription to add more specialists.",
+                        upgradeRequired = true,
+                        currentTier = tier,
+                        staffLimit = staffLimit.Value
+                    });
+                }
+            }
         }
 
         staff.IsActive = request.IsActive;

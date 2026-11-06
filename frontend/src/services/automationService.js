@@ -1,7 +1,7 @@
 import { fetchApi } from './apiClient';
 
 export const automationService = {
-  // Live Message Logs (WhatsApp, SMS, Email, InApp)
+  // Live Message Logs (Email, InApp)
   getMessageLogs: (limit = 50) => fetchApi(`/api/admin/automation/reminders/logs?limit=${limit}`, { method: 'GET' }),
 
   // Re-engagement ("We Miss You" Campaigns)
@@ -13,5 +13,9 @@ export const automationService = {
   createOffPeakRule: (data) => fetchApi('/api/admin/automation/discounts', { method: 'POST', body: data }),
   updateOffPeakRule: (id, data) => fetchApi(`/api/admin/automation/discounts/${id}`, { method: 'PUT', body: data }),
   deleteOffPeakRule: (id) => fetchApi(`/api/admin/automation/discounts/${id}`, { method: 'DELETE' }),
-};
 
+  // Email SMTP Relay Configuration & Live Test
+  getSmtpConfig: () => fetchApi('/api/admin/automation/smtp', { method: 'GET' }),
+  updateSmtpConfig: (data) => fetchApi('/api/admin/automation/smtp', { method: 'PUT', body: data }),
+  testSmtpConfig: (data) => fetchApi('/api/admin/automation/smtp/test', { method: 'POST', body: data }),
+};
