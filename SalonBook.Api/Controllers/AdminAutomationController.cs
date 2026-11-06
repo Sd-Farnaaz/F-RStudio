@@ -351,7 +351,11 @@ public class AdminAutomationController : ControllerBase
         var port = request.SmtpPort.HasValue && request.SmtpPort.Value > 0 ? request.SmtpPort.Value : salon!.SmtpPort;
         var username = request.SmtpUsername != null ? request.SmtpUsername.Trim() : salon!.SmtpUsername;
         var password = !string.IsNullOrWhiteSpace(request.SmtpPassword) ? request.SmtpPassword : salon!.SmtpPassword;
-        var senderEmail = !string.IsNullOrWhiteSpace(request.SenderEmail) ? request.SenderEmail.Trim() : salon!.SenderEmail;
+        var senderEmail = !string.IsNullOrWhiteSpace(request.SenderEmail) ? request.SenderEmail.Trim() 
+            : (!string.IsNullOrWhiteSpace(salon!.SenderEmail) ? salon.SenderEmail 
+            : (!string.IsNullOrWhiteSpace(username) && username.Contains('@') ? username 
+            : (salon.ContactEmail ?? _currentUserService.Email ?? "rufnixstudio@gmail.com")));
+
         var senderName = !string.IsNullOrWhiteSpace(request.SenderName) ? request.SenderName.Trim() : (salon!.SenderName ?? salon.Name);
         var enableSsl = request.SmtpEnableSsl ?? salon!.SmtpEnableSsl;
 
@@ -369,7 +373,7 @@ public class AdminAutomationController : ControllerBase
             return BadRequest(new TestEmailSmtpResponse
             {
                 Success = false,
-                Message = "Sender Email is missing. Please enter your sender email address."
+                Message = "Sender Email is missing. Please fill in the 'Sender Email Address' field."
             });
         }
 

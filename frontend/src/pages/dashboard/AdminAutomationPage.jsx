@@ -413,21 +413,24 @@ export default function AdminAutomationPage() {
     try {
       setTestingSmtp(true);
       setTestResult(null);
+      const effectiveSender = smtpConfig.senderEmail?.trim() || 
+        (smtpConfig.smtpUsername?.includes('@') ? smtpConfig.smtpUsername.trim() : user?.email || 'rufnixstudio@gmail.com');
+
       const res = await automationService.testSmtpConfig({
         recipientEmail: testRecipient.trim(),
         smtpHost: smtpConfig.smtpHost?.trim() || null,
         smtpPort: Number(smtpConfig.smtpPort) || null,
         smtpUsername: smtpConfig.smtpUsername?.trim() || null,
         smtpPassword: smtpConfig.smtpPassword || null,
-        senderEmail: smtpConfig.senderEmail?.trim() || null,
-        senderName: smtpConfig.senderName?.trim() || null,
+        senderEmail: effectiveSender,
+        senderName: smtpConfig.senderName?.trim() || user?.salonName || 'F&R Beauty Studio',
         smtpEnableSsl: smtpConfig.smtpEnableSsl
       });
 
       setTestResult({ success: true, message: res.message });
       setFeedback({ type: 'success', text: res.message });
     } catch (err) {
-      const msg = err.message || 'SMTP Connection test failed.';
+      const msg = err.data?.message || err.data?.Message || err.message || 'SMTP Connection test failed.';
       setTestResult({ success: false, message: msg });
       setFeedback({ type: 'error', text: msg });
     } finally {

@@ -26,6 +26,7 @@ async function handleResponse(response) {
   if (!response.ok) {
     let message = 'An unexpected error occurred';
     if (data && data.message) message = data.message;
+    else if (data && data.Message) message = data.Message;
     else if (data && data.detail) message = data.detail;
     else if (data && data.title) message = data.title;
     else if (data && data.errors) {
