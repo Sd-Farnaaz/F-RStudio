@@ -4,7 +4,7 @@ import {
   Compass, User as UserIcon, Store, ShieldCheck, Star, DollarSign, 
   ShoppingBag, Zap, Sparkles, ExternalLink 
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import NotificationBell from './NotificationBell';
 import { getImageUrl } from '../../utils/imageUrl';

@@ -97,6 +97,7 @@ export default function AdminDashboard() {
               <img 
                 src={getImageUrl(user.salonLogoUrl)} 
                 alt={user?.salonName || "Salon"} 
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
                 className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-md bg-white shrink-0" 
               />
             ) : null}
