@@ -3,9 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { adminService } from '../../services/adminService';
 import { paymentService } from '../../services/paymentService';
+import { detectCurrentLocation } from '../../utils/geolocation';
+import { getImageUrl } from '../../utils/imageUrl';
 import { 
   AlertCircle, CheckCircle2, Save, MapPin, Store, RotateCcw, ExternalLink, 
-  RefreshCw, CreditCard, QrCode, DollarSign, Info
+  RefreshCw, CreditCard, QrCode, DollarSign, Info, Camera, UploadCloud, Compass, Loader2
 } from 'lucide-react';
 
 const REQUIRED_FIELDS = ['name', 'businessType'];
@@ -25,7 +27,7 @@ export default function SalonProfilePage() {
     name: '', businessType: 'Hair Salon', description: '', 
     addressLine: '', city: '', state: '', postalCode: '', country: '', 
     phoneNumber: '', contactEmail: '', timeZone: 'UTC', currencyCode: 'USD',
-    slug: ''
+    slug: '', logoUrl: ''
   });
   
   const [loading, setLoading] = useState(true);
@@ -33,6 +35,9 @@ export default function SalonProfilePage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isDirty, setIsDirty] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationMessage, setLocationMessage] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Payment Settings State
   const [paymentSettings, setPaymentSettings] = useState({
@@ -84,7 +89,8 @@ export default function SalonProfilePage() {
         contactEmail: data.contactEmail || '',
         timeZone: data.timeZone || 'UTC',
         currencyCode: data.currencyCode || 'USD',
-        slug: data.slug || ''
+        slug: data.slug || '',
+        logoUrl: data.logoUrl || ''
       };
       
       setInitialProfile(loadedProfile);
@@ -94,6 +100,67 @@ export default function SalonProfilePage() {
       setError(err.message || 'Failed to load profile. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file (.jpg, .png, .webp).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Photo exceeds 5MB. Please choose a smaller file.');
+      return;
+    }
+
+    setUploadingLogo(true);
+    setError('');
+    setSuccess('');
+    try {
+      const response = await adminService.uploadSalonLogo(file);
+      const newLogoUrl = response.logoUrl || '';
+      setProfile(prev => ({ ...prev, logoUrl: newLogoUrl }));
+      setInitialProfile(prev => ({ ...prev, logoUrl: newLogoUrl }));
+      setSuccess('Salon photo updated successfully.');
+    } catch (err) {
+      setError(err.message || 'Failed to upload photo.');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleDetectLocation = async () => {
+    setIsLocating(true);
+    setLocationMessage('');
+    setError('');
+    try {
+      const location = await detectCurrentLocation();
+      setProfile(prev => {
+        const updated = {
+          ...prev,
+          addressLine: location.addressLine || prev.addressLine,
+          city: location.city || prev.city,
+          state: location.state || prev.state,
+          postalCode: location.postalCode || prev.postalCode,
+          country: location.country || prev.country
+        };
+        setIsDirty(JSON.stringify(updated) !== JSON.stringify(initialProfile));
+        return updated;
+      });
+
+      const summary = [location.addressLine, location.city, location.state, location.postalCode]
+        .filter(Boolean)
+        .join(', ');
+      setLocationMessage(summary || 'Location detected.');
+      setSuccess('Location coordinates detected and address auto-filled!');
+    } catch (err) {
+      setError(err.message || 'Unable to detect location. Please type your address manually.');
+    } finally {
+      setIsLocating(false);
     }
   };
 
@@ -359,6 +426,52 @@ export default function SalonProfilePage() {
                     <Store className="w-5 h-5 mr-2 text-primary-rose" /> Business Identity
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Salon Photo / Logo */}
+                    <div className="col-span-2 p-4 bg-ivory/50 rounded-xl border border-border-color flex flex-col sm:flex-row items-center gap-4">
+                      {profile.logoUrl ? (
+                        <img 
+                          src={getImageUrl(profile.logoUrl)} 
+                          alt="Salon Logo" 
+                          className="w-20 h-20 rounded-xl object-cover border border-border-color shadow-2xs shrink-0"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 rounded-xl bg-white border border-dashed border-border-color flex items-center justify-center text-primary-rose/70 shrink-0">
+                          <Store className="w-8 h-8" />
+                        </div>
+                      )}
+                      <div className="flex-1 text-center sm:text-left">
+                        <h4 className="text-sm font-semibold text-deep-plum">Salon or Owner Photo</h4>
+                        <p className="text-xs text-muted mt-0.5">Upload a high-quality logo or studio image for your public storefront and booking page.</p>
+                        <div className="mt-2.5 flex items-center gap-2 justify-center sm:justify-start">
+                          <label className="px-3.5 py-1.5 bg-primary-rose text-white text-xs font-medium rounded-lg hover:bg-primary-rose/90 transition-all cursor-pointer shadow-2xs inline-flex items-center gap-1.5">
+                            {uploadingLogo ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>Uploading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <UploadCloud className="w-3.5 h-3.5" />
+                                <span>{profile.logoUrl ? 'Change Photo' : 'Upload Photo'}</span>
+                              </>
+                            )}
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              onChange={handleLogoUpload} 
+                              className="hidden" 
+                              disabled={uploadingLogo || saving}
+                            />
+                          </label>
+                          {profile.logoUrl && (
+                            <span className="text-[11px] text-emerald-600 flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Active photo
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="col-span-2 md:col-span-1">
                       <label className="block text-sm font-medium text-deep-plum mb-1.5">Salon Name *</label>
                       <input 
@@ -397,9 +510,36 @@ export default function SalonProfilePage() {
 
                 {/* Section B: Contact & Location */}
                 <section>
-                  <h3 className="text-lg font-serif font-medium text-deep-plum mb-4 flex items-center">
-                    <MapPin className="w-5 h-5 mr-2 text-primary-rose" /> Contact & Location
-                  </h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+                    <h3 className="text-lg font-serif font-medium text-deep-plum flex items-center">
+                      <MapPin className="w-5 h-5 mr-2 text-primary-rose" /> Contact & Location
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={handleDetectLocation}
+                      disabled={isLocating || saving}
+                      className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-medium transition-all inline-flex items-center gap-1.5 shadow-2xs self-start sm:self-auto disabled:opacity-60"
+                    >
+                      {isLocating ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-700" />
+                          <span>Detecting GPS location...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Compass className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>📍 Detect My Real Location (Auto-Fill)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {locationMessage && (
+                    <div className="mb-4 p-2.5 bg-emerald-50 text-emerald-700 text-xs rounded-lg border border-emerald-200 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Detected: <strong>{locationMessage}</strong></span>
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm font-medium text-deep-plum mb-1.5">Phone Number</label>

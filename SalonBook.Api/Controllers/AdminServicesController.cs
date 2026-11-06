@@ -79,6 +79,8 @@ public class AdminServicesController : ControllerBase
             }
         }
 
+        string? initialImageUrl = !string.IsNullOrWhiteSpace(request.ImageUrl) ? request.ImageUrl.Trim() : null;
+
         var service = new Service
         {
             SalonId = salonId.Value, // Hardcoded to authenticated admin's salon
@@ -87,12 +89,33 @@ public class AdminServicesController : ControllerBase
             Category = request.Category.Trim(),
             Price = request.Price,
             DurationMinutes = request.DurationMinutes,
+            ImageUrl = initialImageUrl,
             IsActive = request.IsActive,
             CreatedAtUtc = DateTime.UtcNow
         };
 
         _dbContext.Services.Add(service);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Optional Service photo uploaded as Base64 Data URL during creation
+        if (!string.IsNullOrWhiteSpace(request.ImageBase64))
+        {
+            try
+            {
+                var storedImageUrl = await _salonImageStorageService.SaveBase64ImageAsync(
+                    Path.Combine("salons", salonId.Value.ToString(), "services", service.Id.ToString()),
+                    $"/uploads/salons/{salonId.Value}/services/{service.Id}/",
+                    request.ImageBase64,
+                    cancellationToken);
+
+                service.ImageUrl = storedImageUrl;
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to persist base64 service image during creation for service {ServiceId}", service.Id);
+            }
+        }
 
         _logger.LogInformation("Service '{ServiceName}' (ID: {ServiceId}) created for Salon ID {SalonId} by {Email}",
             service.Name, service.Id, salonId.Value, _currentUserService.Email);
@@ -225,6 +248,33 @@ public class AdminServicesController : ControllerBase
         service.Price = request.Price;
         service.DurationMinutes = request.DurationMinutes;
         service.IsActive = request.IsActive;
+
+        if (!string.IsNullOrWhiteSpace(request.ImageBase64))
+        {
+            try
+            {
+                var storedImageUrl = await _salonImageStorageService.SaveBase64ImageAsync(
+                    Path.Combine("salons", salonId.Value.ToString(), "services", service.Id.ToString()),
+                    $"/uploads/salons/{salonId.Value}/services/{service.Id}/",
+                    request.ImageBase64,
+                    cancellationToken);
+
+                if (!string.IsNullOrWhiteSpace(service.ImageUrl) && !service.ImageUrl.Equals(storedImageUrl, StringComparison.OrdinalIgnoreCase))
+                {
+                    await _salonImageStorageService.DeleteServiceImageAsync(salonId.Value, service.Id, service.ImageUrl, cancellationToken);
+                }
+                service.ImageUrl = storedImageUrl;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to persist base64 service image during update for service {ServiceId}", service.Id);
+            }
+        }
+        else if (request.ImageUrl != null)
+        {
+            service.ImageUrl = string.IsNullOrWhiteSpace(request.ImageUrl) ? null : request.ImageUrl.Trim();
+        }
+
         service.UpdatedAtUtc = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);

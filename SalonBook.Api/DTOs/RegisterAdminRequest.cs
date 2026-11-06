@@ -30,5 +30,29 @@ public class RegisterAdminRequest
     [Required(ErrorMessage = "Password is required.")]
     [StringLength(100, MinimumLength = 8, ErrorMessage = "Password must be at least 8 characters long.")]
     public string Password { get; set; } = string.Empty;
+
+    // Optional Salon & Owner Details
+    [StringLength(250)]
+    public string? AddressLine { get; set; }
+
+    [StringLength(100)]
+    public string? City { get; set; }
+
+    [StringLength(100)]
+    public string? State { get; set; }
+
+    [StringLength(20)]
+    public string? PostalCode { get; set; }
+
+    [StringLength(100)]
+    public string? Country { get; set; } = "India";
+
+    /// <summary>
+    /// Optional salon logo or owner/self photo passed as a base64 Data URL.
+    /// </summary>
+    public string? PhotoBase64 { get; set; }
+
+    [StringLength(500)]
+    public string? LogoUrl { get; set; }
 }
 

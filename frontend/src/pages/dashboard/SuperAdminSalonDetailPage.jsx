@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import SuperAdminLayout from '../../components/layout/SuperAdminLayout';
 import { superAdminService } from '../../services/superAdminService';
 import { subscriptionService } from '../../services/subscriptionService';
+import { getImageUrl } from '../../utils/imageUrl';
 import { 
   ArrowLeft, 
   Clock, 
@@ -282,7 +283,7 @@ export default function SuperAdminSalonDetailPage() {
               <div className="flex items-start gap-4">
                 {salon.logoUrl ? (
                   <img
-                    src={salon.logoUrl}
+                    src={getImageUrl(salon.logoUrl)}
                     alt={salon.name}
                     className="w-18 h-18 rounded-2xl object-cover border border-border-color bg-white shrink-0 shadow-2xs"
                   />

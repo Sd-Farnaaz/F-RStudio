@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { MapPin, ShieldCheck, ChevronRight, Store, Phone, Clock } from 'lucide-react';
+import { getImageUrl } from '../../utils/imageUrl';
 
 export default function SalonCard({ salon }) {
   if (!salon) return null;
@@ -21,7 +22,7 @@ export default function SalonCard({ salon }) {
         <div className="flex items-start gap-4 mb-4">
           {salon.logoUrl ? (
             <img
-              src={salon.logoUrl}
+              src={getImageUrl(salon.logoUrl)}
               alt={salon.name}
               className="w-16 h-16 rounded-2xl object-cover border border-border-color bg-white shrink-0 shadow-2xs group-hover:scale-102 transition-transform"
             />

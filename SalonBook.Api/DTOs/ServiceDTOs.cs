@@ -21,6 +21,11 @@ public class CreateServiceRequest
     [Range(5, 480, ErrorMessage = "Duration must be between 5 and 480 minutes.")]
     public int DurationMinutes { get; set; } = 30;
 
+    [StringLength(500)]
+    public string? ImageUrl { get; set; }
+
+    public string? ImageBase64 { get; set; }
+
     public bool IsActive { get; set; } = true;
 }
 
@@ -42,6 +47,11 @@ public class UpdateServiceRequest
 
     [Range(5, 480, ErrorMessage = "Duration must be between 5 and 480 minutes.")]
     public int DurationMinutes { get; set; } = 30;
+
+    [StringLength(500)]
+    public string? ImageUrl { get; set; }
+
+    public string? ImageBase64 { get; set; }
 
     public bool IsActive { get; set; } = true;
 }

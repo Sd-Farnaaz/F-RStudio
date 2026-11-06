@@ -12,6 +12,25 @@ export const adminService = {
   updateService: (id, data) => fetchApi(`/api/admin/services/${id}`, { method: 'PUT', body: data }),
   updateServiceStatus: (id, isActive) => fetchApi(`/api/admin/services/${id}/status`, { method: 'PATCH', body: { isActive } }),
   deleteService: (id) => fetchApi(`/api/admin/services/${id}`, { method: 'DELETE' }),
+  uploadServiceImage: (serviceId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return fetchApi(`/api/admin/services/${serviceId}/image`, {
+      method: 'POST',
+      body: formData
+    });
+  },
+  deleteServiceImage: (serviceId) => fetchApi(`/api/admin/services/${serviceId}/image`, { method: 'DELETE' }),
+
+  // Salon Branding / Logo
+  uploadSalonLogo: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return fetchApi('/api/admin/salon/profile/logo', {
+      method: 'POST',
+      body: formData
+    });
+  },
 
   // Vendor Analytics & Dashboard
   getAnalyticsRevenue: () => fetchApi('/api/vendors/analytics/revenue', { method: 'GET' }),

@@ -98,8 +98,10 @@ export async function fetchApi(endpoint, options = {}) {
   const token = !skipAuth ? localStorage.getItem('accessToken') : null;
   const isGetOrHead = !fetchOptions.method || fetchOptions.method.toUpperCase() === 'GET' || fetchOptions.method.toUpperCase() === 'HEAD';
 
+  const isFormData = typeof FormData !== 'undefined' && fetchOptions.body instanceof FormData;
+
   const headers = {
-    ...(!isGetOrHead || fetchOptions.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(!isGetOrHead && !isFormData && fetchOptions.body ? { 'Content-Type': 'application/json' } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...fetchOptions.headers,
   };
@@ -109,7 +111,7 @@ export async function fetchApi(endpoint, options = {}) {
     headers,
   };
 
-  if (config.body && typeof config.body !== 'string') {
+  if (!isFormData && config.body && typeof config.body !== 'string') {
     config.body = JSON.stringify(config.body);
   }
 

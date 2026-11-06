@@ -9,6 +9,7 @@ public interface ISalonImageStorageService
     Task DeleteSalonLogoAsync(int salonId, string? logoUrl, CancellationToken cancellationToken = default);
     Task<string> SaveServiceImageAsync(int salonId, int serviceId, IFormFile file, CancellationToken cancellationToken = default);
     Task DeleteServiceImageAsync(int salonId, int serviceId, string? imageUrl, CancellationToken cancellationToken = default);
+    Task<string> SaveBase64ImageAsync(string relativeFolder, string urlPrefix, string base64Data, CancellationToken cancellationToken = default);
 }
 
 public static class ImageValidator
@@ -181,5 +182,94 @@ public class LocalSalonImageStorageService : ISalonImageStorageService
         }
 
         return Task.CompletedTask;
+    }
+
+    public async Task<string> SaveBase64ImageAsync(string relativeFolder, string urlPrefix, string base64Data, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(base64Data))
+        {
+            throw new ArgumentException("Base64 image content is empty.");
+        }
+
+        var extension = ".png";
+        var rawBase64 = base64Data;
+
+        if (base64Data.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        {
+            var commaIndex = base64Data.IndexOf(',');
+            if (commaIndex > 0)
+            {
+                var headerPart = base64Data[..commaIndex];
+                rawBase64 = base64Data[(commaIndex + 1)..];
+
+                if (headerPart.Contains("image/jpeg", StringComparison.OrdinalIgnoreCase) || headerPart.Contains("image/jpg", StringComparison.OrdinalIgnoreCase))
+                {
+                    extension = ".jpg";
+                }
+                else if (headerPart.Contains("image/webp", StringComparison.OrdinalIgnoreCase))
+                {
+                    extension = ".webp";
+                }
+                else if (headerPart.Contains("image/gif", StringComparison.OrdinalIgnoreCase))
+                {
+                    extension = ".gif";
+                }
+                else if (headerPart.Contains("image/png", StringComparison.OrdinalIgnoreCase))
+                {
+                    extension = ".png";
+                }
+            }
+        }
+
+        byte[] bytes;
+        try
+        {
+            bytes = Convert.FromBase64String(rawBase64);
+        }
+        catch (FormatException)
+        {
+            throw new InvalidOperationException("Invalid base64 image data.");
+        }
+
+        if (bytes.Length > MaxFileSizeBytes)
+        {
+            throw new InvalidOperationException($"Image file size exceeds the allowed limit of {MaxFileSizeBytes / (1024 * 1024)} MB.");
+        }
+
+        using (var memoryStream = new MemoryStream(bytes))
+        {
+            if (!ImageValidator.IsValidImage(memoryStream, extension))
+            {
+                if (extension == ".png" && ImageValidator.IsValidImage(memoryStream, ".jpg"))
+                {
+                    extension = ".jpg";
+                }
+                else if (extension == ".jpg" && ImageValidator.IsValidImage(memoryStream, ".png"))
+                {
+                    extension = ".png";
+                }
+                else
+                {
+                    throw new InvalidOperationException("Invalid image content. The binary header does not match a supported image format.");
+                }
+            }
+        }
+
+        var rootPath = _environment.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        var uploadFolder = Path.Combine(rootPath, "uploads", relativeFolder);
+        Directory.CreateDirectory(uploadFolder);
+
+        var storedFileName = $"{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
+        var fullFilePath = Path.Combine(uploadFolder, storedFileName);
+
+        var canonicalUploadDir = Path.GetFullPath(uploadFolder) + Path.DirectorySeparatorChar;
+        var canonicalFilePath = Path.GetFullPath(fullFilePath);
+        if (!canonicalFilePath.StartsWith(canonicalUploadDir, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Invalid file destination path.");
+        }
+
+        await File.WriteAllBytesAsync(fullFilePath, bytes, cancellationToken);
+        return $"{urlPrefix}{storedFileName}";
     }
 }

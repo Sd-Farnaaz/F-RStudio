@@ -7,6 +7,7 @@ import { appointmentService, toUtcIso } from '../../services/appointmentService'
 import { reviewService } from '../../services/reviewService';
 import AiStylistModal from '../../components/ai/AiStylistModal';
 import { useAuth } from '../../context/AuthContext';
+import { getImageUrl } from '../../utils/imageUrl';
 import { 
   MapPin, 
   Clock, 
@@ -452,7 +453,7 @@ export default function SalonDetailPage() {
                   <div className="shrink-0">
                     {salon.logoUrl ? (
                       <img 
-                        src={salon.logoUrl} 
+                        src={getImageUrl(salon.logoUrl)} 
                         alt={salon.name} 
                         className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-soft-blush shadow-xs bg-white"
                       />
@@ -689,7 +690,7 @@ export default function SalonDetailPage() {
                             {service.imageUrl && (
                               <div className="mb-3.5 rounded-xl overflow-hidden aspect-[16/9] bg-soft-blush border border-border-color/50">
                                 <img 
-                                  src={service.imageUrl} 
+                                  src={getImageUrl(service.imageUrl)} 
                                   alt={service.name} 
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 />

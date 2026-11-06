@@ -24,6 +24,7 @@ public class AuthController : ControllerBase
     private readonly IHostEnvironment _env;
     private readonly IEmailService _emailService;
     private readonly IEmailTemplateBuilder _emailTemplateBuilder;
+    private readonly ISalonImageStorageService _salonImageStorageService;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
@@ -35,6 +36,7 @@ public class AuthController : ControllerBase
         IHostEnvironment env,
         IEmailService emailService,
         IEmailTemplateBuilder emailTemplateBuilder,
+        ISalonImageStorageService salonImageStorageService,
         ILogger<AuthController> logger)
     {
         _dbContext = dbContext;
@@ -45,6 +47,7 @@ public class AuthController : ControllerBase
         _env = env;
         _emailService = emailService;
         _emailTemplateBuilder = emailTemplateBuilder;
+        _salonImageStorageService = salonImageStorageService;
         _logger = logger;
     }
 
@@ -124,6 +127,12 @@ public class AuthController : ControllerBase
                     Name = request.SalonName.Trim(),
                     Slug = uniqueSlug,
                     BusinessType = request.BusinessType.Trim(),
+                    AddressLine = request.AddressLine?.Trim(),
+                    City = request.City?.Trim(),
+                    State = request.State?.Trim(),
+                    PostalCode = request.PostalCode?.Trim(),
+                    Country = string.IsNullOrWhiteSpace(request.Country) ? "India" : request.Country.Trim(),
+                    LogoUrl = !string.IsNullOrWhiteSpace(request.LogoUrl) ? request.LogoUrl.Trim() : null,
                     TimeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? "Asia/Kolkata" : request.TimeZone.Trim(),
                     CurrencyCode = string.IsNullOrWhiteSpace(request.CurrencyCode) ? "INR" : request.CurrencyCode.Trim().ToUpperInvariant(),
                     OnboardingState = "Created",
@@ -140,6 +149,26 @@ public class AuthController : ControllerBase
 
                 _dbContext.Salons.Add(salon);
                 await _dbContext.SaveChangesAsync(cancellationToken);
+
+                // Optional Salon / Owner photo uploaded as Base64 Data URL
+                if (!string.IsNullOrWhiteSpace(request.PhotoBase64))
+                {
+                    try
+                    {
+                        var savedLogoUrl = await _salonImageStorageService.SaveBase64ImageAsync(
+                            Path.Combine("salons", salon.Id.ToString()),
+                            $"/uploads/salons/{salon.Id}/",
+                            request.PhotoBase64,
+                            cancellationToken);
+
+                        salon.LogoUrl = savedLogoUrl;
+                        await _dbContext.SaveChangesAsync(cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to persist optional salon photo during registration for salon ID {SalonId}", salon.Id);
+                    }
+                }
 
                 var adminUser = new User
                 {
