@@ -34,6 +34,7 @@ public class ServiceConfiguration : IEntityTypeConfiguration<Service>
             .IsRequired();
 
         builder.Property(s => s.ImageUrl)
+            .HasColumnType("nvarchar(max)")
             .IsRequired(false);
 
         builder.Property(s => s.IsActive)

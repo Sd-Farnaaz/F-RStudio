@@ -1,3 +1,4 @@
+import { getImageUrl } from '../../utils/imageUrl';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
@@ -91,12 +92,21 @@ export default function AdminDashboard() {
         
         {/* Welcome Header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-primary-rose">Salon Management Portal</span>
-            <h1 className="text-3xl font-serif font-semibold text-deep-plum mt-1">
-              Welcome back, {user?.fullName?.split(' ')[0] || 'Admin'}
-            </h1>
-            <p className="text-sm text-muted mt-0.5">{user?.salonName || 'Salon Overview & Daily Operations'}</p>
+          <div className="flex items-center gap-3.5">
+            {user?.salonLogoUrl ? (
+              <img 
+                src={getImageUrl(user.salonLogoUrl)} 
+                alt={user?.salonName || "Salon"} 
+                className="w-14 h-14 rounded-2xl object-cover border-2 border-white shadow-md bg-white shrink-0" 
+              />
+            ) : null}
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-primary-rose">Salon Management Portal</span>
+              <h1 className="text-3xl font-serif font-semibold text-deep-plum mt-0.5">
+                Welcome back, {user?.fullName?.split(' ')[0] || 'Admin'}
+              </h1>
+              <p className="text-sm text-muted mt-0.5">{user?.salonName || 'Salon Overview & Daily Operations'}</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <button

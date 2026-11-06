@@ -72,6 +72,7 @@ public class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
             .HasMaxLength(100);
 
         builder.Property(a => a.PaymentProofUrl)
+            .HasColumnType("nvarchar(max)")
             .IsRequired(false);
 
         builder.Property(a => a.PaymentSubmittedAtUtc)

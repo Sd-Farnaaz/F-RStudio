@@ -96,9 +96,11 @@ public class SalonConfiguration : IEntityTypeConfiguration<Salon>
             .HasMaxLength(100);
 
         builder.Property(s => s.QrCodeImageUrl)
+            .HasColumnType("nvarchar(max)")
             .IsRequired(false);
 
         builder.Property(s => s.LogoUrl)
+            .HasColumnType("nvarchar(max)")
             .IsRequired(false);
 
         builder.Property(s => s.SubscriptionTier)

@@ -64,6 +64,12 @@ export default function SalonProfilePage() {
   }, []);
 
   useEffect(() => {
+    if (profile.logoUrl) {
+      setLogoError(false);
+    }
+  }, [profile.logoUrl]);
+
+  useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (isDirty) {
         e.preventDefault();
@@ -93,8 +99,8 @@ export default function SalonProfilePage() {
         contactEmail: data.contactEmail || '',
         timeZone: data.timeZone || 'UTC',
         currencyCode: data.currencyCode || 'USD',
-        slug: data.slug || '',
-        logoUrl: data.logoUrl || ''
+        slug: data.slug || data.Slug || '',
+        logoUrl: data.logoUrl || data.LogoUrl || ''
       };
       
       setInitialProfile(loadedProfile);
@@ -128,34 +134,52 @@ export default function SalonProfilePage() {
     setSuccess('');
 
     try {
-      // Compress and optimize client-side to ensure rapid upload and lightweight persistence
+      // 1. Client-side compress and resize for fast, persistent storage
       const { dataUrl, file: compressedFile } = await compressImageFile(file, {
         maxWidth: 1000,
         maxHeight: 1000,
         quality: 0.82
       });
 
-      setProfile(prev => {
-        const updated = { ...prev, logoUrl: dataUrl };
-        setIsDirty(JSON.stringify(updated) !== JSON.stringify(initialProfile));
-        return updated;
-      });
+      // Show preview immediately in the UI
+      setProfile(prev => ({ ...prev, logoUrl: dataUrl }));
       setLogoError(false);
 
+      let savedUrl = dataUrl;
       try {
         const response = await adminService.uploadSalonLogo(compressedFile);
-        const newLogoUrl = response?.logoUrl || dataUrl;
-        setProfile(prev => ({ ...prev, logoUrl: newLogoUrl }));
-        setInitialProfile(prev => ({ ...prev, logoUrl: newLogoUrl }));
-        updateUser({ salonLogoUrl: newLogoUrl });
-        setLogoError(false);
-        setSuccess('Salon photo updated successfully.');
+        savedUrl = response?.logoUrl || response?.LogoUrl || dataUrl;
       } catch (uploadErr) {
-        // High-fidelity fallback: compressed base64 is in profile state and will be stored on profile save
-        setSuccess('Salon photo selected. Click "Save Changes" below to save your profile.');
+        console.warn('Dedicated upload endpoint fallback to direct profile update:', uploadErr);
+        // Fallback: save directly via updateSalonProfile
+        await adminService.updateSalonProfile({
+          name: profile.name || initialProfile?.name || 'Salon',
+          businessType: profile.businessType || initialProfile?.businessType || 'Hair Salon',
+          description: profile.description,
+          addressLine: profile.addressLine,
+          city: profile.city,
+          state: profile.state,
+          postalCode: profile.postalCode,
+          country: profile.country || 'India',
+          phoneNumber: profile.phoneNumber,
+          contactEmail: profile.contactEmail,
+          timeZone: profile.timeZone || 'Asia/Kolkata',
+          currencyCode: profile.currencyCode || 'INR',
+          logoUrl: dataUrl,
+          photoBase64: dataUrl
+        });
+        savedUrl = dataUrl;
       }
-    } catch (compressionErr) {
-      setError('Failed to process the photo. Please try a different image.');
+
+      setProfile(prev => ({ ...prev, logoUrl: savedUrl }));
+      setInitialProfile(prev => ({ ...prev, logoUrl: savedUrl }));
+      updateUser({ salonLogoUrl: savedUrl });
+      setLogoError(false);
+      setIsDirty(false);
+      setSuccess('Salon photo uploaded and saved successfully.');
+    } catch (err) {
+      console.error('Error handling logo upload:', err);
+      setError(err.message || 'Failed to process and upload the photo. Please try a different image.');
     } finally {
       setUploadingLogo(false);
     }

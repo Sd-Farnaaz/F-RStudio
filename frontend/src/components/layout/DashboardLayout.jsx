@@ -14,6 +14,11 @@ export default function DashboardLayout({ children }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [sidebarLogoError, setSidebarLogoError] = useState(false);
   const [topbarLogoError, setTopbarLogoError] = useState(false);
+
+  useEffect(() => {
+    setSidebarLogoError(false);
+    setTopbarLogoError(false);
+  }, [user?.salonLogoUrl]);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -157,9 +162,17 @@ export default function DashboardLayout({ children }) {
 
         <div className="shrink-0 p-4 border-t border-border-color bg-white">
           <div className="px-3 py-3 mb-4 rounded-lg bg-ivory border border-border-color flex items-center">
-            <div className="w-10 h-10 rounded-full bg-primary-rose text-white flex items-center justify-center font-medium shadow-sm">
-              {user?.fullName?.charAt(0) || 'U'}
-            </div>
+            {role === 'Admin' && user?.salonLogoUrl && !sidebarLogoError ? (
+              <img 
+                src={getImageUrl(user.salonLogoUrl)} 
+                alt={user?.salonName || user?.fullName || 'Salon'} 
+                className="w-10 h-10 rounded-full object-cover border border-border-color shadow-sm shrink-0 bg-white"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-primary-rose text-white flex items-center justify-center font-medium shadow-sm shrink-0">
+                {user?.fullName?.charAt(0) || 'U'}
+              </div>
+            )}
             <div className="ml-3 overflow-hidden">
               <p className="text-sm font-medium text-deep-plum truncate">{user?.fullName || 'User'}</p>
               <p className="text-xs text-muted truncate">{user?.email}</p>
