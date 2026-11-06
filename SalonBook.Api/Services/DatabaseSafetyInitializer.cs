@@ -679,7 +679,23 @@ END
 IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Services' AND COLUMN_NAME = 'ImageUrl' AND (CHARACTER_MAXIMUM_LENGTH != -1 OR CHARACTER_MAXIMUM_LENGTH IS NULL))
 BEGIN
     ALTER TABLE [dbo].[Services] ALTER COLUMN [ImageUrl] NVARCHAR(MAX) NULL;
-END";
+END
+
+-- Clean up orphaned dead local upload file references that no longer exist on disk
+-- Only preserve valid Base64 data URLs ('data:image%') or external web links ('http%')
+UPDATE [dbo].[Salons]
+SET [LogoUrl] = NULL
+WHERE [LogoUrl] IS NOT NULL 
+  AND [LogoUrl] NOT LIKE 'data:%' 
+  AND [LogoUrl] NOT LIKE 'http://%' 
+  AND [LogoUrl] NOT LIKE 'https://%';
+
+UPDATE [dbo].[Services]
+SET [ImageUrl] = NULL
+WHERE [ImageUrl] IS NOT NULL 
+  AND [ImageUrl] NOT LIKE 'data:%' 
+  AND [ImageUrl] NOT LIKE 'http://%' 
+  AND [ImageUrl] NOT LIKE 'https://%';";
             await ExecuteStepAsync(dbContext, "Salons Lifecycle & Subscription Columns", salonColumnsSql, cancellationToken);
 
             // 10. Audit Table, Column, Index, and Foreign Key existence to confirm health

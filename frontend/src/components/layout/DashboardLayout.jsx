@@ -7,10 +7,13 @@ import {
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import NotificationBell from './NotificationBell';
+import { getImageUrl } from '../../utils/imageUrl';
 
 export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [sidebarLogoError, setSidebarLogoError] = useState(false);
+  const [topbarLogoError, setTopbarLogoError] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -91,11 +94,12 @@ export default function DashboardLayout({ children }) {
               className="flex items-center gap-2.5 min-w-0 max-w-[210px] group transition-opacity hover:opacity-90"
               title={user.salonName}
             >
-              {user?.salonLogoUrl ? (
+              {user?.salonLogoUrl && !sidebarLogoError ? (
                 <img 
-                  src={user.salonLogoUrl} 
+                  src={getImageUrl(user.salonLogoUrl)} 
                   alt={user.salonName} 
-                  className="w-9 h-9 object-cover rounded-full border border-border-color shadow-2xs shrink-0" 
+                  onError={() => setSidebarLogoError(true)}
+                  className="w-9 h-9 object-cover rounded-full border border-border-color shadow-2xs shrink-0 bg-white" 
                 />
               ) : (
                 <div className="w-9 h-9 rounded-full bg-soft-blush border border-primary-rose/30 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
@@ -185,11 +189,12 @@ export default function DashboardLayout({ children }) {
               <Menu className="h-6 w-6" />
             </button>
             <Link to={getLogoLink()} className="flex items-center gap-2 font-serif font-semibold text-deep-plum text-sm max-w-[190px]">
-              {user?.salonLogoUrl ? (
+              {user?.salonLogoUrl && !topbarLogoError ? (
                 <img 
-                  src={user.salonLogoUrl} 
+                  src={getImageUrl(user.salonLogoUrl)} 
                   alt={user?.salonName || "Salon"} 
-                  className="w-7 h-7 object-cover rounded-full border border-border-color shadow-2xs shrink-0" 
+                  onError={() => setTopbarLogoError(true)}
+                  className="w-7 h-7 object-cover rounded-full border border-border-color shadow-2xs shrink-0 bg-white" 
                 />
               ) : (
                 <img 

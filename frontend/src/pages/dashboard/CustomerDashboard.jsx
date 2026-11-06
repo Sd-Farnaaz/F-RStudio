@@ -10,6 +10,7 @@ import { reviewService } from '../../services/reviewService';
 import { customerDossierService } from '../../services/customerDossierService';
 import AiStylistModal from '../../components/ai/AiStylistModal';
 import InvoiceModal from '../../components/common/InvoiceModal';
+import { getImageUrl } from '../../utils/imageUrl';
 import { 
   Calendar, MapPin, Clock, Scissors, User, XCircle, AlertCircle, 
   RefreshCw, CreditCard, QrCode, CheckCircle2, Copy, Check, ExternalLink, 
@@ -2482,8 +2483,14 @@ export default function CustomerDashboard() {
                         <div className="p-3 bg-white rounded-xl border border-border-color text-center">
                           <span className="text-xs font-semibold uppercase text-muted block mb-2">Scan & Pay via UPI App</span>
                           <img
-                            src={activePaymentApt.salonQrCodeImageUrl}
+                            src={getImageUrl(activePaymentApt.salonQrCodeImageUrl)}
                             alt="Salon QR Scanner"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              if (e.currentTarget.parentElement) {
+                                e.currentTarget.parentElement.style.display = 'none';
+                              }
+                            }}
                             className="w-36 h-36 object-contain mx-auto rounded-lg bg-white p-2 border border-border-color shadow-sm"
                           />
                         </div>
@@ -2864,7 +2871,17 @@ export default function CustomerDashboard() {
                         <div className="flex flex-wrap gap-2 pt-1">
                           {reviewForm.photoUrls.map((url, i) => (
                             <div key={i} className="relative group w-14 h-14 rounded-xl overflow-hidden border border-border-color shadow-2xs">
-                              <img src={url} alt={`Preview ${i + 1}`} className="w-full h-full object-cover" />
+                              <img 
+                                src={getImageUrl(url)} 
+                                alt={`Preview ${i + 1}`} 
+                                onError={(e) => {
+                                  e.currentTarget.onerror = null;
+                                  if (e.currentTarget.parentElement) {
+                                    e.currentTarget.parentElement.style.display = 'none';
+                                  }
+                                }}
+                                className="w-full h-full object-cover" 
+                              />
                               <button
                                 type="button"
                                 onClick={() => handleRemovePhotoUrl(i)}
@@ -2984,12 +3001,22 @@ export default function CustomerDashboard() {
                           {existingReviewData.photoUrls.map((url, i) => (
                             <a
                               key={i}
-                              href={url}
+                              href={getImageUrl(url)}
                               target="_blank"
                               rel="noreferrer"
                               className="w-16 h-16 rounded-xl overflow-hidden border border-border-color hover:border-primary-rose transition-all shadow-2xs"
                             >
-                              <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                              <img 
+                                src={getImageUrl(url)} 
+                                alt={`Photo ${i + 1}`} 
+                                onError={(e) => {
+                                  e.currentTarget.onerror = null;
+                                  if (e.currentTarget.parentElement) {
+                                    e.currentTarget.parentElement.style.display = 'none';
+                                  }
+                                }}
+                                className="w-full h-full object-cover" 
+                              />
                             </a>
                           ))}
                         </div>

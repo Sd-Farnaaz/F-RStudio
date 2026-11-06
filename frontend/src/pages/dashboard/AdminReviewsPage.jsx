@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { reviewService } from '../../services/reviewService';
+import { getImageUrl } from '../../utils/imageUrl';
 import { 
   Star, 
   MessageSquare, 
@@ -363,10 +364,20 @@ export default function AdminReviewsPage() {
                         <button
                           key={i}
                           type="button"
-                          onClick={() => setActivePhoto(url)}
+                          onClick={() => setActivePhoto(getImageUrl(url))}
                           className="w-12 h-12 rounded-xl overflow-hidden border border-border-color hover:border-primary-rose transition-all shadow-2xs cursor-pointer"
                         >
-                          <img src={url} alt={`Client photo ${i + 1}`} className="w-full h-full object-cover" />
+                          <img 
+                            src={getImageUrl(url)} 
+                            alt={`Client photo ${i + 1}`} 
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              if (e.currentTarget.parentElement) {
+                                e.currentTarget.parentElement.style.display = 'none';
+                              }
+                            }}
+                            className="w-full h-full object-cover" 
+                          />
                         </button>
                       ))}
                     </div>
@@ -536,7 +547,7 @@ export default function AdminReviewsPage() {
               >
                 <X className="w-4 h-4" />
               </button>
-              <img src={activePhoto} alt="Review attachment" className="w-full max-h-[75vh] object-contain rounded-xl" />
+              <img src={getImageUrl(activePhoto)} alt="Review attachment" className="w-full max-h-[75vh] object-contain rounded-xl" />
             </div>
           </div>
         )}

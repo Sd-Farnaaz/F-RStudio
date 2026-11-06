@@ -789,6 +789,13 @@ export default function SalonDetailPage() {
                                 <img 
                                   src={getImageUrl(service.imageUrl)} 
                                   alt={service.name} 
+                                  onError={(e) => {
+                                    e.currentTarget.onerror = null;
+                                    e.currentTarget.style.display = 'none';
+                                    if (e.currentTarget.parentElement) {
+                                      e.currentTarget.parentElement.style.display = 'none';
+                                    }
+                                  }}
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 />
                               </div>
@@ -1237,12 +1244,18 @@ export default function SalonDetailPage() {
                                   <button
                                     key={idx}
                                     type="button"
-                                    onClick={() => setSelectedLightboxPhoto(url)}
+                                    onClick={() => setSelectedLightboxPhoto(getImageUrl(url))}
                                     className="group relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border border-border-color hover:border-primary-rose focus:ring-2 focus:ring-primary-rose/40 transition-all shadow-2xs cursor-pointer"
                                   >
                                     <img
-                                      src={url}
+                                      src={getImageUrl(url)}
                                       alt="Client review photo"
+                                      onError={(e) => {
+                                        e.currentTarget.onerror = null;
+                                        if (e.currentTarget.parentElement) {
+                                          e.currentTarget.parentElement.style.display = 'none';
+                                        }
+                                      }}
                                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                                     />
                                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">

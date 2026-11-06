@@ -250,13 +250,15 @@ using (var scope = app.Services.CreateScope())
                 IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Salons' AND COLUMN_NAME = 'LogoUrl')
                 BEGIN
                     ALTER TABLE [Salons] ALTER COLUMN [LogoUrl] nvarchar(max) NULL;
+                    UPDATE [Salons] SET [LogoUrl] = NULL WHERE [LogoUrl] IS NOT NULL AND [LogoUrl] NOT LIKE 'data:%' AND [LogoUrl] NOT LIKE 'http://%' AND [LogoUrl] NOT LIKE 'https://%';
                 END
                 IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Services' AND COLUMN_NAME = 'ImageUrl')
                 BEGIN
                     ALTER TABLE [Services] ALTER COLUMN [ImageUrl] nvarchar(max) NULL;
+                    UPDATE [Services] SET [ImageUrl] = NULL WHERE [ImageUrl] IS NOT NULL AND [ImageUrl] NOT LIKE 'data:%' AND [ImageUrl] NOT LIKE 'http://%' AND [ImageUrl] NOT LIKE 'https://%';
                 END
             ");
-            logger.LogInformation("Database columns Salons.LogoUrl and Services.ImageUrl verified as NVARCHAR(MAX).");
+            logger.LogInformation("Database columns Salons.LogoUrl and Services.ImageUrl verified as NVARCHAR(MAX) and dead paths cleaned.");
         }
         catch (Exception ex)
         {
@@ -312,6 +314,21 @@ app.UseSwaggerUI(options =>
 
 // 14. Middleware Pipeline
 app.UseStaticFiles();
+
+// Gracefully intercept missing legacy uploaded images under /uploads/ and serve transparent fallback PNG instead of 404
+app.Use(async (context, next) =>
+{
+    await next();
+    if (context.Response.StatusCode == 404 && context.Request.Path.Value?.StartsWith("/uploads", StringComparison.OrdinalIgnoreCase) == true)
+    {
+        context.Response.StatusCode = 200;
+        context.Response.ContentType = "image/png";
+        context.Response.Headers.CacheControl = "public, max-age=86400";
+        var transparentPng = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=");
+        await context.Response.Body.WriteAsync(transparentPng);
+    }
+});
+
 app.UseCors(FrontendCorsPolicy);
 app.UseRateLimiter();
 
