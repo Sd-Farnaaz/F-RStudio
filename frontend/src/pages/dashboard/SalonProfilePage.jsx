@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import { useAuth } from '../../context/AuthContext';
 import { adminService } from '../../services/adminService';
 import { paymentService } from '../../services/paymentService';
 import { detectCurrentLocation } from '../../utils/geolocation';
@@ -19,6 +20,7 @@ const OPTIONAL_FIELDS = [
 
 export default function SalonProfilePage() {
   const navigate = useNavigate();
+  const { updateUser } = useAuth();
   
   const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'payments'
   
@@ -135,6 +137,7 @@ export default function SalonProfilePage() {
         const newLogoUrl = response?.logoUrl || dataUrl;
         setProfile(prev => ({ ...prev, logoUrl: newLogoUrl }));
         setInitialProfile(prev => ({ ...prev, logoUrl: newLogoUrl }));
+        updateUser({ salonLogoUrl: newLogoUrl });
         setSuccess('Salon photo updated successfully.');
       } catch (err) {
         // If upload endpoint had an issue, the base64 dataUrl is still preserved in profile state and will persist on save
@@ -228,6 +231,7 @@ export default function SalonProfilePage() {
       
       setSuccess('Profile updated successfully!');
       setInitialProfile(profile);
+      updateUser({ salonName: profile.name, salonLogoUrl: profile.logoUrl });
       setIsDirty(false);
       
       // Clear success message after 3s

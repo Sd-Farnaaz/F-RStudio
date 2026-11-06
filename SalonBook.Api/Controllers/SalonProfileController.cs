@@ -195,7 +195,6 @@ public class SalonProfileController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
-    }
 
     /// <summary>
     /// Remove the salon's logo/profile image.

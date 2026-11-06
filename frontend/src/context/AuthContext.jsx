@@ -38,6 +38,20 @@ export function AuthProvider({ children }) {
     setUser(authResponse.user);
   };
 
+  const updateUser = (updatedFields) => {
+    setUser(prev => prev ? { ...prev, ...updatedFields } : prev);
+  };
+
+  const refreshUser = async () => {
+    try {
+      const userData = await authService.getMe();
+      setUser(userData);
+      return userData;
+    } catch (error) {
+      console.error("Failed to refresh user profile:", error);
+    }
+  };
+
   const clearSession = () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
@@ -62,7 +76,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, clearSession }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, clearSession, updateUser, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

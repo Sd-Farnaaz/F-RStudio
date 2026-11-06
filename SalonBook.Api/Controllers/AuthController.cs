@@ -726,6 +726,7 @@ public class AuthController : ControllerBase
             SalonId = user.SalonId,
             SalonSlug = salon?.Slug,
             SalonName = salon?.Name,
+            SalonLogoUrl = salon?.LogoUrl,
             FullName = user.FullName,
             Email = user.Email,
             Role = user.Role,
@@ -736,3 +737,4 @@ public class AuthController : ControllerBase
 
     #endregion
 }
+

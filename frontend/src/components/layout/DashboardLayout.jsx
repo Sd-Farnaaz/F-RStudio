@@ -1,5 +1,9 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Calendar, Users, Home, Settings, LogOut, Search, Menu, X, CreditCard, Compass, User as UserIcon, Store, ShieldCheck, Star, DollarSign, ShoppingBag, Zap, Sparkles } from 'lucide-react';
+import { 
+  Calendar, Users, Home, Settings, LogOut, Search, Menu, X, CreditCard, 
+  Compass, User as UserIcon, Store, ShieldCheck, Star, DollarSign, 
+  ShoppingBag, Zap, Sparkles, ExternalLink 
+} from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import NotificationBell from './NotificationBell';
@@ -80,15 +84,43 @@ export default function DashboardLayout({ children }) {
 
       {/* Sidebar */}
       <div className={`fixed inset-y-0 left-0 w-72 bg-white border-r border-border-color flex flex-col transform transition-transform duration-300 ease-in-out z-50 lg:translate-x-0 lg:static shadow-xl lg:shadow-none ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-border-color">
-          <Link to={getLogoLink()} className="flex items-center gap-2.5 text-xl font-serif font-semibold text-deep-plum">
-            <img 
-              src="/images/fr-beauty-studio-logo.png" 
-              alt="F&R Beauty Studio" 
-              className="w-8 h-8 object-contain rounded-full border border-border-color shadow-2xs" 
-            />
-            <span>F&R <span className="text-primary-rose">Studio</span></span>
-          </Link>
+        <div className="h-16 shrink-0 flex items-center justify-between px-5 sm:px-6 border-b border-border-color">
+          {role === 'Admin' && user?.salonName ? (
+            <Link 
+              to={getLogoLink()} 
+              className="flex items-center gap-2.5 min-w-0 max-w-[210px] group transition-opacity hover:opacity-90"
+              title={user.salonName}
+            >
+              {user?.salonLogoUrl ? (
+                <img 
+                  src={user.salonLogoUrl} 
+                  alt={user.salonName} 
+                  className="w-9 h-9 object-cover rounded-full border border-border-color shadow-2xs shrink-0" 
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-soft-blush border border-primary-rose/30 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                  <Store className="w-4 h-4 text-primary-rose" />
+                </div>
+              )}
+              <div className="flex flex-col min-w-0 leading-tight">
+                <span className="font-serif font-bold text-base text-deep-plum truncate group-hover:text-primary-rose transition-colors">
+                  {user.salonName}
+                </span>
+                <span className="text-[10px] uppercase font-sans font-semibold tracking-wider text-muted truncate">
+                  Salon Portal
+                </span>
+              </div>
+            </Link>
+          ) : (
+            <Link to={getLogoLink()} className="flex items-center gap-2.5 text-xl font-serif font-semibold text-deep-plum">
+              <img 
+                src="/images/fr-beauty-studio-logo.png" 
+                alt="F&R Beauty Studio" 
+                className="w-8 h-8 object-contain rounded-full border border-border-color shadow-2xs shrink-0" 
+              />
+              <span>F&R <span className="text-primary-rose">Studio</span></span>
+            </Link>
+          )}
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-muted hover:text-deep-plum">
             <X className="w-6 h-6" />
           </button>
@@ -144,6 +176,7 @@ export default function DashboardLayout({ children }) {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Topbar */}
         <header className="h-16 bg-white border-b border-border-color flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0 shadow-sm z-30 relative">
+          {/* Mobile Brand & Hamburger */}
           <div className="flex items-center gap-2.5 lg:hidden">
             <button 
               onClick={() => setSidebarOpen(true)}
@@ -151,16 +184,61 @@ export default function DashboardLayout({ children }) {
             >
               <Menu className="h-6 w-6" />
             </button>
-            <Link to={getLogoLink()} className="flex items-center gap-2 font-serif font-semibold text-deep-plum text-sm">
-              <img 
-                src="/images/fr-beauty-studio-logo.png" 
-                alt="F&R Beauty Studio" 
-                className="w-7 h-7 object-contain rounded-full border border-border-color shadow-2xs" 
-              />
-              <span>F&R Studio</span>
+            <Link to={getLogoLink()} className="flex items-center gap-2 font-serif font-semibold text-deep-plum text-sm max-w-[190px]">
+              {user?.salonLogoUrl ? (
+                <img 
+                  src={user.salonLogoUrl} 
+                  alt={user?.salonName || "Salon"} 
+                  className="w-7 h-7 object-cover rounded-full border border-border-color shadow-2xs shrink-0" 
+                />
+              ) : (
+                <img 
+                  src="/images/fr-beauty-studio-logo.png" 
+                  alt="F&R Beauty Studio" 
+                  className="w-7 h-7 object-contain rounded-full border border-border-color shadow-2xs shrink-0" 
+                />
+              )}
+              <span className="truncate">{role === 'Admin' && user?.salonName ? user.salonName : 'F&R Studio'}</span>
             </Link>
           </div>
+
+          {/* Desktop Left: Salon Identity Badge in Navbar */}
+          <div className="hidden lg:flex items-center gap-3">
+            {role === 'Admin' && user?.salonName ? (
+              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-ivory border border-border-color shadow-2xs">
+                <Store className="w-4 h-4 text-primary-rose shrink-0" />
+                <span className="font-serif font-semibold text-deep-plum text-sm tracking-wide">
+                  {user.salonName}
+                </span>
+                <span className="text-[10px] uppercase font-sans font-semibold tracking-wider px-2 py-0.5 rounded-full bg-rose-tint text-primary-rose border border-primary-rose/20">
+                  Salon Portal
+                </span>
+                {user?.salonSlug && (
+                  <a
+                    href={`/salon/${user.salonSlug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-muted hover:text-primary-rose transition-colors flex items-center gap-1 ml-1 pl-2.5 border-l border-border-color font-medium"
+                    title="View public booking storefront"
+                  >
+                    <span>Storefront</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
+            ) : role === 'SuperAdmin' ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-soft-blush/60 text-deep-plum text-xs font-medium border border-border-color/60">
+                <ShieldCheck className="w-4 h-4 text-primary-rose" />
+                <span>F&R Platform SuperAdmin Console</span>
+              </div>
+            ) : (
+              <div className="text-xs text-muted font-medium">
+                Client Portal
+              </div>
+            )}
+          </div>
           
+          {/* Topbar Right: Search & Notifications */}
           <div className="flex-1 flex justify-end items-center gap-4">
             <div className="relative hidden sm:block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />

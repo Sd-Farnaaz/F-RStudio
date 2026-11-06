@@ -23,6 +23,8 @@ public class UserProfileResponse
 
     public string? SalonName { get; set; }
 
+    public string? SalonLogoUrl { get; set; }
+
     public string FullName { get; set; } = string.Empty;
 
     public string Email { get; set; } = string.Empty;
@@ -33,4 +35,3 @@ public class UserProfileResponse
 
     public DateTime CreatedAtUtc { get; set; }
 }
-

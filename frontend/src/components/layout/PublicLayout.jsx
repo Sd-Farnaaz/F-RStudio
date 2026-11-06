@@ -118,9 +118,16 @@ export default function PublicLayout({ children }) {
             ) : (
               <Link 
                 to={getDashboardLink()} 
-                className="px-5 py-2.5 bg-primary-rose text-white text-sm font-semibold rounded-xl hover:bg-primary-rose/90 shadow-xs hover:shadow-sm active:scale-[0.99] transition-all"
+                className="px-5 py-2.5 bg-primary-rose text-white text-sm font-semibold rounded-xl hover:bg-primary-rose/90 shadow-xs hover:shadow-sm active:scale-[0.99] transition-all flex items-center gap-2"
               >
-                Dashboard
+                {user?.role === 'Admin' && user?.salonName ? (
+                  <>
+                    <Store className="w-4 h-4 shrink-0" />
+                    <span className="max-w-[170px] truncate">{user.salonName}</span>
+                  </>
+                ) : (
+                  <span>Dashboard</span>
+                )}
               </Link>
             )}
           </div>
@@ -194,9 +201,16 @@ export default function PublicLayout({ children }) {
               <Link 
                 to={getDashboardLink()} 
                 onClick={() => setMobileMenuOpen(false)} 
-                className="w-full py-3 text-center bg-primary-rose text-white font-semibold rounded-xl shadow-xs hover:bg-primary-rose/90 transition-all text-sm"
+                className="w-full py-3 text-center bg-primary-rose text-white font-semibold rounded-xl shadow-xs hover:bg-primary-rose/90 transition-all text-sm flex items-center justify-center gap-2"
               >
-                Go to Dashboard
+                {user?.role === 'Admin' && user?.salonName ? (
+                  <>
+                    <Store className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{user.salonName} (Dashboard)</span>
+                  </>
+                ) : (
+                  <span>Go to Dashboard</span>
+                )}
               </Link>
             )}
           </div>
