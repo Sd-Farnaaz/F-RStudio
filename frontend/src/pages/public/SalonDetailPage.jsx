@@ -16,7 +16,9 @@ import {
   AlertCircle, 
   Calendar, 
   CheckCircle2, 
+  ChevronLeft,
   ChevronRight, 
+  LayoutGrid, 
   Sparkles, 
   User, 
   ShieldCheck, 
@@ -73,6 +75,16 @@ export default function SalonDetailPage() {
 
   const bookingCardRef = useRef(null);
   const reviewsSectionRef = useRef(null);
+  const servicesSliderRef = useRef(null);
+  const staffSliderRef = useRef(null);
+
+  // Sliders Navigation State
+  const [servicesViewMode, setServicesViewMode] = useState('slider'); // 'slider' | 'grid'
+  const [canScrollServicesLeft, setCanScrollServicesLeft] = useState(false);
+  const [canScrollServicesRight, setCanScrollServicesRight] = useState(true);
+
+  const [canScrollStaffLeft, setCanScrollStaffLeft] = useState(false);
+  const [canScrollStaffRight, setCanScrollStaffRight] = useState(true);
 
   // Verified Reviews State
   const [reviewSummary, setReviewSummary] = useState(null);
@@ -103,7 +115,7 @@ export default function SalonDetailPage() {
   const fetchReviews = async (page = 1, minRating = 0, hasPhotos = false) => {
     try {
       setReviewsLoading(true);
-      const params = { page, pageSize: 6 };
+      const params = { page, pageSize: 4 };
       if (minRating > 0) params.minRating = minRating;
       if (hasPhotos) params.hasPhotos = true;
       const data = await reviewService.getSalonReviews(slug, params);
@@ -231,6 +243,85 @@ export default function SalonDetailPage() {
     if (selectedCategory === 'All') return services;
     return services.filter(s => s.category?.toLowerCase() === selectedCategory.toLowerCase());
   }, [services, selectedCategory]);
+
+  // Check scroll positions for Service Menu slider
+  const checkServicesScroll = () => {
+    if (!servicesSliderRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = servicesSliderRef.current;
+    setCanScrollServicesLeft(scrollLeft > 10);
+    setCanScrollServicesRight(scrollLeft < scrollWidth - clientWidth - 10);
+  };
+
+  const handleSlideServices = (direction) => {
+    if (!servicesSliderRef.current) return;
+    const scrollAmount = Math.max(300, servicesSliderRef.current.clientWidth * 0.75);
+    servicesSliderRef.current.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth'
+    });
+  };
+
+  // Check scroll positions for Staff / Specialists slider
+  const checkStaffScroll = () => {
+    if (!staffSliderRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = staffSliderRef.current;
+    setCanScrollStaffLeft(scrollLeft > 10);
+    setCanScrollStaffRight(scrollLeft < scrollWidth - clientWidth - 10);
+  };
+
+  const handleSlideStaff = (direction) => {
+    if (!staffSliderRef.current) return;
+    const scrollAmount = Math.max(260, staffSliderRef.current.clientWidth * 0.75);
+    staffSliderRef.current.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth'
+    });
+  };
+
+  // Reset scroll when category or services list changes
+  useEffect(() => {
+    if (servicesSliderRef.current) {
+      servicesSliderRef.current.scrollLeft = 0;
+      setTimeout(checkServicesScroll, 100);
+    }
+  }, [selectedCategory, filteredServices.length]);
+
+  useEffect(() => {
+    if (staffSliderRef.current) {
+      setTimeout(checkStaffScroll, 100);
+    }
+  }, [staffMembers.length]);
+
+  // Review pagination range helper: returns array like [1, 2, 3, '...', 8]
+  const getReviewPaginationRange = (totalPages, currentPage) => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    const delta = 1;
+    const range = [];
+    const rangeWithDots = [];
+    let l;
+
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
+        range.push(i);
+      }
+    }
+
+    for (let i of range) {
+      if (l) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l !== 1) {
+          rangeWithDots.push('...');
+        }
+      }
+      rangeWithDots.push(i);
+      l = i;
+    }
+
+    return rangeWithDots;
+  };
 
   const selectedServices = useMemo(() => {
     return services.filter(s => selectedServiceIds.includes(s.id));
@@ -724,9 +815,65 @@ export default function SalonDetailPage() {
                     </p>
                   </div>
 
-                  <span className="text-xs text-muted self-start sm:self-auto bg-white px-3 py-1.5 rounded-full border border-border-color">
-                    {filteredServices.length} {filteredServices.length === 1 ? 'treatment' : 'treatments'}
-                  </span>
+                  <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                    <span className="text-xs text-muted bg-white px-3 py-1.5 rounded-full border border-border-color shadow-2xs">
+                      {filteredServices.length} {filteredServices.length === 1 ? 'treatment' : 'treatments'}
+                    </span>
+
+                    {/* View Mode Toggle: Slide vs Grid */}
+                    <div className="flex items-center bg-white border border-border-color rounded-xl p-0.5 shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => setServicesViewMode('slider')}
+                        title="Slide Carousel View"
+                        className={`px-2.5 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 ${
+                          servicesViewMode === 'slider' 
+                            ? 'bg-deep-plum text-white font-semibold shadow-xs' 
+                            : 'text-muted hover:text-deep-plum'
+                        }`}
+                      >
+                        <Layers className="w-3.5 h-3.5" />
+                        <span className="text-[11px]">Slide</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setServicesViewMode('grid')}
+                        title="Full Grid View"
+                        className={`px-2.5 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 ${
+                          servicesViewMode === 'grid' 
+                            ? 'bg-deep-plum text-white font-semibold shadow-xs' 
+                            : 'text-muted hover:text-deep-plum'
+                        }`}
+                      >
+                        <LayoutGrid className="w-3.5 h-3.5" />
+                        <span className="text-[11px]">Grid</span>
+                      </button>
+                    </div>
+
+                    {/* Slide Navigation Arrows */}
+                    {servicesViewMode === 'slider' && filteredServices.length > 2 && (
+                      <div className="flex items-center gap-1 ml-1">
+                        <button
+                          type="button"
+                          onClick={() => handleSlideServices('left')}
+                          disabled={!canScrollServicesLeft}
+                          aria-label="Previous services slide"
+                          className="w-8 h-8 rounded-xl border border-border-color bg-white hover:bg-soft-blush text-deep-plum flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSlideServices('right')}
+                          disabled={!canScrollServicesRight}
+                          aria-label="Next services slide"
+                          className="w-8 h-8 rounded-xl border border-border-color bg-white hover:bg-soft-blush text-deep-plum flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Category Filter Tabs */}
@@ -748,7 +895,7 @@ export default function SalonDetailPage() {
                   </div>
                 )}
 
-                {/* Service Cards Grid */}
+                {/* Service Cards (Slide or Grid) */}
                 {filteredServices.length === 0 ? (
                   <div className="bg-white border border-border-color rounded-2xl p-10 text-center">
                     <Scissors className="w-10 h-10 text-dusty-rose mx-auto mb-3 opacity-60" />
@@ -768,7 +915,15 @@ export default function SalonDetailPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div 
+                    ref={servicesSliderRef}
+                    onScroll={checkServicesScroll}
+                    className={
+                      servicesViewMode === 'slider'
+                        ? 'flex items-stretch gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-3 pt-1 px-0.5 scrollbar-none'
+                        : 'grid grid-cols-1 md:grid-cols-2 gap-4'
+                    }
+                  >
                     {filteredServices.map(service => {
                       const isSelected = selectedServiceIds.includes(service.id);
 
@@ -777,6 +932,10 @@ export default function SalonDetailPage() {
                           key={service.id}
                           onClick={() => handleToggleService(service.id)}
                           className={`group rounded-2xl p-5 border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                            servicesViewMode === 'slider' 
+                              ? 'shrink-0 w-[280px] sm:w-[320px] md:w-[340px] snap-start' 
+                              : ''
+                          } ${
                             isSelected
                               ? 'bg-soft-blush/40 border-primary-rose ring-2 ring-primary-rose/20 shadow-sm'
                               : 'bg-white border-border-color hover:border-dusty-rose hover:shadow-md'
@@ -868,6 +1027,37 @@ export default function SalonDetailPage() {
                     })}
                   </div>
                 )}
+
+                {/* Service Menu Slide Helper Indicator */}
+                {servicesViewMode === 'slider' && filteredServices.length > 2 && (
+                  <div className="flex items-center justify-between text-xs text-muted px-1 pt-1">
+                    <span className="text-[11px] text-muted flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary-rose/60 animate-pulse"></span>
+                      Swipe or click arrows to explore all {filteredServices.length} treatments
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleSlideServices('left')}
+                        disabled={!canScrollServicesLeft}
+                        className="text-xs font-semibold text-deep-plum hover:text-primary-rose disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-0.5"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                        <span>Prev</span>
+                      </button>
+                      <span className="text-muted/40">•</span>
+                      <button
+                        type="button"
+                        onClick={() => handleSlideServices('right')}
+                        disabled={!canScrollServicesRight}
+                        className="text-xs font-semibold text-deep-plum hover:text-primary-rose disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-0.5"
+                      >
+                        <span>Next</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </section>
 
               {/* ========================================================================= */}
@@ -887,12 +1077,43 @@ export default function SalonDetailPage() {
                         Meet Our Specialists
                       </h2>
                     </div>
-                    <span className="text-xs text-muted">
-                      {staffMembers.length} {staffMembers.length === 1 ? 'Expert Stylist' : 'Expert Stylists'} Available
-                    </span>
+                    
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted bg-ivory px-3 py-1.5 rounded-full border border-border-color">
+                        {staffMembers.length} {staffMembers.length === 1 ? 'Expert Stylist' : 'Expert Stylists'} Available
+                      </span>
+
+                      {/* Specialists Slide Arrows */}
+                      {staffMembers.length > 2 && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleSlideStaff('left')}
+                            disabled={!canScrollStaffLeft}
+                            aria-label="Previous specialists slide"
+                            className="w-8 h-8 rounded-xl border border-border-color bg-white hover:bg-soft-blush text-deep-plum flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSlideStaff('right')}
+                            disabled={!canScrollStaffRight}
+                            aria-label="Next specialists slide"
+                            className="w-8 h-8 rounded-xl border border-border-color bg-white hover:bg-soft-blush text-deep-plum flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  <div 
+                    ref={staffSliderRef}
+                    onScroll={checkStaffScroll}
+                    className="flex items-stretch gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-3 pt-1 px-0.5 scrollbar-none"
+                  >
                     {staffMembers.map((staff) => {
                       const isPicked = selectedStaffId.toString() === staff.id.toString();
                       const initials = (staff.fullName || 'ST')
@@ -906,7 +1127,7 @@ export default function SalonDetailPage() {
                       return (
                         <div
                           key={staff.id}
-                          className={`rounded-2xl p-4 border transition-all duration-200 flex flex-col justify-between ${
+                          className={`shrink-0 w-[240px] sm:w-[260px] md:w-[280px] snap-start rounded-2xl p-4 border transition-all duration-200 flex flex-col justify-between ${
                             isPicked
                               ? 'bg-soft-blush/40 border-primary-rose ring-2 ring-primary-rose/20 shadow-xs'
                               : 'bg-ivory/40 hover:bg-white border-border-color hover:border-dusty-rose hover:shadow-xs'
@@ -1291,28 +1512,82 @@ export default function SalonDetailPage() {
                       );
                     })}
 
-                    {/* Pagination controls */}
-                    {reviewSummary.reviews.totalPages > 1 && (
-                      <div className="flex items-center justify-between pt-4 border-t border-border-color text-xs">
-                        <button
-                          type="button"
-                          disabled={reviewPage <= 1}
-                          onClick={() => setReviewPage((p) => Math.max(1, p - 1))}
-                          className="px-3 py-1.5 border border-border-color rounded-xl hover:bg-ivory disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                        >
-                          Previous
-                        </button>
-                        <span className="text-muted">
-                          Page {reviewPage} of {reviewSummary.reviews.totalPages}
-                        </span>
-                        <button
-                          type="button"
-                          disabled={reviewPage >= reviewSummary.reviews.totalPages}
-                          onClick={() => setReviewPage((p) => p + 1)}
-                          className="px-3 py-1.5 border border-border-color rounded-xl hover:bg-ivory disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                        >
-                          Next
-                        </button>
+                    {/* Numbered Slide Pagination: 1, 2, 3... */}
+                    {reviewSummary?.reviews && (reviewSummary.reviews.totalPages > 1 || reviewSummary.reviews.items?.length > 0) && (
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-border-color">
+                        <div className="text-xs text-muted flex items-center gap-1.5">
+                          <span>Review slide</span>
+                          <span className="px-2 py-0.5 bg-ivory rounded-md border border-border-color text-deep-plum font-bold">
+                            {reviewPage}
+                          </span>
+                          <span>of {reviewSummary.reviews.totalPages || 1}</span>
+                          {reviewSummary.totalReviews > 0 && (
+                            <span className="text-muted/70 ml-1">
+                              • {reviewSummary.totalReviews} total verified
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                          {/* Previous Slide Button */}
+                          <button
+                            type="button"
+                            disabled={reviewPage <= 1}
+                            onClick={() => {
+                              setReviewPage((p) => Math.max(1, p - 1));
+                              scrollToReviews();
+                            }}
+                            className="px-3 py-2 rounded-xl border border-border-color bg-white hover:bg-soft-blush text-deep-plum text-xs font-semibold flex items-center gap-1 transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs"
+                            aria-label="Previous reviews slide"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Prev</span>
+                          </button>
+
+                          {/* Numbered Page Buttons: 1, 2, 3... */}
+                          {getReviewPaginationRange(reviewSummary.reviews.totalPages || 1, reviewPage).map((num, idx) => {
+                            if (num === '...') {
+                              return (
+                                <span key={`dots-${idx}`} className="w-8 h-8 flex items-center justify-center text-muted font-bold text-xs">
+                                  ...
+                                </span>
+                              );
+                            }
+                            const isCurrent = Number(num) === Number(reviewPage);
+                            return (
+                              <button
+                                key={`review-page-${num}`}
+                                type="button"
+                                onClick={() => {
+                                  setReviewPage(Number(num));
+                                  scrollToReviews();
+                                }}
+                                className={`w-9 h-9 rounded-xl text-xs font-semibold transition-all ${
+                                  isCurrent
+                                    ? 'bg-deep-plum text-white shadow-xs ring-2 ring-deep-plum/20 scale-105'
+                                    : 'bg-white hover:bg-soft-blush text-deep-plum border border-border-color hover:border-dusty-rose'
+                                }`}
+                              >
+                                {num}
+                              </button>
+                            );
+                          })}
+
+                          {/* Next Slide Button */}
+                          <button
+                            type="button"
+                            disabled={reviewPage >= (reviewSummary.reviews.totalPages || 1)}
+                            onClick={() => {
+                              setReviewPage((p) => p + 1);
+                              scrollToReviews();
+                            }}
+                            className="px-3 py-2 rounded-xl border border-border-color bg-white hover:bg-soft-blush text-deep-plum text-xs font-semibold flex items-center gap-1 transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs"
+                            aria-label="Next reviews slide"
+                          >
+                            <span className="hidden sm:inline">Next</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
