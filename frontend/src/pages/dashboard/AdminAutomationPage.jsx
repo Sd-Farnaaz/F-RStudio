@@ -371,15 +371,28 @@ export default function AdminAutomationPage() {
       return;
     }
 
+    let finalUsername = smtpConfig.smtpUsername?.trim() || null;
+    let finalSenderEmail = smtpConfig.senderEmail?.trim() || null;
+
+    // Brevo auto-correction: login username is xxxx@smtp-brevo.com, personal email is sender email
+    if (smtpConfig.smtpHost.includes('brevo.com')) {
+      if (finalUsername && !finalUsername.toLowerCase().endsWith('@smtp-brevo.com')) {
+        if (!finalSenderEmail) {
+          finalSenderEmail = finalUsername;
+        }
+        finalUsername = 'c165e2001@smtp-brevo.com';
+      }
+    }
+
     try {
       setSavingSmtp(true);
       setFeedback(null);
       const res = await automationService.updateSmtpConfig({
         smtpHost: smtpConfig.smtpHost.trim(),
         smtpPort: Number(smtpConfig.smtpPort) || 587,
-        smtpUsername: smtpConfig.smtpUsername?.trim() || null,
-        smtpPassword: smtpConfig.smtpPassword || null, // Will preserve existing secret if blank
-        senderEmail: smtpConfig.senderEmail?.trim() || null,
+        smtpUsername: finalUsername,
+        smtpPassword: smtpConfig.smtpPassword?.trim() || null, // Will preserve existing secret if blank
+        senderEmail: finalSenderEmail,
         senderName: smtpConfig.senderName?.trim() || null,
         smtpEnableSsl: Boolean(smtpConfig.smtpEnableSsl),
         isConfigured: Boolean(smtpConfig.isConfigured)
@@ -387,6 +400,8 @@ export default function AdminAutomationPage() {
 
       setSmtpConfig(prev => ({
         ...prev,
+        smtpUsername: finalUsername || prev.smtpUsername,
+        senderEmail: finalSenderEmail || prev.senderEmail,
         isConfigured: res.isConfigured,
         hasPassword: res.hasPassword,
         smtpPassword: '' // Clear input field for security
@@ -410,19 +425,38 @@ export default function AdminAutomationPage() {
       return;
     }
 
+    if (!smtpConfig.hasPassword && !smtpConfig.smtpPassword?.trim()) {
+      const msg = 'Please enter your Brevo SMTP Master Key in the "Email Secret / Password" field and click Save SMTP Settings before testing.';
+      setFeedback({ type: 'error', text: msg });
+      setTestResult({ success: false, message: msg });
+      return;
+    }
+
+    let finalUsername = smtpConfig.smtpUsername?.trim() || null;
+    let finalSenderEmail = smtpConfig.senderEmail?.trim() || 
+      (smtpConfig.smtpUsername?.includes('@') ? smtpConfig.smtpUsername.trim() : user?.email || 'rufnixstudio@gmail.com');
+
+    // Brevo auto-correction for test
+    if (smtpConfig.smtpHost?.includes('brevo.com')) {
+      if (finalUsername && !finalUsername.toLowerCase().endsWith('@smtp-brevo.com')) {
+        if (!smtpConfig.senderEmail?.trim()) {
+          finalSenderEmail = finalUsername;
+        }
+        finalUsername = 'c165e2001@smtp-brevo.com';
+      }
+    }
+
     try {
       setTestingSmtp(true);
       setTestResult(null);
-      const effectiveSender = smtpConfig.senderEmail?.trim() || 
-        (smtpConfig.smtpUsername?.includes('@') ? smtpConfig.smtpUsername.trim() : user?.email || 'rufnixstudio@gmail.com');
 
       const res = await automationService.testSmtpConfig({
         recipientEmail: testRecipient.trim(),
         smtpHost: smtpConfig.smtpHost?.trim() || null,
         smtpPort: Number(smtpConfig.smtpPort) || null,
-        smtpUsername: smtpConfig.smtpUsername?.trim() || null,
-        smtpPassword: smtpConfig.smtpPassword || null,
-        senderEmail: effectiveSender,
+        smtpUsername: finalUsername,
+        smtpPassword: smtpConfig.smtpPassword?.trim() || null,
+        senderEmail: finalSenderEmail,
         senderName: smtpConfig.senderName?.trim() || user?.salonName || 'F&R Beauty Studio',
         smtpEnableSsl: smtpConfig.smtpEnableSsl
       });
@@ -1225,6 +1259,12 @@ export default function AdminAutomationPage() {
                           placeholder="e.g. c165e2001@smtp-brevo.com"
                           className="w-full px-3.5 py-2.5 bg-ivory border border-border-color rounded-xl text-xs text-deep-plum font-mono focus:bg-white focus:ring-1 focus:ring-primary-rose"
                         />
+                        {smtpConfig.smtpHost?.includes('brevo') && smtpConfig.smtpUsername?.includes('@') && !smtpConfig.smtpUsername.toLowerCase().endsWith('@smtp-brevo.com') && (
+                          <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 space-y-0.5">
+                            <span className="font-bold block">Brevo Login Notice:</span>
+                            <span>Brevo requires your relay login username (<strong>c165e2001@smtp-brevo.com</strong>). Your email (<strong>{smtpConfig.smtpUsername}</strong>) will automatically be used as the Sender Address below.</span>
+                          </div>
+                        )}
                         <p className="text-[10px] text-muted">Use Brevo SMTP login (not your personal Gmail)</p>
                       </div>
 

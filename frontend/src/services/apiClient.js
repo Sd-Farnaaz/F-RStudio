@@ -27,12 +27,16 @@ async function handleResponse(response) {
     let message = 'An unexpected error occurred';
     if (data && data.message) message = data.message;
     else if (data && data.Message) message = data.Message;
-    else if (data && data.error) message = data.error;
+    else if (data && data.errorMessage) message = data.errorMessage;
+    else if (data && data.ErrorMessage) message = data.ErrorMessage;
+    else if (data && data.error) message = typeof data.error === 'string' ? data.error : (data.error.message || JSON.stringify(data.error));
     else if (data && data.detail) message = data.detail;
     else if (data && data.title) message = data.title;
     else if (data && data.errors) {
       const errors = Object.values(data.errors).flat();
       message = errors[0] || 'Validation failed';
+    } else if (response.status === 400) {
+      message = 'Bad Request: Please check that all required fields and credentials are correct.';
     } else if (response.status === 401) {
       message = 'Invalid email or password.';
     } else if (response.status === 403) {

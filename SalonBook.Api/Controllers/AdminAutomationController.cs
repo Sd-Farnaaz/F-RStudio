@@ -323,17 +323,34 @@ public class AdminAutomationController : ControllerBase
         var (allowed, result, salon) = await CheckAutomationAccessAsync(cancellationToken);
         if (!allowed) return result!;
 
-        salon!.SmtpHost = request.SmtpHost?.Trim();
+        var host = request.SmtpHost?.Trim();
+        var username = request.SmtpUsername?.Trim();
+        var senderEmail = request.SenderEmail?.Trim();
+
+        // Brevo auto-correction: Brevo SMTP login username is always xxxx@smtp-brevo.com
+        if (!string.IsNullOrWhiteSpace(host) && host.Contains("brevo.com", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!string.IsNullOrWhiteSpace(username) && !username.EndsWith("@smtp-brevo.com", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(senderEmail))
+                {
+                    senderEmail = username;
+                }
+                username = !string.IsNullOrWhiteSpace(_emailOptions.SmtpUsername) ? _emailOptions.SmtpUsername : "c165e2001@smtp-brevo.com";
+            }
+        }
+
+        salon!.SmtpHost = host;
         salon.SmtpPort = request.SmtpPort > 0 ? request.SmtpPort : 587;
-        salon.SmtpUsername = request.SmtpUsername?.Trim();
+        salon.SmtpUsername = username;
 
         // Only overwrite secret/password if provided
         if (!string.IsNullOrWhiteSpace(request.SmtpPassword))
         {
-            salon.SmtpPassword = request.SmtpPassword;
+            salon.SmtpPassword = request.SmtpPassword.Trim();
         }
 
-        salon.SenderEmail = request.SenderEmail?.Trim();
+        salon.SenderEmail = senderEmail;
         salon.SenderName = request.SenderName?.Trim();
         salon.SmtpEnableSsl = request.SmtpEnableSsl;
         salon.IsEmailConfigured = request.IsConfigured;
@@ -375,13 +392,26 @@ public class AdminAutomationController : ControllerBase
             : (salon!.SmtpPort > 0 ? salon.SmtpPort : (_emailOptions.SmtpPort > 0 ? _emailOptions.SmtpPort : 587));
         var username = !string.IsNullOrWhiteSpace(request.SmtpUsername) ? request.SmtpUsername.Trim() 
             : (!string.IsNullOrWhiteSpace(salon!.SmtpUsername) ? salon.SmtpUsername : _emailOptions.SmtpUsername);
-        var password = !string.IsNullOrWhiteSpace(request.SmtpPassword) ? request.SmtpPassword 
+        var password = !string.IsNullOrWhiteSpace(request.SmtpPassword) ? request.SmtpPassword.Trim() 
             : (!string.IsNullOrWhiteSpace(salon!.SmtpPassword) ? salon.SmtpPassword : _emailOptions.SmtpPassword);
         var senderEmail = !string.IsNullOrWhiteSpace(request.SenderEmail) ? request.SenderEmail.Trim() 
             : (!string.IsNullOrWhiteSpace(salon!.SenderEmail) ? salon.SenderEmail 
             : (!string.IsNullOrWhiteSpace(_emailOptions.SenderEmail) ? _emailOptions.SenderEmail
             : (!string.IsNullOrWhiteSpace(username) && username.Contains('@') ? username 
             : (salon.ContactEmail ?? _currentUserService.Email ?? "rufnixstudio@gmail.com"))));
+
+        // Brevo auto-correction: if user typed personal Gmail into the Brevo SMTP username box
+        if (!string.IsNullOrWhiteSpace(host) && host.Contains("brevo.com", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!string.IsNullOrWhiteSpace(username) && !username.EndsWith("@smtp-brevo.com", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(senderEmail) || senderEmail == _emailOptions.SenderEmail)
+                {
+                    senderEmail = username;
+                }
+                username = !string.IsNullOrWhiteSpace(_emailOptions.SmtpUsername) ? _emailOptions.SmtpUsername : "c165e2001@smtp-brevo.com";
+            }
+        }
 
         var senderName = !string.IsNullOrWhiteSpace(request.SenderName) ? request.SenderName.Trim() 
             : (salon!.SenderName ?? salon.Name ?? _emailOptions.SenderName ?? "F&R Beauty Studio");
@@ -393,6 +423,15 @@ public class AdminAutomationController : ControllerBase
             {
                 Success = false,
                 Message = "SMTP Host is missing. Please enter a valid SMTP host (e.g. smtp.gmail.com or smtp-relay.brevo.com)."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            return BadRequest(new TestEmailSmtpResponse
+            {
+                Success = false,
+                Message = "SMTP Password / API Key is missing. Please enter your Brevo SMTP Master Key in the 'Email Secret / Password' field."
             });
         }
 

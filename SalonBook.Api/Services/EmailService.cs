@@ -129,6 +129,7 @@ public class EmailService : IEmailService
                 DeliveryMethod = SmtpDeliveryMethod.Network,
                 UseDefaultCredentials = false,
                 EnableSsl = enableSsl,
+                Timeout = 20000,
                 Credentials = string.IsNullOrWhiteSpace(username)
                     ? CredentialCache.DefaultNetworkCredentials
                     : new NetworkCredential(username, password ?? string.Empty)
