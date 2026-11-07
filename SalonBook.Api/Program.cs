@@ -42,6 +42,7 @@ builder.Services.PostConfigure<EmailOptions>(options =>
 {
     var envPass = Environment.GetEnvironmentVariable("Email__SmtpPassword") 
         ?? Environment.GetEnvironmentVariable("EMAIL_SMTP_PASSWORD")
+        ?? Environment.GetEnvironmentVariable("BREVO_API_KEY")
         ?? Environment.GetEnvironmentVariable("BREVO_SMTP_KEY");
     if (!string.IsNullOrWhiteSpace(envPass) && string.IsNullOrWhiteSpace(options.SmtpPassword))
     {

@@ -45,11 +45,18 @@ const DAYS = [
 
 const PRESETS = [
   {
-    name: 'Brevo (Recommended)',
+    name: 'Brevo API (Port 443 - Railway Safe)',
+    host: 'api.brevo.com',
+    port: 443,
+    ssl: true,
+    help: 'Recommended for Railway! Uses Port 443 (HTTPS) with Brevo API key (xkeysib-...) to bypass SMTP port blocking.'
+  },
+  {
+    name: 'Brevo SMTP (Port 587)',
     host: 'smtp-relay.brevo.com',
     port: 587,
     ssl: true,
-    help: 'Default transactional relay for F&R Studio. Supports Brevo API Key as password.'
+    help: 'Default transactional relay for F&R Studio. (Note: Railway blocks Port 587 on Hobby/Free plans).'
   },
   {
     name: 'Google Gmail SMTP',
@@ -64,13 +71,6 @@ const PRESETS = [
     port: 587,
     ssl: true,
     help: 'Username is "apikey" and password is your SendGrid Secret API Key.'
-  },
-  {
-    name: 'Amazon SES',
-    host: 'email-smtp.us-east-1.amazonaws.com',
-    port: 587,
-    ssl: true,
-    help: 'Amazon Simple Email Service SMTP credentials.'
   }
 ];
 
@@ -1227,19 +1227,19 @@ export default function AdminAutomationPage() {
                         onClick={() => {
                           setSmtpConfig(prev => ({
                             ...prev,
-                            smtpHost: 'smtp-relay.brevo.com',
-                            smtpPort: 587,
+                            smtpHost: 'api.brevo.com',
+                            smtpPort: 443,
                             smtpUsername: 'c165e2001@smtp-brevo.com',
                             senderEmail: 'rufnixstudio@gmail.com',
                             senderName: 'F&R Beauty Studio',
                             smtpEnableSsl: true,
                             isConfigured: true
                           }));
-                          setFeedback({ type: 'success', text: 'Pre-filled Brevo relay details! Enter your Brevo SMTP Master Key in the password field.' });
+                          setFeedback({ type: 'success', text: 'Pre-filled Brevo API (Port 443 HTTPS)! Enter your Brevo API Key (xkeysib-...) in the password field.' });
                         }}
                         className="px-3 py-1.5 bg-primary-rose hover:bg-primary-rose/90 text-white text-xs font-medium rounded-lg transition-colors shrink-0 shadow-2xs"
                       >
-                        Auto-Fill Brevo
+                        Auto-Fill Brevo (Port 443)
                       </button>
                     </div>
 
@@ -1283,7 +1283,7 @@ export default function AdminAutomationPage() {
                             type={showSmtpPassword ? 'text' : 'password'}
                             value={smtpConfig.smtpPassword}
                             onChange={(e) => setSmtpConfig(prev => ({ ...prev, smtpPassword: e.target.value }))}
-                            placeholder={smtpConfig.hasPassword ? '•••••••• (leave blank to keep)' : 'Brevo key xsmtpsib-...'}
+                            placeholder={smtpConfig.hasPassword ? '•••••••• (leave blank to keep)' : 'Brevo API Key (xkeysib-...) or SMTP Key'}
                             className="w-full px-3.5 py-2.5 pr-10 bg-ivory border border-border-color rounded-xl text-xs text-deep-plum font-mono focus:bg-white focus:ring-1 focus:ring-primary-rose"
                           />
                           <button
@@ -1294,7 +1294,13 @@ export default function AdminAutomationPage() {
                             {showSmtpPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                           </button>
                         </div>
-                        <p className="text-[10px] text-muted">Brevo SMTP Master API Key</p>
+                        {smtpConfig.smtpPassword?.startsWith('xsmtpsib-') && (
+                          <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 space-y-0.5">
+                            <span className="font-bold block">Railway Notice:</span>
+                            <span>You entered an SMTP key (<code>xsmtpsib-...</code>). Railway firewall blocks outbound SMTP ports 587/465. To bypass this, generate a <strong>Brevo API Key</strong> (starts with <code>xkeysib-...</code>) in Brevo &gt; SMTP &amp; API &gt; API Keys.</span>
+                          </div>
+                        )}
+                        <p className="text-[10px] text-muted">For Railway: Use Brevo API Key (xkeysib-...) to avoid SMTP port blocks</p>
                       </div>
                     </div>
 

@@ -1,5 +1,8 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Mail;
+using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 using SalonBook.Api.Configurations;
 using SalonBook.Api.Models;
@@ -10,11 +13,16 @@ public class EmailService : IEmailService
 {
     private readonly EmailOptions _options;
     private readonly ILogger<EmailService> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public EmailService(IOptions<EmailOptions> options, ILogger<EmailService> logger)
+    public EmailService(
+        IOptions<EmailOptions> options, 
+        ILogger<EmailService> logger,
+        IHttpClientFactory httpClientFactory)
     {
         _options = options.Value;
         _logger = logger;
+        _httpClientFactory = httpClientFactory;
     }
 
     public Task<EmailSendResult> SendEmailAsync(string toEmail, string subject, string body, CancellationToken cancellationToken = default)
@@ -96,12 +104,33 @@ public class EmailService : IEmailService
             );
         }
 
+        var senderDisplayName = !string.IsNullOrWhiteSpace(senderName)
+            ? senderName
+            : "F&R Beauty Studio";
+
+        var trimmedPassword = password?.Trim();
+
+        // 1. If password/API key starts with "xkeysib-" OR host points to api.brevo.com:
+        // Use Brevo's HTTPS REST API over Port 443! This completely bypasses Railway's outbound SMTP port blocking (ports 587, 465, 2525).
+        if (!string.IsNullOrWhiteSpace(trimmedPassword) && 
+            (trimmedPassword.StartsWith("xkeysib-", StringComparison.OrdinalIgnoreCase) || 
+             host.Contains("api.brevo.com", StringComparison.OrdinalIgnoreCase) ||
+             (host.Contains("brevo.com", StringComparison.OrdinalIgnoreCase) && trimmedPassword.StartsWith("xkeysib-", StringComparison.OrdinalIgnoreCase))))
+        {
+            return await SendBrevoHttpApiAsync(
+                apiKey: trimmedPassword,
+                senderEmail: senderEmail,
+                senderName: senderDisplayName,
+                toEmail: toEmail,
+                subject: subject,
+                htmlBody: htmlBody,
+                plainTextBody: plainTextBody,
+                cancellationToken: cancellationToken
+            );
+        }
+
         try
         {
-            var senderDisplayName = !string.IsNullOrWhiteSpace(senderName)
-                ? senderName
-                : "F&R Beauty Studio";
-
             using var mailMessage = new MailMessage
             {
                 From = new MailAddress(senderEmail, senderDisplayName),
@@ -143,11 +172,87 @@ public class EmailService : IEmailService
         {
             _logger.LogError(ex, "Failed to send email via {Host}:{Port} to {ToEmail} with subject '{Subject}'. Error: {Message}", host, port, toEmail, subject, ex.Message);
             var detailedMsg = ex.InnerException != null ? $"{ex.Message} -> {ex.InnerException.Message}" : ex.Message;
+
+            if (detailedMsg.Contains("timed out", StringComparison.OrdinalIgnoreCase) || detailedMsg.Contains("unreachable", StringComparison.OrdinalIgnoreCase))
+            {
+                detailedMsg = "SMTP port 587/465 is blocked by Railway's firewall on Hobby/Free plans. Please generate a Brevo REST API Key (starts with xkeysib-) in Brevo > SMTP & API > API Keys, and paste it into the password field to send via Port 443 (HTTPS), which is never blocked.";
+            }
+
             return new EmailSendResult(
                 Success: false,
                 ErrorMessage: detailedMsg,
                 ErrorCode: "SMTP_SEND_FAILURE",
                 Skipped: false
+            );
+        }
+    }
+
+    private async Task<EmailSendResult> SendBrevoHttpApiAsync(
+        string apiKey,
+        string senderEmail,
+        string senderName,
+        string toEmail,
+        string subject,
+        string htmlBody,
+        string? plainTextBody,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(20);
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.brevo.com/v3/smtp/email");
+            request.Headers.Add("api-key", apiKey.Trim());
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+            var payload = new
+            {
+                sender = new { name = senderName, email = senderEmail },
+                to = new[] { new { email = toEmail } },
+                subject = subject,
+                htmlContent = htmlBody,
+                textContent = string.IsNullOrWhiteSpace(plainTextBody) ? null : plainTextBody
+            };
+
+            var jsonContent = JsonSerializer.Serialize(payload);
+            request.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            var response = await httpClient.SendAsync(request, cancellationToken);
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _logger.LogInformation("Successfully sent email via Brevo HTTPS REST API (Port 443) to {ToEmail} with subject '{Subject}'.", toEmail, subject);
+                return new EmailSendResult(Success: true);
+            }
+
+            _logger.LogWarning("Brevo REST API error ({StatusCode}): {Body}", response.StatusCode, responseBody);
+
+            var userFriendlyMsg = responseBody;
+            try
+            {
+                using var doc = JsonDocument.Parse(responseBody);
+                if (doc.RootElement.TryGetProperty("message", out var msgProp))
+                {
+                    userFriendlyMsg = msgProp.GetString() ?? responseBody;
+                }
+            }
+            catch {}
+
+            return new EmailSendResult(
+                Success: false,
+                ErrorMessage: $"Brevo API error ({response.StatusCode}): {userFriendlyMsg}",
+                ErrorCode: "BREVO_API_ERROR"
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send email via Brevo REST API to {ToEmail}.", toEmail);
+            return new EmailSendResult(
+                Success: false,
+                ErrorMessage: $"Brevo API request failed: {ex.Message}",
+                ErrorCode: "BREVO_API_EXCEPTION"
             );
         }
     }
