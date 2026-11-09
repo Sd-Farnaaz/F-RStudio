@@ -110,12 +110,8 @@ public class EmailService : IEmailService
 
         var trimmedPassword = password?.Trim();
 
-        // 1. If password/API key starts with "xkeysib-" OR host points to api.brevo.com:
-        // Use Brevo's HTTPS REST API over Port 443! This completely bypasses Railway's outbound SMTP port blocking (ports 587, 465, 2525).
-        if (!string.IsNullOrWhiteSpace(trimmedPassword) && 
-            (trimmedPassword.StartsWith("xkeysib-", StringComparison.OrdinalIgnoreCase) || 
-             host.Contains("api.brevo.com", StringComparison.OrdinalIgnoreCase) ||
-             (host.Contains("brevo.com", StringComparison.OrdinalIgnoreCase) && trimmedPassword.StartsWith("xkeysib-", StringComparison.OrdinalIgnoreCase))))
+        // 1. If password/API key starts with "xkeysib-", use Brevo's HTTPS REST API over Port 443
+        if (!string.IsNullOrWhiteSpace(trimmedPassword) && trimmedPassword.StartsWith("xkeysib-", StringComparison.OrdinalIgnoreCase))
         {
             return await SendBrevoHttpApiAsync(
                 apiKey: trimmedPassword,
@@ -127,6 +123,22 @@ public class EmailService : IEmailService
                 plainTextBody: plainTextBody,
                 cancellationToken: cancellationToken
             );
+        }
+
+        // 2. Intelligent Brevo routing:
+        // If password is a Brevo SMTP key (starts with "xsmtpsib-") OR if host was set to api.brevo.com,
+        // automatically route to Brevo SMTP relay on port 587 so the connection succeeds.
+        var effectiveHost = host;
+        var effectivePort = port;
+        if (!string.IsNullOrWhiteSpace(trimmedPassword) && trimmedPassword.StartsWith("xsmtpsib-", StringComparison.OrdinalIgnoreCase))
+        {
+            effectiveHost = "smtp-relay.brevo.com";
+            effectivePort = 587;
+        }
+        else if (!string.IsNullOrWhiteSpace(effectiveHost) && effectiveHost.Contains("api.brevo.com", StringComparison.OrdinalIgnoreCase))
+        {
+            effectiveHost = "smtp-relay.brevo.com";
+            effectivePort = 587;
         }
 
         try
@@ -153,7 +165,7 @@ public class EmailService : IEmailService
                 mailMessage.IsBodyHtml = true;
             }
 
-            using var smtpClient = new SmtpClient(host, port)
+            using var smtpClient = new SmtpClient(effectiveHost, effectivePort)
             {
                 DeliveryMethod = SmtpDeliveryMethod.Network,
                 UseDefaultCredentials = false,
@@ -165,12 +177,12 @@ public class EmailService : IEmailService
             };
 
             await smtpClient.SendMailAsync(mailMessage, cancellationToken);
-            _logger.LogInformation("Successfully sent email via {Host}:{Port} to {ToEmail} with subject '{Subject}'.", host, port, toEmail, subject);
+            _logger.LogInformation("Successfully sent email via {Host}:{Port} to {ToEmail} with subject '{Subject}'.", effectiveHost, effectivePort, toEmail, subject);
             return new EmailSendResult(Success: true);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send email via {Host}:{Port} to {ToEmail} with subject '{Subject}'. Error: {Message}", host, port, toEmail, subject, ex.Message);
+            _logger.LogError(ex, "Failed to send email via {Host}:{Port} to {ToEmail} with subject '{Subject}'. Error: {Message}", effectiveHost, effectivePort, toEmail, subject, ex.Message);
             var detailedMsg = ex.InnerException != null ? $"{ex.Message} -> {ex.InnerException.Message}" : ex.Message;
 
             if (detailedMsg.Contains("timed out", StringComparison.OrdinalIgnoreCase) || detailedMsg.Contains("unreachable", StringComparison.OrdinalIgnoreCase))

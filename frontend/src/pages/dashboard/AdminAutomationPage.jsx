@@ -1217,30 +1217,53 @@ export default function AdminAutomationPage() {
                     </div>
 
                     {/* Brevo Quick Setup Helper */}
-                    <div className="flex items-center justify-between p-3 bg-soft-blush/60 rounded-xl border border-dusty-rose/40">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-soft-blush/60 rounded-xl border border-dusty-rose/40">
                       <div>
-                        <span className="text-xs font-semibold text-deep-plum block">F&R Platform Brevo Relay Helper</span>
-                        <span className="text-[11px] text-muted block">Pre-fill Brevo relay host, port, username, and verified sender.</span>
+                        <span className="text-xs font-semibold text-deep-plum block">F&R Brevo Quick Setup Presets</span>
+                        <span className="text-[11px] text-muted block">Select your key type to automatically configure host & port:</span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSmtpConfig(prev => ({
-                            ...prev,
-                            smtpHost: 'api.brevo.com',
-                            smtpPort: 443,
-                            smtpUsername: 'c165e2001@smtp-brevo.com',
-                            senderEmail: 'rufnixstudio@gmail.com',
-                            senderName: 'F&R Beauty Studio',
-                            smtpEnableSsl: true,
-                            isConfigured: true
-                          }));
-                          setFeedback({ type: 'success', text: 'Pre-filled Brevo API (Port 443 HTTPS)! Enter your Brevo API Key (xkeysib-...) in the password field.' });
-                        }}
-                        className="px-3 py-1.5 bg-primary-rose hover:bg-primary-rose/90 text-white text-xs font-medium rounded-lg transition-colors shrink-0 shadow-2xs"
-                      >
-                        Auto-Fill Brevo (Port 443)
-                      </button>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSmtpConfig(prev => ({
+                              ...prev,
+                              smtpHost: 'smtp-relay.brevo.com',
+                              smtpPort: 587,
+                              smtpUsername: 'c165e2001@smtp-brevo.com',
+                              senderEmail: 'rufnixstudio@gmail.com',
+                              senderName: 'F&R Beauty Studio',
+                              smtpEnableSsl: true,
+                              isConfigured: true
+                            }));
+                            setFeedback({ type: 'success', text: 'Configured Brevo SMTP Relay (Port 587)! Enter your Brevo SMTP Key (xsmtpsib-...) in the password field.' });
+                          }}
+                          className="px-3 py-1.5 bg-deep-plum hover:bg-deep-plum/90 text-white text-xs font-medium rounded-lg transition-colors shrink-0 shadow-2xs flex items-center gap-1.5"
+                        >
+                          <span>Brevo SMTP (Port 587)</span>
+                          <span className="text-[10px] opacity-80 font-mono">xsmtpsib-</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSmtpConfig(prev => ({
+                              ...prev,
+                              smtpHost: 'api.brevo.com',
+                              smtpPort: 443,
+                              smtpUsername: 'c165e2001@smtp-brevo.com',
+                              senderEmail: 'rufnixstudio@gmail.com',
+                              senderName: 'F&R Beauty Studio',
+                              smtpEnableSsl: true,
+                              isConfigured: true
+                            }));
+                            setFeedback({ type: 'success', text: 'Configured Brevo HTTPS API (Port 443)! Enter your Brevo API Key (xkeysib-...) in the password field.' });
+                          }}
+                          className="px-3 py-1.5 bg-primary-rose hover:bg-primary-rose/90 text-white text-xs font-medium rounded-lg transition-colors shrink-0 shadow-2xs flex items-center gap-1.5"
+                        >
+                          <span>Brevo API (Port 443)</span>
+                          <span className="text-[10px] opacity-80 font-mono">xkeysib-</span>
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1282,8 +1305,21 @@ export default function AdminAutomationPage() {
                           <input
                             type={showSmtpPassword ? 'text' : 'password'}
                             value={smtpConfig.smtpPassword}
-                            onChange={(e) => setSmtpConfig(prev => ({ ...prev, smtpPassword: e.target.value }))}
-                            placeholder={smtpConfig.hasPassword ? '•••••••• (leave blank to keep)' : 'Brevo API Key (xkeysib-...) or SMTP Key'}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSmtpConfig(prev => {
+                                const next = { ...prev, smtpPassword: val };
+                                if (val.startsWith('xsmtpsib-')) {
+                                  next.smtpHost = 'smtp-relay.brevo.com';
+                                  next.smtpPort = 587;
+                                } else if (val.startsWith('xkeysib-')) {
+                                  next.smtpHost = 'api.brevo.com';
+                                  next.smtpPort = 443;
+                                }
+                                return next;
+                              });
+                            }}
+                            placeholder={smtpConfig.hasPassword ? '•••••••• (leave blank to keep)' : 'Brevo SMTP Key (xsmtpsib-...) or API Key (xkeysib-...)'}
                             className="w-full px-3.5 py-2.5 pr-10 bg-ivory border border-border-color rounded-xl text-xs text-deep-plum font-mono focus:bg-white focus:ring-1 focus:ring-primary-rose"
                           />
                           <button
@@ -1295,12 +1331,18 @@ export default function AdminAutomationPage() {
                           </button>
                         </div>
                         {smtpConfig.smtpPassword?.startsWith('xsmtpsib-') && (
-                          <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 space-y-0.5">
-                            <span className="font-bold block">Railway Notice:</span>
-                            <span>You entered an SMTP key (<code>xsmtpsib-...</code>). Railway firewall blocks outbound SMTP ports 587/465. To bypass this, generate a <strong>Brevo API Key</strong> (starts with <code>xkeysib-...</code>) in Brevo &gt; SMTP &amp; API &gt; API Keys.</span>
+                          <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 space-y-0.5">
+                            <span className="font-bold block">✅ Brevo SMTP Key Detected (xsmtpsib-...)</span>
+                            <span>Host auto-configured to <strong>smtp-relay.brevo.com</strong> on Port <strong>587</strong>. Ready to save & test!</span>
                           </div>
                         )}
-                        <p className="text-[10px] text-muted">For Railway: Use Brevo API Key (xkeysib-...) to avoid SMTP port blocks</p>
+                        {smtpConfig.smtpPassword?.startsWith('xkeysib-') && (
+                          <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 space-y-0.5">
+                            <span className="font-bold block">✅ Brevo API Key Detected (xkeysib-...)</span>
+                            <span>Host auto-configured to <strong>api.brevo.com</strong> on Port <strong>443</strong> (HTTPS REST API). Ready to save & test!</span>
+                          </div>
+                        )}
+                        <p className="text-[10px] text-muted">Supports Brevo SMTP Key (xsmtpsib-...) on port 587 or Brevo API Key (xkeysib-...) on port 443</p>
                       </div>
                     </div>
 

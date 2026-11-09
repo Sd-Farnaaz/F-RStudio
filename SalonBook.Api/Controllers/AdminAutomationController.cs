@@ -340,6 +340,25 @@ public class AdminAutomationController : ControllerBase
             }
         }
 
+        var effectivePassword = !string.IsNullOrWhiteSpace(request.SmtpPassword) 
+            ? request.SmtpPassword.Trim() 
+            : salon!.SmtpPassword;
+
+        // Auto-correct Brevo Host & Port based on key type
+        if (!string.IsNullOrWhiteSpace(effectivePassword))
+        {
+            if (effectivePassword.StartsWith("xsmtpsib-", StringComparison.OrdinalIgnoreCase))
+            {
+                host = "smtp-relay.brevo.com";
+                request.SmtpPort = 587;
+            }
+            else if (effectivePassword.StartsWith("xkeysib-", StringComparison.OrdinalIgnoreCase))
+            {
+                host = "api.brevo.com";
+                request.SmtpPort = 443;
+            }
+        }
+
         salon!.SmtpHost = host;
         salon.SmtpPort = request.SmtpPort > 0 ? request.SmtpPort : 587;
         salon.SmtpUsername = username;
@@ -410,6 +429,21 @@ public class AdminAutomationController : ControllerBase
                     senderEmail = username;
                 }
                 username = !string.IsNullOrWhiteSpace(_emailOptions.SmtpUsername) ? _emailOptions.SmtpUsername : "c165e2001@smtp-brevo.com";
+            }
+        }
+
+        // Auto-correct Brevo Host & Port based on key type for test
+        if (!string.IsNullOrWhiteSpace(password))
+        {
+            if (password.StartsWith("xsmtpsib-", StringComparison.OrdinalIgnoreCase))
+            {
+                host = "smtp-relay.brevo.com";
+                port = 587;
+            }
+            else if (password.StartsWith("xkeysib-", StringComparison.OrdinalIgnoreCase))
+            {
+                host = "api.brevo.com";
+                port = 443;
             }
         }
 
