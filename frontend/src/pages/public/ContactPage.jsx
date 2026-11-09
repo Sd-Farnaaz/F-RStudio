@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import PublicLayout from '../../components/layout/PublicLayout';
+import { publicService } from '../../services/publicService';
 import { 
   Mail, 
   Send, 
@@ -10,7 +11,8 @@ import {
   Sparkles, 
   Store, 
   HelpCircle, 
-  ExternalLink 
+  ExternalLink, 
+  Loader2 
 } from 'lucide-react';
 
 const SUPPORT_EMAIL = 'rufnixstudio@gmail.com';
@@ -34,6 +36,8 @@ export default function ContactPage() {
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
   const validate = () => {
     const errs = {};

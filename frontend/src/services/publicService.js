@@ -24,4 +24,5 @@ export const publicService = {
     return fetchApi(`/api/salons/${encodeURIComponent(slug)}/services${query ? `?${query}` : ''}`, { method: 'GET', skipAuth: true });
   },
   getSalonStaff: (slug) => fetchApi(`/api/salons/${encodeURIComponent(slug)}/staff`, { method: 'GET', skipAuth: true }),
+  sendContactInquiry: (data) => fetchApi('/api/contact', { method: 'POST', body: data, skipAuth: true }),
 };
